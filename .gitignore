@@ -1,0 +1,10 @@
+# wrangler（Cloudflare Pages 部署工具）在執行的資料夾留下的快取，內含帳戶 ID
+.wrangler/
+.openai/
+.env
+.env.*
+!.env.example
+node_modules/
+.preview.log
+*.pem
+*.key

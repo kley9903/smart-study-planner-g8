@@ -1,0 +1,23 @@
+{
+  "name": "Smart Study Planner — Group 8",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "forwardPorts": [5173],
+  "portsAttributes": {
+    "5173": {
+      "label": "Study Planner preview",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "npm run check",
+  "postAttachCommand": "npm run preview:cloud",
+  "customizations": {
+    "codespaces": { "openFiles": ["CONTRIBUTING.md"] },
+    "vscode": {
+      "settings": {
+        "files.autoSave": "afterDelay",
+        "files.autoSaveDelay": 1000,
+        "editor.tabSize": 2
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "smart-study-planner-g8",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node serve.mjs",
+    "check": "node scripts/check.mjs",
+    "preview:cloud": "node scripts/start-preview.mjs"
+  }
+}

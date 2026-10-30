@@ -1,0 +1,70 @@
+/* 設計 token：顏色、字體、尺寸。改視覺先改這裡。 */
+:root {
+  /* 桌面與紙 */
+  --desk: #ebe6dc;
+  --desk-2: #e2dcd0;
+  --paper: #fbf9f4;
+  --paper-2: #f6f2ea;
+  --paper-3: #efe9de;
+  --rule: #e3dccf;
+  --rule-2: #eee8dd;
+  --margin-line: #e9b2a6;
+
+  /* 墨水（已確認）與鉛筆（AI 建議） */
+  --ink: #1b2232;
+  --ink-2: #444c5d;
+  --ink-3: #697081;
+  --graphite: #757a84;
+  --graphite-2: #9ea2a9;
+  --graphite-3: #c7c9cc;
+
+  /* 沒空的時間：很淺的灰色塊，頂端一條細線標出開始；睡眠深一級。只是背景資訊，不可以搶過讀書時段 */
+  --off: #f5f3ef;
+  --off-2: #ece9e3;
+  --off-line: #d8d3c9;
+  --off-line-2: #cfc9be;
+
+  /* 印章朱紅：品牌、現在、截止 */
+  --seal: #c03d28;
+  --seal-2: #d9604b;
+  --seal-wash: #f7e4dd;
+
+  /* 每科一種墨水 */
+  --blue: #2b5ea7;
+  --blue-wash: #e3eaf5;
+  --blue-deep: #1c3b69;
+  --amber: #a96c17;
+  --amber-wash: #f4e8d3;
+  --amber-deep: #66410c;
+  --green: #2a7454;
+  --green-wash: #dfeee5;
+  --green-deep: #1a4833;
+  --plum: #754897;
+  --plum-wash: #ece2f3;
+  --plum-deep: #45285c;
+
+  --ok: #2a7454;
+  --ok-wash: #e1efe6;
+
+  --font-serif: "Noto Serif TC", "Songti TC", "Source Han Serif TC", "PMingLiU", serif;
+  --font-sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Heiti TC", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+
+  --radius-xs: 4px;
+  --radius-sm: 7px;
+  --radius: 11px;
+  --radius-lg: 18px;
+
+  --shadow-sheet: 0 1px 2px rgba(48, 40, 24, 0.06), 0 16px 40px -20px rgba(48, 40, 24, 0.32);
+  --shadow-card: 0 1px 2px rgba(48, 40, 24, 0.05), 0 6px 18px -10px rgba(48, 40, 24, 0.22);
+  --shadow-pop: 0 2px 6px rgba(30, 25, 15, 0.08), 0 22px 48px -14px rgba(30, 25, 15, 0.34);
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --header-h: 64px;
+  --bottom-nav-h: 0px;
+}
+
+[data-ink="blue"] { --c: var(--blue); --c-wash: var(--blue-wash); --c-deep: var(--blue-deep); }
+[data-ink="amber"] { --c: var(--amber); --c-wash: var(--amber-wash); --c-deep: var(--amber-deep); }
+[data-ink="green"] { --c: var(--green); --c-wash: var(--green-wash); --c-deep: var(--green-deep); }
+[data-ink="plum"] { --c: var(--plum); --c-wash: var(--plum-wash); --c-deep: var(--plum-deep); }

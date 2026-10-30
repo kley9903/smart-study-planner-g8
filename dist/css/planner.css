@@ -1,0 +1,294 @@
+/* 時間格：所有頁面共用（本週、時間、首次設定） */
+.planner {
+  --ppm: 0.72;            /* 每分鐘幾 px */
+  --p-start: 480;         /* 由幾點開始（分鐘） */
+  --p-end: 1500;          /* 到幾點（可超過 1440，即過了午夜） */
+  --cols: 7;
+  --gutter: 58px;
+  --col-min: 96px;
+  --hour: calc(60px * var(--ppm));
+  position: relative;
+}
+.planner__scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.planner__inner { min-width: calc(var(--gutter) + var(--cols) * var(--col-min)); }
+
+.planner__head,
+.planner__body {
+  display: grid;
+  grid-template-columns: var(--gutter) repeat(var(--cols), minmax(var(--col-min), 1fr));
+}
+.planner__head { position: relative; border-bottom: 1px solid var(--rule); }
+.planner__corner { display: flex; align-items: flex-end; justify-content: flex-end; padding: 0 9px 10px 0; font-size: 11px; color: var(--graphite); border-right: 1.5px solid var(--margin-line); }
+
+.dayhead { position: relative; padding: 12px 8px 10px 11px; border-left: 1px solid var(--rule); min-width: 0; }
+.dayhead:first-of-type { border-left: 0; }
+.dayhead__row { display: flex; align-items: baseline; gap: 7px; white-space: nowrap; }
+.dayhead__num { font-family: var(--font-serif); font-size: 25px; font-weight: 700; line-height: 1; letter-spacing: -0.01em; }
+.dayhead__wd { font-size: 13px; color: var(--ink-3); font-weight: 500; }
+.dayhead__today { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; color: var(--seal); letter-spacing: 0.08em; line-height: 1.2; }
+.dayhead.is-today .dayhead__num { color: var(--seal); }
+.dayhead.is-today::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2.5px; border-radius: 2px; background: var(--seal); }
+.dayhead.is-weekend { background: rgba(239, 233, 222, 0.42); }
+.dayhead__flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; min-height: 20px; }
+.dl-chip {
+  display: inline-flex; align-items: center; gap: 4px; max-width: 100%;
+  padding: 1px 7px; border-radius: 5px; font-size: 11.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: var(--seal-wash); color: #8f2a18;
+}
+.dl-chip .i { font-size: 12px; flex: none; }
+.dl-chip--soft { background: transparent; color: var(--ink-3); padding-left: 0; }
+.dl-chip--short { background: #fff; color: var(--seal); border: 1.5px dashed var(--seal-2); }
+
+/* 睡眠折疊列 */
+.planner__fold {
+  display: grid; grid-template-columns: var(--gutter) 1fr; align-items: center;
+  min-height: 30px; font-size: 12px; color: var(--ink-2);
+  background: var(--paper-3);
+  border-bottom: 1px solid var(--rule);
+}
+.planner__fold > .i { justify-self: end; margin-right: 18px; font-size: 14px; color: var(--ink-3); }
+.planner__fold-text { display: flex; align-items: center; gap: 12px; padding: 0 12px; white-space: nowrap; overflow: hidden; }
+.planner__fold .link-btn { font-size: 12px; }
+
+.planner__body { position: relative; height: calc((var(--p-end) - var(--p-start)) * var(--ppm) * 1px); }
+
+.planner__gutter { position: relative; border-right: 1.5px solid var(--margin-line); }
+.tick {
+  position: absolute; right: 9px; top: calc((var(--m) - var(--p-start)) * var(--ppm) * 1px);
+  transform: translateY(-50%); font-family: var(--font-mono); font-size: 11px; color: var(--graphite); line-height: 1;
+}
+.tick:first-child { transform: none; top: 3px; }
+.gutter-now {
+  position: absolute; right: 3px; top: calc((var(--m) - var(--p-start)) * var(--ppm) * 1px); transform: translateY(-50%);
+  background: var(--seal); color: #fff; font-family: var(--font-mono); font-size: 11px; font-weight: 500; line-height: 1;
+  padding: 3px 5px; border-radius: 5px; z-index: 8;
+}
+
+.pcol {
+  position: relative; min-width: 0; border-left: 1px solid var(--rule);
+  background-image:
+    repeating-linear-gradient(to bottom, var(--rule-2) 0 1px, transparent 1px var(--hour)),
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--hour) / 2), rgba(227, 220, 207, 0.45) calc(var(--hour) / 2) calc(var(--hour) / 2 + 1px), transparent calc(var(--hour) / 2 + 1px) var(--hour));
+}
+.planner__gutter + .pcol { border-left: 0; }
+.pcol.is-weekend { background-color: rgba(239, 233, 222, 0.38); }
+.pcol.is-today { background-color: rgba(255, 255, 255, 0.55); }
+
+/* ---- 不可用時段：很淺的灰色塊，頂端細線標出開始（程式裡叫 hatch）。每週重複／只限這天同一種灰，靠標籤前的圖示分辨 ---- */
+.hatch {
+  position: absolute; left: 0; right: 0;
+  top: calc((var(--s) - var(--p-start)) * var(--ppm) * 1px);
+  height: calc((var(--e) - var(--s)) * var(--ppm) * 1px);
+  background: var(--off);
+  box-shadow: inset 0 2px 0 var(--off-line);
+  z-index: 1;
+}
+.hatch--sleep { background: var(--off-2); box-shadow: inset 0 2px 0 var(--off-line-2); z-index: 2; }
+.hatch.is-pencil {
+  background: rgba(232, 229, 223, 0.5);
+  outline: 1.5px dashed var(--graphite); outline-offset: -2px; z-index: 3;
+}
+.hatch.is-hl { box-shadow: inset 0 0 0 2px var(--ink-3); z-index: 4; }
+.hatch__label {
+  position: absolute; top: 5px; left: 8px; max-width: calc(100% - 14px);
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; line-height: 1.45; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hatch__label .i { font-size: 11.5px; flex: none; color: var(--ink-3); }
+.hatch.is-pencil .hatch__label { top: 4px; left: 5px; padding: 1px 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.92); border: 1px dashed var(--graphite); color: var(--ink); font-weight: 500; }
+.hatch.is-tiny .hatch__label { display: none; }
+.hatch--sleep .hatch__label { color: var(--ink-3); }
+
+button.hatch { border: 0; padding: 0; cursor: pointer; text-align: left; font: inherit; }
+button.hatch:hover { box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+
+/* ---- 讀書時段 ---- */
+.blk {
+  position: absolute; left: 4px; right: 4px;
+  top: calc((var(--s) - var(--p-start)) * var(--ppm) * 1px + 1px);
+  height: calc((var(--e) - var(--s)) * var(--ppm) * 1px - 2px);
+  display: flex; flex-direction: column; gap: 1px; align-items: stretch;
+  padding: 4px 7px 4px 9px; border-radius: 7px; border: 0; text-align: left; overflow: hidden;
+  font: inherit; z-index: 5;
+  transition: opacity 0.2s, box-shadow 0.15s, transform 0.15s;
+}
+.blk__title { font-size: 12.5px; font-weight: 500; line-height: 1.32; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.blk__step { font-weight: 700; }
+.blk__meta { font-family: var(--font-mono); font-size: 11px; line-height: 1.3; opacity: 0.86; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.blk__meta .i { font-size: 11.5px; }
+.blk__badge { position: absolute; right: 5px; top: 5px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; font-size: 11px; }
+
+.blk--ink { background: var(--c-wash); color: var(--c-deep); box-shadow: inset 3px 0 0 var(--c); }
+.blk--ink:hover { box-shadow: inset 3px 0 0 var(--c), 0 6px 16px -8px rgba(27, 34, 50, 0.45); transform: translateY(-1px); }
+.blk--ink.is-done { background: var(--paper-2); color: var(--ink-3); }
+.blk--ink.is-done { background: color-mix(in srgb, var(--c-wash) 55%, var(--paper)); color: color-mix(in srgb, var(--c-deep) 60%, var(--paper)); }
+.blk--ink.is-done .blk__badge { background: var(--c); color: #fff; }
+.blk--ink.is-doing { box-shadow: inset 3px 0 0 var(--c), inset 0 0 0 1.5px var(--c); }
+
+.blk--pencil {
+  background: #fff; color: var(--ink-2);
+  border: 1.5px dashed var(--graphite); padding: 3px 6px 3px 8px; z-index: 6;
+}
+.blk--pencil.is-new { animation: pencil-in 0.5s var(--ease) both; }
+.blk--pencil .blk__title { color: var(--ink); }
+.blk--pencil .blk__meta { color: var(--ink-3); }
+.blk--pencil:hover { border-color: var(--ink-3); }
+.blk--pencil .pencil-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c); display: inline-block; flex: none; }
+
+/* 會被移走的原時段：只留虛線外框和一個小標籤，不重複內容 */
+.blk--ghost {
+  background: transparent; border: 1.5px dashed var(--graphite-3); padding: 3px 5px; z-index: 4;
+  justify-content: flex-start;
+}
+.ghost-tag {
+  display: inline-flex; align-items: center; gap: 4px; max-width: 100%; width: fit-content;
+  padding: 1px 6px; border-radius: 4px; background: rgba(251, 249, 244, 0.96);
+  font-size: 11px; line-height: 1.45; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ghost-tag .i { font-size: 11px; flex: none; }
+
+.blk.is-short { flex-direction: row; align-items: center; gap: 6px; padding-top: 0; padding-bottom: 0; }
+.blk.is-short .blk__title { -webkit-line-clamp: 1; white-space: nowrap; display: block; text-overflow: ellipsis; }
+.blk.is-short .blk__meta { display: none; }
+.blk.is-short .blk__badge { top: 50%; transform: translateY(-50%); }
+
+.planner.has-hl .blk:not(.is-hl) { opacity: 0.25; }
+.planner.has-hl .blk.is-hl { box-shadow: inset 3px 0 0 var(--c), 0 0 0 2px var(--c); }
+.blk.is-flash { animation: flash 1.4s ease-out 2; }
+
+.blk.just-inked { animation: ink-wipe 0.75s var(--ease) both; }
+.blk.just-inked::after {
+  content: "✓"; position: absolute; right: 6px; bottom: 5px;
+  width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--seal); color: #fff; font-size: 12px; font-weight: 700;
+  animation: stamp 1.6s var(--ease) both; animation-delay: inherit;
+}
+@keyframes ink-wipe { from { clip-path: inset(0 100% 0 0 round 7px); } to { clip-path: inset(0 0 0 0 round 7px); } }
+@keyframes stamp { 0% { opacity: 0; transform: scale(1.6); } 25% { opacity: 1; transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: scale(1); } }
+@keyframes pencil-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@keyframes flash { 0%, 100% { box-shadow: inset 3px 0 0 var(--c); } 40% { box-shadow: inset 3px 0 0 var(--c), 0 0 0 4px rgba(43, 94, 167, 0.3); } }
+
+/* ---- 現在、截止、空檔 ---- */
+.now-line {
+  position: absolute; left: -1px; right: 0; height: 0; z-index: 7; pointer-events: none;
+  top: calc((var(--m) - var(--p-start)) * var(--ppm) * 1px);
+  border-top: 2px solid var(--seal);
+}
+.now-line::before { content: ""; position: absolute; left: -4px; top: -6px; width: 10px; height: 10px; border-radius: 50%; background: var(--seal); box-shadow: 0 0 0 3px rgba(251, 249, 244, 0.9); }
+
+.dl-line {
+  position: absolute; left: 0; right: 0; height: 0; z-index: 7; pointer-events: none;
+  top: calc((var(--m) - var(--p-start)) * var(--ppm) * 1px);
+  border-top: 1.5px dashed var(--seal);
+}
+.dl-line span {
+  position: absolute; right: 4px; bottom: 2px; padding: 1px 6px; border-radius: 4px 4px 4px 0;
+  background: var(--seal); color: #fff; font-size: 11px; font-weight: 500; white-space: nowrap; line-height: 1.5;
+}
+
+.gap {
+  position: absolute; left: 6px; right: 6px; z-index: 2; pointer-events: none;
+  top: calc((var(--s) - var(--p-start)) * var(--ppm) * 1px);
+  height: calc((var(--e) - var(--s)) * var(--ppm) * 1px);
+  display: grid; place-items: center;
+}
+.gap span { font-family: var(--font-mono); font-size: 11px; color: var(--graphite); white-space: nowrap; }
+.planner.hide-gaps .gap { display: none; }
+
+.planner__arrows { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 9; }
+.planner__arrows path { fill: none; stroke: var(--ink-2); stroke-width: 1.8; stroke-dasharray: 5 4; animation: dash 1.2s linear infinite; }
+.planner__arrows .ah { fill: var(--ink-2); stroke: none; stroke-dasharray: none; animation: none; }
+@keyframes dash { to { stroke-dashoffset: -18; } }
+
+/* 拖拉標記沒空時間時的選取框 */
+.paint-sel {
+  position: absolute; left: 2px; right: 2px; z-index: 10; pointer-events: none;
+  top: calc((var(--s) - var(--p-start)) * var(--ppm) * 1px);
+  height: calc((var(--e) - var(--s)) * var(--ppm) * 1px);
+  background: rgba(27, 34, 50, 0.1);
+  outline: 2px solid var(--ink); outline-offset: -2px; border-radius: 4px;
+}
+.paint-sel span { position: absolute; left: 6px; top: 4px; background: var(--ink); color: var(--paper); font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border-radius: 4px; }
+.planner.is-painting .pcol { cursor: crosshair; touch-action: none; }
+.planner.is-erasing button.hatch:not(.hatch--sleep):hover { box-shadow: inset 0 0 0 2px var(--seal); }
+
+/* ---- 遠方：每份功課一行，不會互相重疊 ---- */
+.horizon { padding: 20px 22px 22px; border-top: 1px solid var(--rule); }
+.horizon__head { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; margin-bottom: 12px; }
+.horizon__head h3 { font-size: 17px; }
+.horizon__head p { font-size: 13px; color: var(--ink-3); }
+.horizon__scroll { overflow-x: auto; scrollbar-width: thin; }
+.hz { --days: 20; --win: 7; min-width: 660px; }
+.hz-axis, .hz-row { display: grid; grid-template-columns: 104px minmax(0, 1fr) 128px; align-items: center; column-gap: 12px; }
+.hz-track { position: relative; height: 38px; }
+.hz-track::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: calc(var(--win) / var(--days) * 100%);
+  background: rgba(27, 34, 50, 0.045);
+}
+.hz-track::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: calc(var(--win) / var(--days) * 100%);
+  border-left: 1.5px dashed var(--graphite-3);
+}
+.hz-axis .hz-track { height: 46px; }
+.hz-axis .hz-track::before { border-radius: 8px 8px 0 0; }
+.hz-span { position: absolute; top: 4px; font-size: 11.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap; }
+.hz-span--now { left: 8px; }
+.hz-span--later { left: calc(var(--win) / var(--days) * 100% + 10px); color: var(--ink-3); font-weight: 400; }
+.hz-day { position: absolute; bottom: 5px; left: calc((var(--i) + 0.5) / var(--days) * 100%); transform: translateX(-50%); font-family: var(--font-mono); font-size: 11px; color: var(--graphite); white-space: nowrap; }
+.hz-day.is-weekend { color: var(--graphite-2); }
+.hz-day.is-today { color: var(--seal); font-weight: 500; }
+.hz-day.is-month { color: var(--ink-2); font-weight: 500; }
+
+.hz-row {
+  width: 100%; border: 0; background: transparent; padding: 0; font: inherit; text-align: left; cursor: pointer;
+  border-top: 1px solid var(--rule-2); transition: background 0.15s;
+}
+.hz-row:hover { background: rgba(255, 255, 255, 0.6); }
+.hz-row[aria-pressed="true"] { background: var(--c-wash); }
+.hz-name { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; color: var(--ink); white-space: nowrap; overflow: hidden; padding-left: 4px; }
+.hz-bar {
+  position: absolute; left: 0; top: 50%; height: 6px; transform: translateY(-50%);
+  width: calc(var(--d) / var(--days) * 100%); border-radius: 3px;
+  background: var(--c-wash); box-shadow: inset 0 0 0 1px var(--c-wash);
+}
+.hz-due {
+  position: absolute; top: 50%; left: calc(var(--d) / var(--days) * 100%); transform: translate(10px, -50%);
+  font-size: 12px; color: var(--c-deep); white-space: nowrap; font-weight: 500;
+}
+.hz-due::before {
+  content: ""; position: absolute; left: -15px; top: 50%; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--c); transform: translateY(-50%); box-shadow: 0 0 0 3px var(--paper);
+}
+.hz-due.is-left { transform: translate(calc(-100% - 12px), -50%); }
+.hz-due.is-left::before { left: auto; right: -17px; }
+.hz-due small { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); font-weight: 400; margin-left: 4px; }
+.hz-meta { font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hz-mark {
+  position: absolute; top: 50%; left: calc(var(--d) / var(--days) * 100%); transform: translate(-50%, -50%);
+  font-size: 11px; padding: 1px 6px; border-radius: 5px; border: 1.5px dashed var(--graphite); background: #fff; color: var(--ink-2); white-space: nowrap; z-index: 1;
+}
+
+/* ---- 手機：日子選擇 ---- */
+.daypick { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 10px; scrollbar-width: none; }
+.daypick::-webkit-scrollbar { display: none; }
+.daypick__btn {
+  position: relative; flex: 1 0 auto; min-width: 46px; display: grid; justify-items: center; gap: 1px;
+  padding: 7px 4px 8px; border-radius: 12px; border: 1px solid var(--rule); background: var(--paper);
+  color: var(--ink-2); font-size: 11.5px;
+}
+.daypick__btn b { font-family: var(--font-serif); font-size: 19px; color: var(--ink); line-height: 1.1; }
+.daypick__btn.is-today b { color: var(--seal); }
+.daypick__btn.has-change { border: 1.5px dashed var(--graphite); }
+.daypick__btn[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: rgba(251, 249, 244, 0.8); }
+.daypick__btn[aria-pressed="true"] b { color: var(--paper); }
+.daypick__dot { width: 5px; height: 5px; border-radius: 50%; background: var(--seal); }
+
+@media (max-width: 759px) {
+  .planner { --gutter: 50px; --col-min: 82px; }
+  .planner__fold .fold-extra { display: none; }
+  .dayhead { padding: 10px 6px 8px 8px; }
+  .dayhead__num { font-size: 21px; }
+  .horizon { padding: 16px 14px 18px; }
+  .hz-axis, .hz-row { grid-template-columns: 84px minmax(0, 1fr) 0; column-gap: 8px; }
+  .hz-meta { display: none; }
+}
