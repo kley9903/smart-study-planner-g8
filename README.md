@@ -4,6 +4,8 @@
 
 **第一次參與：先讀 [組員入門指南](CONTRIBUTING.md)。**
 
+[開啟雲端開發環境](https://codespaces.new/kley9903/smart-study-planner-g8) · [看正式網站](https://smart-study-planner-g8.pages.dev) · [看自動檢查](https://github.com/kley9903/smart-study-planner-g8/actions)
+
 - 每人用自己的 GitHub 帳戶，在自己的分支改程式。
 - GitHub 專案頁 → **Code → Codespaces → Create codespace on main**，即可建立雲端開發環境；首次啟動會檢查專案，連線後自動啟動 5173 網站預覽。
 - 本機或雲端都可以用 `npm start` 啟動，用 `npm run check` 檢查；這兩個命令不需要安裝 npm 套件。
