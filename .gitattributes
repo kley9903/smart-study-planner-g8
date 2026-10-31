@@ -4,3 +4,8 @@
 *.mjs text eol=lf
 *.js text eol=lf
 *.json text eol=lf
+
+# Keep source downloads focused on local development; management settings stay in GitHub.
+/.devcontainer export-ignore
+/.github export-ignore
+/docs/deployment.md export-ignore
