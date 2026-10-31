@@ -72,7 +72,7 @@
 | `scripts/start-preview.mjs` | 舊雲端流程的預覽助手；下載後本機開發用 `npm start` 就好 |
 | `CONTRIBUTING.md` | 下載、執行、修改及交件步驟 |
 | `CONTRIBUTORS.md` | 小組角色、實際貢獻及 GitHub 自動署名的說明 |
-| `README.md` | 原有原型介紹；雲端協作段落保留作舊流程參考，**目前交件方式以 CONTRIBUTING.md 為準** |
+| `README.md` | 組員的修改入口：按想改的 UI／功能找到對應檔案，以及下載與本機預覽步驟 |
 | `docs/code-map.md` | 本檔：程式各部分的位置 |
 | `.gitignore` | 指定不要提交的本機檔案，例如環境變數、快取與憑證 |
 | `.gitattributes` | 文字換行規則，以及下載 ZIP 時略過的管理設定 |
