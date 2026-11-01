@@ -97,6 +97,7 @@ function render(info = {}) {
   drawDock(s, r);
 
   if (changed) {
+    quietScrollUntil = performance.now() + 200; // 換頁回到頂部不算你在捲動
     window.scrollTo(0, 0);
     lastKey = key;
   } else {
@@ -155,6 +156,8 @@ function updateNav(name, s) {
 
 /* ---------------- 右下角的 AI 助手 ---------------- */
 let readyKey = '';
+let lastBubble = '';
+let quietScrollUntil = 0;
 function drawDock(s, r) {
   // AI 建議可以確認時，面板自動縮小讓出時間表，泡泡留下「確認／不要」
   const p = pendingProposal(s);
@@ -166,8 +169,10 @@ function drawDock(s, r) {
   const d = renderDock(s, { quiet: r.name === 'add-task' || !!ui.editTask });
   dock.innerHTML = d.html;
   dock.classList.toggle('is-open', d.open);
-  dock.classList.toggle('has-bubble', d.bubble);
-  if (d.open) dock.classList.remove('is-peek');
+  dock.classList.toggle('has-bubble', !!d.bubble);
+  // 打開面板、或有新的話要說時，她站起來
+  if (d.open || (d.bubble && d.bubble !== lastBubble)) wake();
+  lastBubble = d.bubble;
 }
 
 function setDockOpen(open) {
@@ -182,17 +187,48 @@ function toggleDock(open) {
   else dock.querySelector('.dock__me')?.focus({ preventScroll: true });
 }
 
-// 你在捲動、點選或打字時，角色縮成只露出頭，停下來才站起來
-let peekTimer = null;
-function peek(hold = false) {
+// 你捲動、打字或很久沒動時，她腳下一空掉下去、雙手抓住畫面底邊（is-dropping 播一次 → is-rest 趴著）；
+// 停止捲動 4 秒、你回來動滑鼠或按鍵、滑過她、或她有話要說時再爬上來站好（is-waking）
+const DROP_MS = 850;
+const RISE_MS = 320;
+const IDLE_MS = 30000;
+let dropTimer = null;
+let wakeTimer = null;
+let risenTimer = null;
+let idleTimer = null;
+let restReason = '';
+function rest(reason, wakeAfter = 0) {
   if (ui.dockOpen || dock.hidden) return;
-  dock.classList.add('is-peek');
-  clearTimeout(peekTimer);
-  if (!hold) peekTimer = setTimeout(() => dock.classList.remove('is-peek'), 2500);
+  restReason = reason;
+  if (!dock.classList.contains('is-rest') && !dock.classList.contains('is-dropping')) {
+    clearTimeout(risenTimer);
+    dock.classList.remove('is-waking');
+    dock.classList.add('is-dropping');
+    dropTimer = setTimeout(() => dock.classList.replace('is-dropping', 'is-rest'), DROP_MS);
+  }
+  clearTimeout(wakeTimer);
+  if (wakeAfter) wakeTimer = setTimeout(wake, wakeAfter);
 }
-main.addEventListener('pointerdown', () => peek());
-main.addEventListener('focusin', (e) => { if (e.target.matches('input, textarea, select')) peek(true); });
-main.addEventListener('focusout', (e) => { if (e.target.matches('input, textarea, select')) peek(); });
+function wake() {
+  clearTimeout(dropTimer);
+  clearTimeout(wakeTimer);
+  restReason = '';
+  if (dock.classList.contains('is-dropping') || dock.classList.contains('is-rest')) {
+    dock.classList.remove('is-dropping', 'is-rest');
+    dock.classList.add('is-waking');
+    risenTimer = setTimeout(() => dock.classList.remove('is-waking'), RISE_MS);
+  }
+}
+function active() {
+  if (restReason === 'idle') wake();
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => rest('idle'), IDLE_MS);
+}
+['pointermove', 'pointerdown', 'keydown'].forEach((t) => document.addEventListener(t, active, { passive: true }));
+dock.addEventListener('pointerover', (e) => { if (e.target.closest('.dock__me') && restReason !== 'typing') wake(); });
+main.addEventListener('focusin', (e) => { if (e.target.matches('input, textarea, select')) rest('typing'); });
+main.addEventListener('focusout', (e) => { if (e.target.matches('input, textarea, select')) rest('typing', 1500); });
+active();
 
 function autosize() {
   const ta = document.getElementById('say-input');
@@ -848,7 +884,7 @@ window.addEventListener('resize', () => {
 });
 window.addEventListener('scroll', () => {
   header.classList.toggle('is-scrolled', window.scrollY > 4);
-  peek();
+  if (performance.now() > quietScrollUntil) rest('scroll', 4000);
   place();
   placeTour();
 }, { passive: true });
