@@ -66,6 +66,10 @@
 .doc .chip { margin-top: 6px; font-size: 11.5px; }
 .review { min-height: 320px; }
 .review__head { padding: 20px; }
+.docs-empty { margin: 20px 0; }
+.own-doc { min-height: 0; }
+.own-doc__acts, .own-doc__next { display: flex; flex-wrap: wrap; gap: 8px; }
+.own-doc__body { display: grid; gap: 12px; padding: 0 20px 22px; font-size: 14px; }
 .kept { margin-top: 22px; }
 .kept__title { font-size: 17px; margin-bottom: 12px; }
 .kept__title span { font-family: var(--font-sans); font-size: 13px; color: var(--ink-3); font-weight: 500; margin-left: 4px; }
