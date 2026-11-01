@@ -30,6 +30,7 @@
 | `dist/css/base.css` | 基本排版、頁首及手機導覽 |
 | `dist/css/components.css` | 共用按鈕、標籤、彈出框、提示等元件外觀 |
 | `dist/css/planner.css` | 時間格、讀書時段、沒空背景、建議與確認狀態的外觀 |
+| `dist/css/figma.css` | Figma 版外觀與版面覆寫；導覽、白色細框區塊、各頁比例及手機排版 |
 | `dist/css/pages.css` | 各頁版面、首次使用流程、導覽與不同螢幕寬度的排版 |
 
 ## 每一個頁面
@@ -52,7 +53,7 @@
 
 | 檔案 | 用途 |
 |---|---|
-| `dist/js/app.js` | JavaScript 入口；按網址切頁、更新畫面、接收點擊與表單等操作 |
+| `dist/js/app.js` | JavaScript 入口（含獨立 `#/monthly` 月曆及 `#/add-task` 新增頁）；按網址切頁、更新畫面、接收點擊與表單等操作 |
 | `dist/js/store.js` | 管理目前狀態與修改資料的動作；自己的計劃存在瀏覽器 localStorage，示範狀態主要存在記憶體 |
 | `dist/js/attachments.js` | 附件保存在本瀏覽器 IndexedDB；沒有伺服器上傳或 AI 文件分析 |
 | `dist/js/model.js` | 從狀態推算每日畫面、空檔、課程／任務資料和 AI 建議疊加結果 |

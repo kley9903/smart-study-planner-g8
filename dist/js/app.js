@@ -5,7 +5,8 @@ import {
   addRule, removeRule, setSleep, obRestart, obFinish,
   getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment,
 } from './store.js';
-import { shiftMonth } from './views/month.js';
+import { editor } from './views/task-editor.js';
+import { renderMonth, shiftMonth } from './views/month.js';
 import { stepFields } from './views/task-editor.js';
 import { saveAttachment, getAttachment } from './attachments.js';
 import { L, setLang, applyStatic } from './i18n.js';
@@ -24,7 +25,10 @@ import * as about from './views/about.js';
 import { renderMargin } from './views/margin.js';
 
 const views = {
-  week, tasks, import: importView, time: availability, start, about,
+  week, tasks,
+  monthly: { render: (s) => `<div class="page-head"><div><h1 class="page-head__title">${L('月曆', 'Monthly')}</h1><p class="page-head__lede">${L('查看整個月的截止日期及忙碌時段，點選日期新增或查看內容。', 'View deadlines and busy times for the month. Select a date to view or add items.')}</p></div></div><section class="sheet monthly-page">${renderMonth(s)}</section>` },
+  'add-task': { render: (s) => `<div class="page-head"><h1 class="page-head__title">${L('新增任務', 'Add task')}</h1></div><div class="add-task-page">${editor(s, null, ui.taskDate)}<aside class="card add-task-help"><h2>${L('任務說明', 'Task details')}</h2><p>${L('填寫截止時間和預計時數，保存後可以修改子任務及加入作業說明附件。', 'Enter a deadline and an estimate. After saving, edit the steps and attach assignment guidelines.')}</p><p>${L('到本週產生排程建議，確認後才會生效。', 'Generate schedule suggestions on This week, then confirm to apply them.')}</p></aside></div>` },
+  import: importView, time: availability, start, about,
   margin: { render: (s) => `<div class="margin-page">${renderMargin(s)}</div>` },
 };
 
@@ -50,7 +54,7 @@ const wide = () => window.innerWidth >= 1180;
 function render(info = {}) {
   const r = route();
   if (!r.name) {
-    location.replace('#/start');
+    location.replace('#/week');
     return;
   }
   // 分享出去的示範情境連結（#/week?try=…）和新手導覽連結（#/week?tour=1）一律在導覽模式打開
@@ -66,12 +70,14 @@ function render(info = {}) {
     location.replace(`#/week${q ? `?${q}` : ''}`);
     return;
   }
+  if (r.name === 'week') ui.calendarView = 'week';
+  if (r.name === 'add-task' && current.name !== 'add-task' && !r.query.get('add')) ui.taskDate = '';
   current = r;
   const s = getState();
-  const addDate = r.name === 'tasks' && r.query.get('add');
+  const addDate = ['tasks', 'add-task'].includes(r.name) && r.query.get('add');
   if (addDate && /^\d{4}-\d{2}-\d{2}$/.test(addDate)) {
     ui.taskForm = true; ui.taskDate = addDate; ui.editTask = null;
-    history.replaceState(null, '', '#/tasks');
+    history.replaceState(null, '', `#/${r.name}`);
   }
   const key = `${r.name}/${r.params.join('/')}`;
   const changed = key !== lastKey;
@@ -84,7 +90,7 @@ function render(info = {}) {
   closePopover();
   main.innerHTML = views[r.name].render(s, r.params);
   document.body.dataset.route = r.name;
-  updateNav(r.name, s);
+  updateNav(r.name === 'add-task' ? 'tasks' : r.name, s);
 
   if (changed) {
     if (r.name !== 'margin') window.scrollTo(0, 0);
@@ -406,18 +412,12 @@ function locate(date, blockId, fromId) {
 }
 
 function focusDecision() {
-  if (wide() && current.name === 'week') {
+  if (current.name === 'week') {
     const box = main.querySelector('.margin .decide');
     if (box) {
       box.scrollIntoView({ behavior: 'smooth', block: 'start' });
       box.querySelector('.opt, .btn--ink')?.focus({ preventScroll: true });
     }
-    return;
-  }
-  if (current.name === 'week') {
-    const bar = main.querySelector('.dbar');
-    bar?.querySelector('.dbar__opt, .btn--ink')?.focus({ preventScroll: true });
-    bar?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     return;
   }
   location.hash = '#/margin';
@@ -441,19 +441,14 @@ function openBusyForm(el) {
 }
 
 const actions = {
-  'calendar-view': (el) => {
-    ui.calendarView = el.dataset.view;
-    ui.month ||= getState().today;
-    render();
-    main.querySelector('.week__sheet')?.scrollIntoView({ block: 'start' });
-  },
+  'calendar-view': (el) => { location.hash = el.dataset.view === 'month' ? '#/monthly' : '#/week'; },
   'month-move': (el) => { ui.month = shiftMonth(ui.month || getState().today, Number(el.dataset.delta)); ui.monthDay = ui.month; render(); },
   'month-today': () => { ui.month = ui.monthDay = getState().today; render(); },
   'month-day': (el) => { ui.monthDay = el.dataset.date; render(); },
   'new-busy': (el) => openBusyForm(el),
   'rules-toggle': (el) => { ui.rulesOpen[el.dataset.src] = !ui.rulesOpen[el.dataset.src]; render(); },
-  'task-form-open': () => { ui.taskForm = true; ui.editTask = null; render(); main.querySelector('.tform input')?.focus(); },
-  'task-form-close': () => { ui.taskForm = false; ui.editTask = null; render(); },
+  'task-form-open': () => { ui.taskDate = ''; ui.editTask = null; location.hash = '#/add-task'; },
+  'task-form-close': () => { ui.taskForm = false; ui.editTask = null; if (current.name === 'add-task') location.hash = '#/tasks'; else render(); },
   'task-edit': (el) => { ui.editTask = el.dataset.task; ui.taskForm = false; render(); main.querySelector('.tform input')?.focus(); },
   'step-add': (el) => { const rows = el.closest('form').querySelector('[data-step-rows]'); rows.insertAdjacentHTML('beforeend', stepFields()); rows.lastElementChild.querySelector('input').focus(); },
   'step-remove': (el) => { el.closest('.step-editor__row').remove(); },

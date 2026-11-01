@@ -10,7 +10,7 @@ export function render(s) {
     <div class="page-head">
       <div>
         <p class="eyebrow">${L('課程資料', 'Syllabus')}</p>
-        <h1 class="page-head__title">${L('由課程大綱開始', 'Start from your syllabus')}</h1>
+        <h1 class="page-head__title">${L('課程資料', 'Syllabus')}</h1>
         <p class="page-head__lede">${L('AI 會從大綱找出 deadline、考試、上課時間和功課要求，每一項都附出處頁碼。你核對、確認之後，才會用來排計劃。', 'The AI finds deadlines, exams, class times and requirements in your syllabus, each with its page number. Only what you check and confirm is used for planning.')}</p>
       </div>
       ${pendingAll ? `<span class="chip chip--pencil">${icon('pencil')} ${L(`還有 ${pendingAll} 項待核對`, `${pendingAll} to check`)}</span>` : `<span class="chip chip--ok">${icon('check')} ${L('全部已核對', 'All checked')}</span>`}

@@ -23,7 +23,7 @@ export function render(s, params) {
     <div class="page-head">
       <div>
         <p class="eyebrow">${L('任務', 'Tasks')}</p>
-        <h1 class="page-head__title">${L('功課與考試', 'Assignments and exams')}</h1>
+        <h1 class="page-head__title">${L('任務', 'Tasks')}</h1>
         <p class="page-head__lede">${L('加入功課和 deadline；預計時數會拆成每段最多 2 小時，再到「本週」按「自動排程」。', 'Add tasks and deadlines. The estimate is split into parts of at most 2 hours; then press "Auto-schedule" on This week.')}</p>
       </div>
       <button class="btn btn--ink" data-action="task-form-open">${icon('plus')} ${L('新增任務', 'Add task')}</button>
@@ -32,12 +32,12 @@ export function render(s, params) {
     <div class="page-head">
       <div>
         <p class="eyebrow">${L('任務', 'Tasks')}</p>
-        <h1 class="page-head__title">${L('AI 把功課拆成做得到的步驟', 'The AI breaks work into doable steps')}</h1>
+        <h1 class="page-head__title">${L('任務', 'Tasks')}</h1>
         <p class="page-head__lede">${L('每一步都有預計時數；AI 先估算，你確認或修改。進度由你回報，時段結束不會自動當作做完。', 'Each step has an estimate: the AI suggests one, you confirm or change it. You report progress; a session ending is not counted as done.')}</p>
       </div>
       <button class="btn btn--ink" data-action="task-form-open">${icon('plus')} ${L('新增任務', 'Add task')}</button>
     </div>`;
-  if (!task) return `${head}${editor(s, null, ui.taskDate)}`;
+  if (!task) return `${head}<div class="tasks"><nav class="tlist" aria-label="${L('任務清單', 'Task list')}"><p class="muted">${L('尚未有任務', 'No tasks yet')}</p></nav><section class="sheet tdetail task-empty"><h2>${L('任務詳情', 'Task details')}</h2><p>${L('新增任務後，可以在這裡編輯截止日期、子任務和作業要求。', 'Add a task to edit its deadline, steps and requirements here.')}</p><a class="btn" href="#/add-task">${icon('plus')} ${L('新增任務', 'Add task')}</a></section></div>`;
   return `
     ${head}
     ${ui.taskForm ? editor(s, null, ui.taskDate) : ''}
@@ -102,7 +102,7 @@ function detail(s, t) {
       ${attachments(t, mine)}
       <div class="td-grid">
         <div>
-          <h2 class="td-section-title">${icon('layers')} ${mine ? L(`分成 ${t.steps.length} 段`, `${t.steps.length} part${t.steps.length === 1 ? '' : 's'}`) : L(`AI 拆成 ${t.steps.length} 步`, `AI split it into ${t.steps.length} steps`)}</h2>
+          <h2 class="td-section-title">${icon('layers')} ${t.estimateBy === 'me' ? L(`分成 ${t.steps.length} 段`, `${t.steps.length} part${t.steps.length === 1 ? '' : 's'}`) : L(`AI 拆成 ${t.steps.length} 步`, `AI split it into ${t.steps.length} steps`)}</h2>
           <div class="route">${t.steps.map((step) => stepRow(s, t, step)).join('')}</div>
         </div>
         <aside class="td-aside">
