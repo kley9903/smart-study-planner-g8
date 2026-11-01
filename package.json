@@ -6,7 +6,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "start": "node serve.mjs",
-    "check": "node scripts/check.mjs",
+    "check": "node scripts/check.mjs && node scripts/check-planner.mjs",
     "preview:cloud": "node scripts/start-preview.mjs"
   }
 }

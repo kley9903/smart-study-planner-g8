@@ -7,7 +7,7 @@ import { HERO, heroChanges, heroMissing, CHECKIN, ESSAY, fallbackText, CHIPS, ma
 import { blockOf, stepOf, taskOf, pendingProposal } from './model.js';
 import { planSteps } from './scheduler.js';
 import { md, span, dayShort, hoursText } from './time.js';
-import { recall, remember } from './ui.js';
+import { recall, remember, esc } from './ui.js';
 import { L } from './i18n.js';
 
 const MINE_KEY = 'mine';
@@ -78,7 +78,8 @@ function freshUi() {
   return {
     hlTask: null, showGaps: false, day: DEMO_TODAY, docId: 'stat', taskId: 'ps4',
     timeTool: null, paintRepeat: 'single', hlRule: null, justInked: [], arrowFor: null,
-    draft: '', editItem: null, sleepEdit: false, dropMsg: '', guideOpen: true,
+    draft: '', editItem: null, sleepEdit: false, dropMsg: '', guideOpen: false,
+    calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
   };
 }
 
@@ -86,7 +87,7 @@ function freshOb() {
   return { loaded: false, itemState: {}, sleep: { start: 30, end: 510 }, sleepSet: false, classesInked: false, lifeAdded: true, drafted: false, inked: false };
 }
 
-export const ui = freshUi();
+export const ui = { ...freshUi(), day: state.today };
 export let ob = freshOb();
 
 const listeners = new Set();
@@ -428,16 +429,17 @@ function splitMinutes(total) {
   return out;
 }
 
-export function addTask({ title, course, kind, date, min, hours }) {
+export function addTask({ title, course, kind, date, min, hours, requirements = '' }) {
   const total = Math.max(30, Math.round(hours * 2) * 30);
   const id = nid('t');
   const parts = splitMinutes(total);
   const steps = parts.map((m, i) => ({ id: `${id}-${i + 1}`, title: parts.length > 1 ? L(`第 ${i + 1} 部分`, `Part ${i + 1}`) : L('全部', 'All'), min: m, progress: 'todo' }));
   state.tasks.push({
     id, course: courseFor(course), title, short: title.length > 14 ? `${title.slice(0, 13)}…` : title, kind,
-    due: { date, min }, weight: '', source: null, estimateBy: 'me', estimateConfirmed: true, steps, aiNote: '',
+    due: { date, min }, requirements, attachments: [], weight: '', source: null, estimateBy: 'me', estimateConfirmed: true, steps, aiNote: '',
   });
   ui.taskId = id;
+  ui.taskForm = false;
   emit({ toast: L(`已加入「${title}」，共 ${hoursText(total)}`, `Added "${title}" (${hoursText(total)})`), keepScroll: true });
 }
 
@@ -452,6 +454,40 @@ export function deleteTask(id) {
   emit({ toast: L(`已刪除「${t.title}」和它的讀書時段`, `Deleted "${t.title}" and its sessions`), toastIcon: 'x' });
 }
 
+/** Editing scheduling inputs invalidates future sessions, never silently reschedules. */
+export function updateTask(id, fields, steps) {
+  const task = taskOf(state, id);
+  if (!task) return;
+  const before = task.steps.filter((st) => !st.dropped);
+  const changed = task.due.date !== fields.date || task.due.min !== fields.min ||
+    JSON.stringify(before.map((st) => [st.id, st.title, st.min])) !== JSON.stringify(steps.map((st) => [st.id, st.title, st.min]));
+  const retained = steps.map((st) => ({ progress: 'todo', ...task.steps.find((old) => old.id === st.id), ...st, id: st.id || nid('st'), estBy: 'me' }));
+  const removed = task.steps.filter((old) => !retained.some((st) => st.id === old.id));
+  // Keep retired steps when past sessions/history still refer to them.
+  const archived = removed.filter((st) => state.history.some((h) => h.step === st.id) || state.blocks.some((b) => b.step === st.id && (b.date < state.today || (b.date === state.today && b.start <= state.now))))
+    .map((st) => ({ ...st, dropped: true }));
+  if (changed) {
+    state.blocks = state.blocks.filter((b) => b.task !== id || b.date < state.today || (b.date === state.today && b.start <= state.now));
+    const pending = pendingProposal(state);
+    if (pending) { pending.status = 'erased'; state.proposal = null; }
+  }
+  Object.assign(task, {
+    title: fields.title, short: fields.title.length > 14 ? `${fields.title.slice(0, 13)}…` : fields.title,
+    course: courseFor(fields.course), kind: fields.kind, requirements: fields.requirements,
+    due: { date: fields.date, min: fields.min }, steps: [...retained, ...archived],
+    estimateBy: 'me', estimateConfirmed: true,
+  });
+  ui.editTask = null;
+  emit({ toast: changed ? L('已保存。尚未開始的安排已清除，請到本週重新排程並確認。', 'Saved. Unstarted sessions cleared; schedule again on Week and confirm.') : L('任務已保存', 'Task saved'), keepScroll: true });
+}
+
+export function addTaskAttachment(taskId, metadata) {
+  const task = taskOf(state, taskId);
+  if (!task) return;
+  (task.attachments ||= []).push(metadata);
+  emit({ toast: L('附件已保存在此瀏覽器', 'Attachment saved in this browser'), keepScroll: true });
+}
+
 export function autoPlan() {
   if (pendingProposal(state)) { emit({ toast: L('先確認或不要目前的建議', 'Confirm or discard the current suggestion first'), toastIcon: 'info' }); return; }
   if (!state.tasks.length) { emit({ toast: L('先加入功課和 deadline', 'Add a task and its deadline first'), toastIcon: 'info' }); return; }
@@ -459,8 +495,8 @@ export function autoPlan() {
   if (!blocks.length && !missing.length) { emit({ toast: L('全部功課都已排好', 'Everything is already scheduled'), toastIcon: 'check' }); return; }
   const lacking = missing.length
     ? L(
-      `<br>放不下（截止前未有足夠空檔）：${missing.map(({ task, step }) => `<b>${task.short}</b> ${step.title}（${hoursText(step.min)}，${dayShort(task.due.date)} 截止）`).join('、')}。可以減少沒空的時間、調低預計時數，或分給之後的日子。`,
-      `<br>Did not fit (not enough free time before the deadline): ${missing.map(({ task, step }) => `<b>${task.short}</b> ${step.title} (${hoursText(step.min)}, due ${dayShort(task.due.date)})`).join(', ')}. Try freeing up busy time or lowering the estimate.`,
+      `<br>放不下（截止前未有足夠空檔）：${missing.map(({ task, step }) => `<b>${esc(task.short)}</b> ${esc(step.title)}（${hoursText(step.min)}，${dayShort(task.due.date)} 截止）`).join('、')}。可以減少沒空的時間、調低預計時數，或分給之後的日子。`,
+      `<br>Did not fit (not enough free time before the deadline): ${missing.map(({ task, step }) => `<b>${esc(task.short)}</b> ${esc(step.title)} (${hoursText(step.min)}, due ${dayShort(task.due.date)})`).join(', ')}. Try freeing up busy time or lowering the estimate.`,
     )
     : '';
   if (!blocks.length) {

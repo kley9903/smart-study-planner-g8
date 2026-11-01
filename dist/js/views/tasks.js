@@ -4,8 +4,8 @@ import { ui, getMode } from '../store.js';
 import { taskOf, inkOf, courseOf, taskStats, stepState, windowDates } from '../model.js';
 import { dayLabel, dayShort, span, hm, hShort, hoursText, diffDays, mdNum, wk } from '../time.js';
 import { L } from '../i18n.js';
+import { editor, attachments } from './task-editor.js';
 
-const KINDS = () => [['功課', 'Assignment'], ['考試', 'Exam'], ['測驗', 'Quiz'], ['報告', 'Report']].map(([zh, en]) => L(zh, en));
 
 export function render(s, params) {
   const mine = getMode() === 'mine';
@@ -26,6 +26,7 @@ export function render(s, params) {
         <h1 class="page-head__title">${L('功課與考試', 'Assignments and exams')}</h1>
         <p class="page-head__lede">${L('加入功課和 deadline；預計時數會拆成每段最多 2 小時，再到「本週」按「自動排程」。', 'Add tasks and deadlines. The estimate is split into parts of at most 2 hours; then press "Auto-schedule" on This week.')}</p>
       </div>
+      <button class="btn btn--ink" data-action="task-form-open">${icon('plus')} ${L('新增任務', 'Add task')}</button>
     </div>`
     : `
     <div class="page-head">
@@ -34,11 +35,12 @@ export function render(s, params) {
         <h1 class="page-head__title">${L('AI 把功課拆成做得到的步驟', 'The AI breaks work into doable steps')}</h1>
         <p class="page-head__lede">${L('每一步都有預計時數；AI 先估算，你確認或修改。進度由你回報，時段結束不會自動當作做完。', 'Each step has an estimate: the AI suggests one, you confirm or change it. You report progress; a session ending is not counted as done.')}</p>
       </div>
+      <button class="btn btn--ink" data-action="task-form-open">${icon('plus')} ${L('新增任務', 'Add task')}</button>
     </div>`;
-  if (!task) return `${head}${taskForm(s)}`;
+  if (!task) return `${head}${editor(s, null, ui.taskDate)}`;
   return `
     ${head}
-    ${mine ? taskForm(s) : ''}
+    ${ui.taskForm ? editor(s, null, ui.taskDate) : ''}
     <div class="tasks ${chosen ? 'has-detail' : ''}">
       <nav class="tlist" aria-label="${L('任務清單', 'Task list')}">
         ${groups.map((g) => `
@@ -47,26 +49,10 @@ export function render(s, params) {
             <div class="tlist__rows">${g.items.map((t) => row(s, t, t.id === task.id)).join('')}</div>
           </div>`).join('')}
       </nav>
-      ${detail(s, task)}
+      ${ui.editTask === task.id ? editor(s, task) : detail(s, task)}
     </div>`;
 }
 
-function taskForm(s) {
-  return `
-    <form class="sheet tform" data-form="task" aria-label="${L('新增功課', 'Add a task')}">
-      <h2 class="tform__title">${icon('plus')} ${L('新增功課或考試', 'Add an assignment or exam')}</h2>
-      <div class="tform__grid">
-        <label class="field tform__wide"><span class="field__label">${L('名稱', 'Name')}</span><input class="input" name="title" required maxlength="40" placeholder="${L('例如：Problem Set 4', 'e.g. Problem Set 4')}"></label>
-        <label class="field"><span class="field__label">${L('科目', 'Course')}</span><input class="input" name="course" maxlength="20" placeholder="${L('例如：統計學', 'e.g. Statistics')}" list="course-list"></label>
-        <label class="field"><span class="field__label">${L('類型', 'Type')}</span><select class="select" name="kind">${KINDS().map((k) => `<option>${k}</option>`).join('')}</select></label>
-        <label class="field"><span class="field__label">${L('截止日期', 'Due date')}</span><input class="input" type="date" name="date" required min="${s.today}"></label>
-        <label class="field"><span class="field__label">${L('截止時間', 'Due time')}</span><input class="input" type="time" name="time" value="23:59" required></label>
-        <label class="field"><span class="field__label">${L('預計要幾小時', 'Estimated hours')}</span><input class="input" type="number" name="hours" min="0.5" max="40" step="0.5" value="3" required></label>
-      </div>
-      <datalist id="course-list">${Object.values(s.courses).map((c) => `<option value="${esc(c.name)}"></option>`).join('')}</datalist>
-      <div class="tform__foot"><button class="btn btn--ink" type="submit">${icon('plus')} ${L('加入', 'Add')}</button></div>
-    </form>`;
-}
 
 function bar(s, t) {
   return `<span class="pbar">${t.steps.filter((x) => !x.dropped).map((st) => {
@@ -104,6 +90,7 @@ function detail(s, t) {
       <a class="btn btn--sm btn--ghost tback" href="#/tasks" style="margin:-6px 0 10px -8px">${icon('back')} ${L('全部任務', 'All tasks')}</a>
       <div class="td-head">
         <span class="course-tag"><span class="dot"></span>${esc(courseOf(s, t).name)} · ${esc(t.kind)}</span>
+        <button class="btn btn--sm td-edit" data-action="task-edit" data-task="${t.id}">${icon('pencil')} ${L('編輯任務', 'Edit task')}</button>
         <h1 class="td-title">${esc(t.title)}</h1>
         <div class="td-facts">
           <span class="chip ${days <= 1 ? 'chip--seal' : ''}">${icon('flag')} ${L(`${dayLabel(t.due.date)} ${hm(t.due.min)} 截止`, `Due ${dayLabel(t.due.date)} ${hm(t.due.min)}`)} · ${dueIn}</span>
@@ -112,6 +99,7 @@ function detail(s, t) {
           ${mine ? `<button class="chip" type="button" data-action="del-task" data-task="${t.id}">${icon('x')} ${L('刪除', 'Delete')}</button>` : ''}
         </div>
       </div>
+      ${attachments(t, mine)}
       <div class="td-grid">
         <div>
           <h2 class="td-section-title">${icon('layers')} ${mine ? L(`分成 ${t.steps.length} 段`, `${t.steps.length} part${t.steps.length === 1 ? '' : 's'}`) : L(`AI 拆成 ${t.steps.length} 步`, `AI split it into ${t.steps.length} steps`)}</h2>

@@ -27,6 +27,7 @@ export function render(s) {
         <h1 class="page-head__title">${L('把沒空的時間塗成灰色', 'Mark when you are busy')}</h1>
         <p class="page-head__lede">${L('預設全部時間都可以讀書。把上課、兼職、睡覺等沒空的時間塗成灰色，AI 排計劃時會避開；每週重複和只限一天的，看標籤前的圖示分辨。', 'By default every hour is free for study. Mark classes, work, sleep and other busy times in gray and planning will avoid them. The icon on each label shows whether it repeats weekly or is for one day only.')}</p>
       </div>
+      <button class="btn btn--ink" data-action="new-busy" data-date="${s.today}">${icon('plus')} ${L('新增忙碌時段', 'Add busy time')}</button>
     </div>
     <div class="tp">
       <section class="sheet tp__main" aria-label="${L('不可用時段時間格', 'Busy-time grid')}">
@@ -113,8 +114,10 @@ function rulesCard(s, src) {
       </li>`).join('');
   return `
     <section class="card side-card">
-      <h3>${title}</h3>
+      <button class="rules-toggle" data-action="rules-toggle" data-src="${src}" aria-expanded="${!!ui.rulesOpen[src]}"><span>${title}</span><span>${list.length} ${icon('chevron')}</span></button>
+      <div ${ui.rulesOpen[src] ? '' : 'hidden'}>
       <p class="side-card__sub">${sub}</p>
       <ul class="rules">${items || `<li class="muted" style="font-size:13px;padding:6px">${L('未有', 'None yet')}</li>`}</ul>
+      </div>
     </section>`;
 }

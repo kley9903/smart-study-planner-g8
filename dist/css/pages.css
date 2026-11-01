@@ -616,3 +616,65 @@
   .tform__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tform__wide { grid-column: 1 / -1; }
 }
+
+/* Figma integration: compact week controls, shared month overview and task editing. */
+.wk-head { padding: 16px 20px 12px; gap: 12px; align-items: center; }
+.wk-title { font-size: 27px; margin-top: 0; }
+.wk-head__side { gap: 8px; }
+.wk-sum { margin-top: 5px; font-size: 13px; }
+.wk-head .legend { font-size: 11.5px; }
+.wk-head .wk-tools { gap: 4px; }
+.month { padding: 20px; }
+.month__toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.month__toolbar h2 { font-size: 24px; }
+.month__nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.month__hint { margin: 10px 0 16px; color: var(--ink-2); font-size: 13px; }
+.month__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
+.month__weekday { padding: 9px 4px; text-align: center; color: var(--ink-3); font-size: 12px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.month__day { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; min-height: 114px; padding: 8px 6px; background: var(--paper); border: 0; border-bottom: 1px solid var(--rule); border-right: 1px solid var(--rule); text-align: left; cursor: pointer; color: var(--ink); font: inherit; }
+.month__day:hover { background: var(--paper-2); }
+.month__day[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); background: var(--paper-2); }
+.month__day.is-outside { background: var(--paper-3); color: var(--ink-3); }
+.month__number { font-family: var(--font-mono); font-size: 14px; }
+.month__day.is-today .month__number { color: var(--seal); font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
+.month__deadline { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 4px; border-radius: 3px; background: var(--seal-wash); color: var(--seal); font-size: 11px; }
+.month__busy, .month__more { font-size: 11px; color: var(--ink-2); }
+.month__busy { margin-top: auto; }
+.month__agenda { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.month__agenda > p { margin-top: 14px; }
+.month__item { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid var(--rule); font-size: 13px; }
+.month__item span { margin-left: auto; color: var(--ink-2); }
+.rules-toggle { width: 100%; border: 0; background: none; color: var(--ink); display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; padding: 4px 0; min-height: 44px; font: inherit; font-weight: 700; cursor: pointer; }
+.rules-toggle > span { display: inline-flex; align-items: center; gap: 8px; }
+.rules-toggle[aria-expanded="true"] > span:last-child .i { transform: rotate(90deg); }
+.td-edit { float: right; }
+.task-files { margin: 18px 0 24px; padding: 16px 0; border-block: 1px solid var(--rule); display: grid; gap: 10px; }
+.task-files .btn { justify-self: start; max-width: 100%; overflow-wrap: anywhere; white-space: normal; text-align: left; }
+.task-requirements { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.step-editor { border: 0; padding: 16px 0; min-width: 0; }
+.step-editor legend { font-weight: 700; padding-top: 16px; }
+.step-editor__row { display: grid; grid-template-columns: minmax(0, 1fr) 95px 44px; align-items: end; gap: 10px; margin-bottom: 12px; }
+.tasks > .tform { min-width: 0; align-self: start; }
+.tform textarea { width: 100%; resize: vertical; }
+.popover form { display: grid; gap: 12px; }
+@media (min-width: 1180px) { .wk-head { align-items: flex-start; } .wk-head__side { width: 100%; grid-template-columns: auto 1fr; align-items: center; } .wk-head__side .legend { grid-column: 2; grid-row: 1; } .wk-tools { grid-column: 1 / -1; } }
+@media (max-width: 759px) {
+  .month { padding: 12px; }
+  .month__day { min-height: 90px; padding: 6px 3px; }
+  .month__deadline { font-size: 10px; padding-inline: 2px; }
+  .month__busy { font-size: 10px; }
+  .month__toolbar h2 { font-size: 21px; }
+  .month__nav .btn { min-height: 44px; }
+  .wk-head__side { justify-items: start; }
+  .wk-head .wk-tools { justify-content: flex-start; }
+  .step-editor__row { grid-template-columns: minmax(0, 1fr) 70px 36px; gap: 6px; }
+  .tasks > .tform { display: block; }
+}
+
+.wk-head [hidden] { display: none; }
+.tform__wide { grid-column: 1 / -1; }
+.tasks .tform__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.task-files { display: block; }
+.task-files summary { cursor: pointer; font-weight: 700; font-size: 14px; min-height: 28px; }
+.task-files__body { display: grid; gap: 12px; margin-top: 14px; }
+.month__day { min-height: 96px; }

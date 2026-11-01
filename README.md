@@ -10,6 +10,8 @@
 |---|---|---|
 | 歡迎頁、首次使用流程 | [start.js](dist/js/views/start.js) | [pages.css](dist/css/pages.css) |
 | 本週頁面、任務摘要、遠方截止日期 | [week.js](dist/js/views/week.js) | [pages.css](dist/css/pages.css) |
+| 月曆總覽及日期操作 | [month.js](dist/js/views/month.js) | [pages.css](dist/css/pages.css) |
+| 任務編輯表單、子任務及附件入口 | [task-editor.js](dist/js/views/task-editor.js) | [pages.css](dist/css/pages.css) |
 | 時間表方格、讀書時段、沒空背景 | [planner.js](dist/js/planner.js) | [planner.css](dist/css/planner.css) |
 | 任務列表、任務詳情及進度畫面 | [tasks.js](dist/js/views/tasks.js) | [pages.css](dist/css/pages.css) |
 | 課程資料匯入及核對畫面 | [import.js](dist/js/views/import.js) | [pages.css](dist/css/pages.css) |
