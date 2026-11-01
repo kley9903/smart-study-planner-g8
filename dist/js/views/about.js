@@ -21,7 +21,7 @@ export function render() {
         <div class="scenario-list">
           <div class="scenario"><span class="scenario__n">1</span><div><b>首次使用：大綱 → 核對 → 睡眠 → 沒空的時間 → AI 排計劃</b><span>每一步只有右下角一個主要按鈕，約 1 分鐘</span></div><a class="btn btn--sm" href="#/start" data-action="ob-begin">開始</a></div>
           <div class="scenario"><span class="scenario__n">2</span><div><b>本週頁頂的「示範導覽」</b><span>回報昨晚進度 → 告訴 AI 明天要全日搬屋 → 時間不夠時選一個做法並確認</span></div><a class="btn btn--sm" href="#/week">去本週</a></div>
-          <div class="scenario"><span class="scenario__n">3</span><div><b>其他頁面</b><span>任務（功課怎樣拆、預計時數）、課程資料（核對大綱）、不可用時段（在格上拖拉標記沒空的時間）</span></div><a class="btn btn--sm" href="#/tasks">去任務</a></div>
+          <div class="scenario"><span class="scenario__n">3</span><div><b>其他頁面</b><span>任務（功課怎樣拆、預計時數）、課程資料（核對大綱）、本週的「改沒空的時間」（在格上拖拉標記沒空的時間）</span></div><a class="btn btn--sm" href="#/tasks">去任務</a></div>
         </div>
       </section>
 

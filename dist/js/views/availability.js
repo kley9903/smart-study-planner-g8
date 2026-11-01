@@ -1,8 +1,7 @@
-// 不可用時段：把沒空的時間塗成灰色；睡眠、每週重複、只限這天。
+// 改沒空的時間：在「本週」按「改沒空的時間」進入，不另開一頁。
+// 時間表上方換成工具列，可以直接塗灰；右邊的 AI 助手換成睡眠、上課時間、你自己加的。
 import { esc, icon } from '../ui.js';
 import { ui, getMode } from '../store.js';
-import { renderPlanner } from '../planner.js';
-import { windowDates } from '../model.js';
 import { span, hm, dayShort, md, wdName, hoursText } from '../time.js';
 import { isMobile } from './week.js';
 import { L } from '../i18n.js';
@@ -12,55 +11,52 @@ export function tool() {
   return ui.timeTool;
 }
 
-export function render(s) {
+/** 時間表要加的 class：塗色中／移除中 */
+export function toolClass() {
   const t = tool();
-  const dates = windowDates(s);
+  return t === 'paint' ? 'is-painting' : t === 'erase' ? 'is-erasing' : '';
+}
+
+/** 放在時間表上方：查看／標記沒空／移除，以及目前工具的說明 */
+export function busyToolbar() {
+  const t = tool();
   const hint = {
-    paint: L('在時間格上按住並向下拖，放手後替這段時間命名。', 'Press and drag down on the grid, then name the time when you let go.'),
+    paint: L('在時間格上按住並向下拖，放手後替這段時間命名。讀書時段暫時變淡，方便看會不會撞到。', 'Press and drag down on the grid, then name the time when you let go. Study sessions are faded so you can see clashes.'),
     erase: L('按一下灰色時段就可以移除（睡眠請在右邊修改）。', 'Press a gray block to remove it (change sleep on the right).'),
     view: L('按一下灰色時段查看詳情；要新增，選「標記沒空」。', 'Press a gray block for details; to add one, choose "Mark busy".'),
   }[t];
   return `
-    <div class="page-head">
-      <div>
-        <p class="eyebrow">${L('不可用時段', 'Busy times')}</p>
-        <h1 class="page-head__title">${L('忙碌時段', 'Busy time')}</h1>
-        <p class="page-head__lede">${L('預設全部時間都可以讀書。把上課、兼職、睡覺等沒空的時間塗成灰色，AI 排計劃時會避開；每週重複和只限一天的，看標籤前的圖示分辨。', 'By default every hour is free for study. Mark classes, work, sleep and other busy times in gray and planning will avoid them. The icon on each label shows whether it repeats weekly or is for one day only.')}</p>
+    <div class="tp__toolbar">
+      <div class="seg" role="group" aria-label="${L('工具', 'Tool')}">
+        <button class="seg__opt" type="button" data-action="tool" data-tool="view" aria-pressed="${t === 'view'}">${icon('eye')} ${L('查看', 'View')}</button>
+        <button class="seg__opt" type="button" data-action="tool" data-tool="paint" aria-pressed="${t === 'paint'}">${icon('pencil')} ${L('標記沒空', 'Mark busy')}</button>
+        <button class="seg__opt" type="button" data-action="tool" data-tool="erase" aria-pressed="${t === 'erase'}">${icon('eraser')} ${L('移除', 'Remove')}</button>
       </div>
-      <button class="btn btn--ink" data-action="new-busy" data-date="${s.today}">${icon('plus')} ${L('新增忙碌時段', 'Add busy time')}</button>
+      <div class="legend" aria-label="${L('圖例', 'Legend')}">
+        <span class="legend__item"><i class="sw sw--off sw--icon">${icon('repeat')}</i>${L('每週重複', 'Weekly')}</span>
+        <span class="legend__item"><i class="sw sw--off sw--icon">${icon('pin')}</i>${L('只限這天', 'One day')}</span>
+        <span class="legend__item"><i class="sw sw--sleep sw--icon">${icon('moon')}</i>${L('睡眠', 'Sleep')}</span>
+      </div>
     </div>
-    <div class="tp">
-      <section class="sheet tp__main" aria-label="${L('不可用時段時間格', 'Busy-time grid')}">
-        <div class="tp__toolbar">
-          <div class="seg" role="group" aria-label="${L('工具', 'Tool')}">
-            <button class="seg__opt" type="button" data-action="tool" data-tool="view" aria-pressed="${t === 'view'}">${icon('eye')} ${L('查看', 'View')}</button>
-            <button class="seg__opt" type="button" data-action="tool" data-tool="paint" aria-pressed="${t === 'paint'}">${icon('pencil')} ${L('標記沒空', 'Mark busy')}</button>
-            <button class="seg__opt" type="button" data-action="tool" data-tool="erase" aria-pressed="${t === 'erase'}">${icon('eraser')} ${L('移除', 'Remove')}</button>
-          </div>
-          <div class="legend" aria-label="${L('圖例', 'Legend')}">
-            <span class="legend__item"><i class="sw sw--off sw--icon">${icon('repeat')}</i>${L('每週重複', 'Weekly')}</span>
-            <span class="legend__item"><i class="sw sw--off sw--icon">${icon('pin')}</i>${L('只限這天', 'One day')}</span>
-            <span class="legend__item"><i class="sw sw--sleep sw--icon">${icon('moon')}</i>${L('睡眠', 'Sleep')}</span>
-          </div>
+    <p class="tp__hint">${icon('info')} ${hint}</p>`;
+}
+
+/** 取代 AI 助手的右欄 */
+export function busySide(s) {
+  return `
+    <aside class="tp__side busy-side" aria-label="${L('沒空的時間', 'Busy times')}">
+      <section class="card side-card">
+        <h3>${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}</h3>
+        <p class="side-card__sub" style="line-height:1.7">${L('預設全部時間都可以讀書。把上課、兼職、睡覺等沒空的時間塗成灰色，排計劃時會避開。', 'By default every hour is free for study. Mark classes, work and sleep in gray and planning will avoid them.')}</p>
+        <div class="busy-side__acts">
+          <button class="btn btn--sm" type="button" data-action="new-busy" data-date="${ui.day || s.today}">${icon('plus')} ${L('用表格新增', 'Add with a form')}</button>
+          <button class="btn btn--sm btn--ink" type="button" data-action="busy-edit" data-on="0">${icon('check')} ${L('完成', 'Done')}</button>
         </div>
-        <p class="tp__hint">${icon('info')} ${hint}</p>
-        ${renderPlanner(s, {
-          dates, mode: 'time', hlRule: ui.hlRule, showBlocks: false, showGaps: false,
-          extraClass: t === 'paint' ? 'is-painting' : t === 'erase' ? 'is-erasing' : '', colMin: isMobile() ? 92 : 104,
-        })}
       </section>
-      <aside class="tp__side">
-        ${sleepCard(s)}
-        ${getMode() === 'mine' && !s.unavailable.some((r) => r.src === 'syllabus') ? '' : rulesCard(s, 'syllabus')}
-        ${rulesCard(s, 'me')}
-        ${getMode() === 'mine' ? '' : `
-        <section class="card side-card">
-          <h3>${icon('note')} ${L('也可以用講的', 'Or just say it')}</h3>
-          <p class="side-card__sub" style="margin-top:8px;line-height:1.7">${L('例如跟 AI 助手說「逢星期六下午兩點到六點半返工」。AI 會用虛線框標出這段時間，等你確認才生效。', 'For example, tell the AI assistant "I work every Saturday 2–6:30pm". It marks the time with a dashed outline until you confirm.')}</p>
-          <p class="demo-note" style="margin-top:8px">${icon('info')} ${L('示範版未支援這句；可以試 AI 助手的「明天要全日幫家人搬屋」。', 'The demo does not support that sentence; try "I have to help my family move house all day tomorrow" in the AI assistant.')}</p>
-        </section>`}
-      </aside>
-    </div>`;
+      ${sleepCard(s)}
+      ${getMode() === 'mine' && !s.unavailable.some((r) => r.src === 'syllabus') ? '' : rulesCard(s, 'syllabus')}
+      ${rulesCard(s, 'me')}
+    </aside>`;
 }
 
 function sleepCard(s) {

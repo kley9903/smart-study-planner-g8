@@ -6,7 +6,7 @@ import { L } from './i18n.js';
 const STEPS_DEF = [
   { sel: '.wk-head', title: ['這是你未來 7 日的計劃', 'This is your next 7 days'], text: ['今天永遠在最左邊。上面寫著已排了多少小時，以及有幾項要你決定。', 'Today is always on the left. The top shows how many hours are planned and how many things need your decision.'] },
   { sel: '.planner .blk--ink', title: ['實色：已確認的讀書時段', 'Solid: confirmed study sessions'], text: ['按一下可以看為甚麼排在這裡，做完了就回報進度。時段結束不會自動當作做完。', 'Press one to see why it is there, and report progress when you finish. A session ending is not counted as done.'] },
-  { sel: '.planner .hatch:not(.hatch--sleep)', title: ['灰色：你沒空的時間', 'Gray: when you are busy'], text: ['上課、兼職、晚飯這些時間，排程一定會避開。可以在「不可用時段」頁自己標記。', 'Classes, work, dinner: planning always avoids these. Mark your own on the Busy times page.'] },
+  { sel: '.planner .hatch:not(.hatch--sleep)', title: ['灰色：你沒空的時間', 'Gray: when you are busy'], text: ['上課、兼職、晚飯這些時間，排程一定會避開。按時間表上方的「改沒空的時間」就可以自己標記。', 'Classes, work, dinner: planning always avoids these. Press "Edit busy times" above the timetable to mark your own.'] },
   { sel: '.horizon', title: ['遠方：7 日之後的 deadline', 'Further ahead: deadlines after 7 days'], text: ['較遠的功課也會被考慮，需要的話會提早在這 7 日開始。', 'Later work is considered too, and can start early in these 7 days if needed.'] },
   { sel: ['#margin', '.top-nav__link--margin', '.bottom-nav [data-nav="margin"]'], title: ['AI 助手', 'AI assistant'], text: ['告訴它臨時有事，它會提出改動。建議先用虛線顯示，你按「確認」才會生效。', 'Tell it when something comes up and it suggests changes. Suggestions are dashed until you press "Confirm".'] },
   { sel: '.guide', title: ['親手試一次', 'Try it yourself'], text: ['跟著這 3 步，看看 AI 怎樣幫你調整計劃。之後可以開始你自己的計劃。', 'Follow these 3 steps to see how the AI adjusts the plan. Then start your own.'], last: true },

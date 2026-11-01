@@ -204,7 +204,7 @@ function step3() {
         <label class="field"><span class="field__label">通常幾點起身</span><select class="select" data-ob-sleep="end">${opts(360, 660, end)}</select></label>
       </div>
     </div>
-    ${foot('睡眠是每晚重複的沒空時間，之後可以在「不可用時段」修改。', 2, `<button class="btn btn--ink btn--lg" type="button" data-action="ob-confirm-sleep">${icon('check')} 確認睡眠時間，下一步</button>`)}`;
+    ${foot('睡眠是每晚重複的沒空時間，之後可以在「本週」按「改沒空的時間」修改。', 2, `<button class="btn btn--ink btn--lg" type="button" data-action="ob-confirm-sleep">${icon('check')} 確認睡眠時間，下一步</button>`)}`;
 }
 
 /* ---------- 第 4 步：沒空的時間 ---------- */
@@ -217,7 +217,7 @@ function step4() {
     <p class="ob__lede">虛線框的灰色時段是 AI 從大綱找到的每週 9 段上課時間；其他灰色時段是你的晚飯、兼職、社團和家庭安排（示範）。沒有塗灰的時間，預設都可以讀書。</p>
     <div class="ob__body">
       <div class="ob-planner">${renderPlanner(s, { dates: windowDates(s), mode: 'time', showBlocks: false, showGaps: false, interactive: false, colMin: 92 })}</div>
-      <p class="demo-note" style="margin-top:10px">${icon('info')} 正式版可以直接在格上拖拉標記，或者跟 AI 說；完整工具在「不可用時段」頁。</p>
+      <p class="demo-note" style="margin-top:10px">${icon('info')} 正式版可以直接在格上拖拉標記，或者跟 AI 說；完整工具在「本週」的「改沒空的時間」。</p>
     </div>
     ${foot('每週重複和只限一天的，看標籤前的圖示分辨。', 3, `<button class="btn btn--ink btn--lg" type="button" data-action="ob-confirm-hatch">${icon('check')} 確認這些時間，下一步</button>`)}`;
 }

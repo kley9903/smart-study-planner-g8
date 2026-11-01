@@ -37,7 +37,7 @@ export function render(s) {
           ${mine ? `<ol class="how-list">
             <li><span class="how-list__n">1</span><span><b>${L('放入大綱', 'Add the syllabus')}</b><br>${L('PDF 保存在這個瀏覽器，隨時可以打開。', 'The PDF stays in this browser, ready to open.')}</span></li>
             <li><span class="how-list__n">2</span><span><b>${L('自動抽取（未接通）', 'Automatic extraction (not connected)')}</b><br>${L('之後會由 AI 找出 deadline、考試、上課時間，等你確認。', 'Later, AI will find deadlines, exams and class times for you to confirm.')}</span></li>
-            <li><span class="how-list__n">3</span><span><b>${L('現在：自己加入', 'For now: add them yourself')}</b><br>${L('功課和考試加到「任務」，上課時間加到「不可用時段」。', 'Add assignments and exams to Tasks, class times to Busy times.')}</span></li>
+            <li><span class="how-list__n">3</span><span><b>${L('現在：自己加入', 'For now: add them yourself')}</b><br>${L('功課和考試加到「任務」，上課時間在「本週」按「改沒空的時間」加入。', 'Add assignments and exams to Tasks, class times with "Edit busy times" on This week.')}</span></li>
             <li><span class="how-list__n">4</span><span><b>${L('到本週排程', 'Schedule on This week')}</b><br>${L('產生建議後，確認了才會生效。', 'Suggestions apply only after you confirm.')}</span></li>
           </ol>` : `<ol class="how-list">
             <li><span class="how-list__n">1</span><span><b>${L('放入大綱', 'Add the syllabus')}</b><br>${L('第一版先做 PDF；之後可以接 Canvas。', 'PDF first; Canvas later.')}</span></li>
@@ -75,7 +75,7 @@ function ownPanel(doc) {
         <p>${L('對照大綱，自己加入：', 'Using the syllabus, add these yourself:')}</p>
         <div class="own-doc__next">
           <a class="btn btn--ink" href="#/add-task">${icon('plus')} ${L('功課和考試 → 新增任務', 'Assignments and exams → Add task')}</a>
-          <a class="btn" href="#/time">${icon('hatch')} ${L('上課時間 → 不可用時段', 'Class times → Busy times')}</a>
+          <a class="btn" href="#/time">${icon('hatch')} ${L('上課時間 → 改沒空的時間', 'Class times → Edit busy times')}</a>
         </div>
       </div>
     </section>`;

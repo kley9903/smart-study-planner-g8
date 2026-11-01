@@ -84,6 +84,11 @@
 .add-task-page .step-editor { padding-top: 4px; }
 .add-task-page .step-editor .demo-note { margin: 6px 0 10px; }
 
+/* 本週的「改沒空的時間」：讀書時段變淡、不能點，右欄換成睡眠和沒空時間清單 */
+.planner.is-busy-edit .blk, .planner.is-busy-edit .dl-line { opacity: 0.3; pointer-events: none; }
+.busy-side__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.week__sheet .tp__toolbar { border-top: 1px solid var(--rule); }
+
 /* 不可用時段 */
 .tp { grid-template-columns: minmax(0, 3fr) minmax(240px, 1fr); gap: 24px; }
 .tp__toolbar { padding: 14px; }

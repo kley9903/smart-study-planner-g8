@@ -1,4 +1,4 @@
-// 時間格：本週、不可用時段、首次使用都用這一個元件。
+// 時間格：本週（包括改沒空的時間）、首次使用都用這一個元件。
 import { dayModel, overlay, gapsOf, taskOf, stepOf, inkOf, pendingProposal } from './model.js';
 import { hm, span, dayNum, wk, md, isWeekend, hShort, addDays, toDate } from './time.js';
 import { L } from './i18n.js';
