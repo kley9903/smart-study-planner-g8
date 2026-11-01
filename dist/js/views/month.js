@@ -51,7 +51,7 @@ export function renderMonth(s) {
     </div>
     <section class="month__agenda" aria-live="polite">
       <div class="month__toolbar"><h3>${esc(selected)}</h3><div class="month__nav">
-        <a class="btn btn--sm" href="#/tasks?add=${selected}">${icon('plus')} ${L('新增任務', 'Add task')}</a>
+        <a class="btn btn--sm" href="#/add-task?add=${selected}">${icon('plus')} ${L('新增任務', 'Add task')}</a>
         <button class="btn btn--sm" data-action="new-busy" data-date="${selected}">${icon('hatch')} ${L('新增忙碌時段', 'Add busy time')}</button>
       </div></div>
       ${deadlines.map((t) => `<a class="month__item" href="#/tasks/${t.id}">${icon('flag')} <b>${esc(t.title)}</b><span>${hm(t.due.min)} ${L('截止', 'due')}</span></a>`).join('')}

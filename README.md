@@ -18,6 +18,7 @@
 | 沒空時段、睡眠設定畫面 | [availability.js](dist/js/views/availability.js) | [planner.css](dist/css/planner.css)、[pages.css](dist/css/pages.css) |
 | AI 助手的對話區及建議卡片 | [margin.js](dist/js/views/margin.js) | [pages.css](dist/css/pages.css) |
 | 原型說明頁 | [about.js](dist/js/views/about.js) | [pages.css](dist/css/pages.css) |
+| Figma 版面、細框白色區塊、導覽與手機排版 | [figma.css](dist/css/figma.css) | [pages.css](dist/css/pages.css) |
 | 整體顏色、字體、間距、圓角 | [tokens.css](dist/css/tokens.css) | — |
 | 按鈕、標籤、彈出框等共用元件外觀 | [components.css](dist/css/components.css) | [tokens.css](dist/css/tokens.css) |
 | 頁首、導覽及全站基本排版 | [index.html](dist/index.html)、[base.css](dist/css/base.css) | — |

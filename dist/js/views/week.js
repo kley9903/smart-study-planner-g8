@@ -23,7 +23,7 @@ export function render(s) {
   return `
     <div class="week">
       <div class="week__main">
-        ${getMode() === 'mine' ? mineBar(s) : guide(s)}
+        ${getMode() === 'mine' ? mineBar(s) : ''}
         <section class="sheet week__sheet" aria-label="${L('未來 7 日讀書計劃', 'Study plan for the next 7 days')}">
           ${head(s, dates)}
           ${ui.calendarView === 'month' ? renderMonth(s) : `
@@ -35,9 +35,10 @@ export function render(s) {
           })}
           ${s.tasks.length ? horizon(s) : ''}`}
         </section>
+        ${getMode() === 'mine' ? '' : guide(s)}
         ${decisionBar(s)}
       </div>
-      ${mobile ? '' : renderMargin(s)}
+      ${renderMargin(s)}
     </div>`;
 }
 
@@ -59,7 +60,7 @@ function mineBar(s) {
         <b>${text}</b>
       </div>
       <div class="guide__acts">
-        <a class="btn btn--sm ${s.tasks.length ? '' : 'btn--ink'}" href="#/tasks">${icon('plus')} ${L('新增功課', 'Add task')}</a>
+        <a class="btn btn--sm ${s.tasks.length ? '' : 'btn--ink'}" href="#/add-task">${icon('plus')} ${L('新增功課', 'Add task')}</a>
         <a class="btn btn--sm" href="#/time">${icon('hatch')} ${L('沒空的時間', 'Busy times')}</a>
         ${s.tasks.length && left.length && !pending ? `<button class="btn btn--sm btn--ink" type="button" data-action="auto-plan">${icon('clock')} ${L('自動排程', 'Auto-schedule')}</button>` : ''}
       </div>
