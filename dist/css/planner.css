@@ -210,7 +210,7 @@ button.hatch:hover { box-shadow: inset 0 0 0 1.5px var(--ink-3); }
 }
 .paint-sel span { position: absolute; left: 6px; top: 4px; background: var(--ink); color: var(--paper); font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border-radius: 4px; }
 .planner.is-painting .pcol { cursor: crosshair; touch-action: none; }
-.planner.is-erasing button.hatch:not(.hatch--sleep):hover { box-shadow: inset 0 0 0 2px var(--seal); }
+.planner.is-busy-edit button.hatch:not(.hatch--sleep):hover { box-shadow: inset 0 0 0 2px var(--seal); }
 
 /* ---- 遠方：每份功課一行，不會互相重疊 ---- */
 .horizon { padding: 20px 22px 22px; border-top: 1px solid var(--rule); }

@@ -300,9 +300,9 @@ function openHatch(el) {
   if (!r) return;
   const kind = r.type === 'single' ? `${icon('pin')} ${L('只限這天', 'One day')}` : `${icon('repeat')} ${L('每週重複', 'Weekly')}`;
   const src = r.src === 'syllabus' ? L('從課程大綱找到，你核對過。', 'Found in your syllabus and checked by you.') : L('你自己加的。', 'Added by you.');
-  if (ui.editBusy && ui.timeTool === 'erase' && real) {
+  if (ui.editBusy && real) {
     openPopover(el, `
-      <div class="pop__eyebrow">${icon('eraser')} ${L('移除沒空時間', 'Remove busy time')}</div>
+      <div class="pop__eyebrow">${icon('hatch')} ${L('沒空時間', 'Busy')} · ${kind}</div>
       <div class="pop__title">${esc(r.label)}</div>
       <div class="pop__time">${ruleWhen(r)}</div>
       <div class="pop__section"><p style="font-size:13.5px;color:var(--ink-2)">${r.type === 'weekly' ? L('這是每週重複的沒空時間，移除後每週這段時間都會變回可以讀書。', 'This repeats weekly; removing it frees this time every week. ') : L('只會移除這一天。', 'Only this day is removed. ')}${r.src === 'syllabus' ? L('這是從課程大綱找到的上課時間。', 'This class time came from your syllabus.') : ''}</p></div>
@@ -325,9 +325,12 @@ const snap = (m) => Math.floor(m / 30) * 30;
 
 function cssNum(el, name) { return parseFloat(getComputedStyle(el).getPropertyValue(name)); }
 
+let lastPointer = 'mouse';
 document.addEventListener('pointerdown', (e) => {
+  lastPointer = e.pointerType;
   const col = e.target.closest('.planner.is-painting .pcol');
-  if (!col || e.button !== 0) return;
+  // 手機拖拉會和捲動打架：改成按一下空白處用表格新增（見下面的 click）
+  if (!col || e.button !== 0 || e.pointerType === 'touch') return;
   const pl = col.closest('.planner');
   const ppm = cssNum(pl, '--ppm');
   const pStart = cssNum(pl, '--p-start');
@@ -359,6 +362,26 @@ document.addEventListener('pointerup', () => {
   drawSel();
   paint = null;
   openPaint(p);
+});
+
+// 手機：按一下空白處，用表格新增（開始時間預設為按下的那個鐘頭）
+document.addEventListener('click', (e) => {
+  if (lastPointer !== 'touch' || !ui.editBusy) return;
+  const col = e.target.closest('.planner.is-painting .pcol');
+  if (!col || e.target.closest('.hatch, .blk')) return;
+  const pl = col.closest('.planner');
+  const m = cssNum(pl, '--p-start') + (e.clientY - col.getBoundingClientRect().top) / cssNum(pl, '--ppm');
+  openBusyForm(col, Math.min(1380, Math.max(0, Math.floor(m / 60) * 60)));
+});
+
+// 電腦：在灰色時段按右鍵直接移除
+document.addEventListener('contextmenu', (e) => {
+  const h = ui.editBusy && e.target.closest('.planner.is-busy-edit .hatch');
+  if (!h) return;
+  e.preventDefault();
+  closePopover();
+  if (h.dataset.rule && getState().unavailable.some((r) => r.id === h.dataset.rule)) removeRule(h.dataset.rule);
+  else if (!h.dataset.rule) toast(L('睡眠請在右邊修改', 'Change sleep on the right'), 'moon');
 });
 
 function drawSel() {
@@ -461,14 +484,14 @@ function focusDecision() {
 /* ---------------- 按鈕動作 ---------------- */
 const $ = (sel) => document.querySelector(sel);
 
-function openBusyForm(el) {
+function openBusyForm(el, start = 540) {
   const date = el.dataset.date || getState().today;
   openPopover(el, `<form data-form="busy">
     <h2 class="pop__title">${L('新增忙碌時段', 'Add busy time')}</h2>
     <label class="field"><span class="field__label">${L('名稱', 'Name')}</span><input class="input" name="label" maxlength="80" required></label>
     <label class="field"><span class="field__label">${L('日期', 'Date')}</span><input class="input" name="date" type="date" value="${date}" required></label>
-    <label class="field"><span class="field__label">${L('開始時間', 'Start time')}</span><input class="input" type="time" name="start" value="09:00" required></label>
-    <label class="field"><span class="field__label">${L('結束時間', 'End time')}</span><input class="input" type="time" name="end" value="10:00" required></label>
+    <label class="field"><span class="field__label">${L('開始時間', 'Start time')}</span><input class="input" type="time" name="start" value="${hm(start)}" required></label>
+    <label class="field"><span class="field__label">${L('結束時間', 'End time')}</span><input class="input" type="time" name="end" value="${hm(start + 60)}" required></label>
     <label class="field"><span class="field__label">${L('重複方式', 'Repeat')}</span><select class="select" name="repeat"><option value="single">${L('只限這天', 'One day')}</option><option value="weekly">${L('每週同一天', 'Weekly on this day')}</option></select></label>
     <p class="demo-note">${L('跨午夜的時段請分成兩天新增。', 'For overnight events, add a separate time on each day.')}</p>
     <button class="btn btn--ink" type="submit">${L('保存', 'Save')}</button>
@@ -539,7 +562,6 @@ const actions = {
     });
   },
   'guide-decide': () => { closePopover(); focusDecision(); },
-  tool: (el) => { ui.timeTool = el.dataset.tool; render(); },
   'dock-toggle': () => toggleDock(!ui.dockOpen),
   'dock-dismiss': (el) => { ui.dockDismissed.push(el.dataset.id); render(); },
   'dock-decide': () => focusDecision(),

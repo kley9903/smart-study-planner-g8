@@ -45,7 +45,7 @@
 | `dist/js/views/task-editor.js` | 新增／編輯任務表單、子任務與附件入口；新增頁右邊的「建議拆法」（`suggestSteps`，示範用固定範本，未接 AI；接 AI 時改這裡） |
 | `dist/js/views/tasks.js` | 任務列表、任務細節、步驟和進度 |
 | `dist/js/views/import.js` | 課程資料匯入及核對畫面；示範模式用預寫的抽取結果，自己的計劃只把 PDF 存在瀏覽器（`ownPanel`）；真正的 PDF／Canvas 抽取尚未接通 |
-| `dist/js/views/availability.js` | 「改沒空的時間」的工具列和右欄（睡眠、上課時間、你自己加的）；不再是獨立頁面，由本週按「改沒空的時間」打開（`ui.editBusy`），舊網址 `#/time` 會轉到這裡 |
+| `dist/js/views/availability.js` | 「改沒空的時間」的說明行和右欄（睡眠、上課時間、你自己加的）；拖拉新增、右鍵移除、手機按空白處新增的處理在 `app.js`；不再是獨立頁面，由本週按「改沒空的時間」打開（`ui.editBusy`），舊網址 `#/time` 會轉到這裡 |
 | `dist/js/views/margin.js` | AI 助手的對話內容、建議及選擇方案的畫面（放在右下角角色展開的面板裡） |
 | `dist/js/views/dock.js` | 每頁右下角的角色入口：名牌狀態、有事時的泡泡（可直接回答）、展開／縮小；名字在 `assistantName` 改 |
 | `dist/img/mascot.webp`、`mascot.png` | 角色待機動畫（12 fps、62 格）和第一格靜止圖（「減少動態效果」時用） |

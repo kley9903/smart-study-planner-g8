@@ -18,18 +18,15 @@
 .week__main { gap: 14px; }
 .week__sheet { border-radius: var(--radius-lg); }
 .wk-head { padding: 20px 22px 14px; gap: 10px; }
-.wk-head__side { width: 100%; grid-template-columns: 1fr auto; gap: 6px; }
-.wk-head__side > .seg { display: none; }
-.wk-head__side .legend { grid-column: 1; grid-row: 1; font-size: 12px; }
-.wk-head__side .wk-tools { grid-column: 2; grid-row: 1; }
+.wk-head { align-items: center; }
+.wk-head__side { width: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .wk-next { padding: 10px 22px; gap: 10px; }
 .guide { background: transparent; border: 0; box-shadow: none; padding: 6px 2px; border-radius: 0; }
-.mine-bar .guide__acts { margin-top: 6px; }
 .figma-guide { margin-top: 4px; font-size: 12.5px; color: var(--ink-3); }
 .figma-guide > summary { cursor: pointer; }
 
 /* 月曆 */
-.monthly-page { max-width: 1120px; min-height: 680px; overflow: hidden; }
+.monthly-page { min-height: 680px; overflow: hidden; }
 .monthly-page .month { padding: 24px; }
 .month__day { min-height: 110px; }
 
@@ -86,12 +83,10 @@
 /* 本週的「改沒空的時間」：讀書時段變淡、不能點，右欄換成睡眠和沒空時間清單 */
 .planner.is-busy-edit .blk, .planner.is-busy-edit .dl-line { opacity: 0.3; pointer-events: none; }
 .busy-side__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.week__sheet .tp__toolbar { border-top: 1px solid var(--rule); }
+.week__sheet .tp__hint { border-top: 1px solid var(--rule); }
 
 /* 不可用時段 */
 .tp { grid-template-columns: minmax(0, 3fr) minmax(240px, 1fr); gap: 24px; }
-.tp__toolbar { padding: 14px; }
-.tp__toolbar .seg { max-width: 100%; flex-wrap: wrap; }
 .tp__side { gap: 14px; }
 .side-card { padding: 18px; }
 .rules-toggle > span:first-child { color: var(--seal); }
@@ -101,7 +96,6 @@
 
 @media (max-width: 1179px) {
   .app-header__inner { gap: 12px; padding-inline: 22px; }
-  .brand__tag { display: none; }
   .top-nav__link { padding-inline: 10px; font-size: 14px; }
   .demo-badge .i, .demo-badge__long { display: none; }
   .demo-badge__short { display: inline; }
@@ -109,8 +103,6 @@
   .week.is-busy-edit { grid-template-columns: minmax(0, 2.6fr) minmax(250px, 1fr); }
   .tp { grid-template-columns: minmax(0, 2.6fr) minmax(240px, 1fr); gap: 18px; }
   .tp__side { grid-template-columns: 1fr; }
-  .wk-head__side { grid-template-columns: 1fr; justify-items: start; }
-  .wk-head__side .wk-tools { grid-column: 1; grid-row: 2; }
   .dbar { display: none; }
   .app-main { padding-inline: 22px; }
 }
@@ -140,7 +132,6 @@
   .top-nav .lbl-short { display: none; }
   .app-main { padding: 14px 14px 36px; }
   .wk-head { padding: 16px; }
-  .wk-head .legend { display: flex; flex-wrap: wrap; }
   .wk-tools { justify-content: flex-start; }
   .tasks { grid-template-columns: 1fr; }
   .tlist { min-height: 0; }
@@ -154,6 +145,5 @@
   .month__weekday { font-size: 11px; }
   .side-card { padding: 18px; }
   .btn, .seg__opt { min-height: 44px; }
-  .tp__toolbar .seg__opt { flex: 1 0 auto; }
 }
 @media (max-width: 359px) { :root { --header-h: 140px; } .header-tools { order: 4; flex-basis: 100%; justify-content: flex-end; } }

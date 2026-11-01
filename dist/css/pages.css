@@ -357,8 +357,6 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
    ========================================================= */
 .tp { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 22px; align-items: start; }
 .tp__main { overflow: hidden; }
-.tp__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; padding: 16px 22px; border-bottom: 1px solid var(--rule); background: var(--paper-2); }
-.tp__toolbar .legend { margin-left: auto; }
 .tp__hint { font-size: 13px; color: var(--ink-3); padding: 10px 22px; border-bottom: 1px solid var(--rule); display: flex; align-items: center; gap: 8px; }
 .tp__side { display: grid; gap: 14px; position: sticky; top: calc(var(--header-h) + 14px); }
 .side-card { padding: 18px 18px 16px; }
@@ -588,7 +586,6 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
   .wk-head { padding: 16px 16px 14px; }
   .wk-title { font-size: 24px; }
   .wk-head__side { justify-items: start; width: 100%; }
-  .wk-head .legend { display: none; }
   .wk-tools { justify-content: flex-start; }
   .wk-next { padding: 12px 16px; }
   .wk-next__why { display: none; }
@@ -613,8 +610,6 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
   .xtable .xrow--pencil td { background: transparent !important; }
   .xrow--pencil { background: linear-gradient(var(--graphite) 50%, transparent 50%) 0 0 / 2px 8px repeat-y, rgba(255, 255, 255, 0.6); }
   .xact { justify-content: flex-start; margin-top: 6px; }
-  .tp__toolbar { padding: 12px 14px; }
-  .tp__toolbar .legend { display: none; }
   .tp__hint { padding: 10px 14px; }
   .tp__side { grid-template-columns: 1fr; }
   .ob__sheet { padding: 22px 16px 20px; }
@@ -661,7 +656,6 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .wk-title { font-size: 27px; margin-top: 0; }
 .wk-head__side { gap: 8px; }
 .wk-sum { margin-top: 5px; font-size: 13px; }
-.wk-head .legend { font-size: 11.5px; }
 .wk-head .wk-tools { gap: 4px; }
 .month { padding: 20px; }
 .month__toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -696,7 +690,7 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .tasks > .tform { min-width: 0; align-self: start; }
 .tform textarea { width: 100%; resize: vertical; }
 .popover form { display: grid; gap: 12px; }
-@media (min-width: 1180px) { .wk-head { align-items: flex-start; } .wk-head__side { width: 100%; grid-template-columns: auto 1fr; align-items: center; } .wk-head__side .legend { grid-column: 2; grid-row: 1; } .wk-tools { grid-column: 1 / -1; } }
+
 @media (max-width: 759px) {
   .month { padding: 12px; }
   .month__day { min-height: 90px; padding: 6px 3px; }
