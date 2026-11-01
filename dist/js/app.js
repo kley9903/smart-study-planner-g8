@@ -3,12 +3,12 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment,
+  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc,
 } from './store.js';
 import { editor } from './views/task-editor.js';
 import { renderMonth, shiftMonth } from './views/month.js';
 import { stepFields, stepHelper, suggestSteps } from './views/task-editor.js';
-import { saveAttachment, getAttachment } from './attachments.js';
+import { saveAttachment, getAttachment, removeAttachment } from './attachments.js';
 import { L, setLang, applyStatic } from './i18n.js';
 import { toast, openPopover, closePopover, place, esc, icon, remember, recall } from './ui.js';
 import { drawArrows, forgetPencils } from './planner.js';
@@ -59,11 +59,6 @@ function render(info = {}) {
   }
   // 分享出去的示範情境連結（#/week?try=…）和新手導覽連結（#/week?tour=1）一律在導覽模式打開
   if ((r.query.get('try') || r.query.get('tour')) && getMode() !== 'demo') enterDemo();
-  // 課程資料頁只有示範內容；AI 抽取大綱接上之前，自己的計劃不顯示這頁
-  if (r.name === 'import' && getMode() === 'mine') {
-    location.replace('#/week');
-    return;
-  }
   document.body.dataset.mode = getMode();
   if (r.name === 'margin' && wide()) {
     const q = r.query.toString();
@@ -529,6 +524,11 @@ const actions = {
   },
   doc: (el) => { ui.docId = el.dataset.doc; ui.editItem = null; render(); },
   'open-doc': (el) => { ui.docId = el.dataset.doc; },
+  'doc-remove': (el) => {
+    if (!confirm(L('從這個瀏覽器移除這份大綱？', 'Remove this syllabus from this browser?'))) return;
+    removeAttachment(el.dataset.doc).catch(() => {});
+    removeOwnDoc(el.dataset.doc);
+  },
   'demo-docs': () => {
     document.getElementById('review')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     toast(L('下面是示範大綱的抽取結果（預先寫好）', 'Below are the demo extraction results (pre-written)'), 'info');
@@ -696,9 +696,20 @@ async function saveGuides(taskId, files) {
   }
 }
 
-function takeFiles(files) {
+async function takeFiles(files) {
   const names = [...files].map((f) => f.name).join('、');
   if (!names) return;
+  if (getMode() === 'mine' && current.name === 'import') {
+    for (const file of files) {
+      if (file.size > 20 * 1024 * 1024) { toast(L(`「${file.name}」超過 20 MB`, `"${file.name}" is over 20 MB`), 'alert'); continue; }
+      const id = crypto.randomUUID();
+      try {
+        await saveAttachment(id, file);
+        addOwnDoc({ id, name: file.name, size: file.size });
+      } catch { toast(L('儲存失敗，請檢查瀏覽器儲存空間。', 'Could not save. Check browser storage space.'), 'alert'); return; }
+    }
+    return;
+  }
   ui.dropMsg = `收到檔名「${names}」。原型不會上傳或讀取內容，會改用示範大綱。`;
   if (current.name === 'start') {
     ob.loaded = true;

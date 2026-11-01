@@ -22,3 +22,4 @@ async function request(mode, operation) {
 }
 export const saveAttachment = (id, file) => request('readwrite', (store) => store.put(file, id));
 export const getAttachment = (id) => request('readonly', (store) => store.get(id));
+export const removeAttachment = (id) => request('readwrite', (store) => store.delete(id));

@@ -44,7 +44,7 @@
 | `dist/js/views/month.js` | 共用任務與忙碌資料的月曆、跨月切換及日期選擇 |
 | `dist/js/views/task-editor.js` | 新增／編輯任務表單、子任務與附件入口；新增頁右邊的「建議拆法」（`suggestSteps`，示範用固定範本，未接 AI；接 AI 時改這裡） |
 | `dist/js/views/tasks.js` | 任務列表、任務細節、步驟和進度 |
-| `dist/js/views/import.js` | 課程資料匯入及核對畫面；真正的 PDF／Canvas 抽取尚未接通 |
+| `dist/js/views/import.js` | 課程資料匯入及核對畫面；示範模式用預寫的抽取結果，自己的計劃只把 PDF 存在瀏覽器（`ownPanel`）；真正的 PDF／Canvas 抽取尚未接通 |
 | `dist/js/views/availability.js` | 沒空時段與睡眠設定畫面 |
 | `dist/js/views/margin.js` | AI 助手區、建議及選擇方案的畫面 |
 | `dist/js/views/about.js` | 原型說明與使用說明頁 |

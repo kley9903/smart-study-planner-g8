@@ -481,6 +481,19 @@ export function updateTask(id, fields, steps) {
   emit({ toast: changed ? L('已保存。尚未開始的安排已清除，請到本週重新排程並確認。', 'Saved. Unstarted sessions cleared; schedule again on Week and confirm.') : L('任務已保存', 'Task saved'), keepScroll: true });
 }
 
+/** 自己的計劃：大綱檔案存在瀏覽器，這裡只記檔名；自動抽取未接通，所以沒有項目。 */
+export function addOwnDoc({ id, name, size }) {
+  state.docs.push({ id, name, size, own: true, pages: null, course: null, items: [] });
+  ui.docId = id;
+  emit({ toast: L(`已保存「${name}」`, `Saved "${name}"`), keepScroll: true });
+}
+
+export function removeOwnDoc(id) {
+  state.docs = state.docs.filter((d) => d.id !== id);
+  if (ui.docId === id) ui.docId = state.docs[0]?.id || null;
+  emit({ toast: L('已移除這份大綱', 'Syllabus removed'), toastIcon: 'x', keepScroll: true });
+}
+
 export function addTaskAttachment(taskId, metadata) {
   const task = taskOf(state, taskId);
   if (!task) return;
