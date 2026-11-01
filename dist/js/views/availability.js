@@ -1,44 +1,18 @@
 // 改沒空的時間：在「本週」按「改沒空的時間」進入，不另開一頁。
-// 時間表上方換成工具列，可以直接塗灰；右邊的 AI 助手換成睡眠、上課時間、你自己加的。
+// 不用選工具：拖拉就新增，灰色時段按右鍵就移除（手機：按空白處新增，按灰色時段再按「移除」）。
+// 右邊的 AI 助手位置換成睡眠、上課時間、你自己加的。
 import { esc, icon } from '../ui.js';
 import { ui, getMode } from '../store.js';
 import { span, hm, dayShort, md, wdName, hoursText } from '../time.js';
 import { isMobile } from './week.js';
 import { L } from '../i18n.js';
 
-export function tool() {
-  if (!ui.timeTool) ui.timeTool = isMobile() ? 'view' : 'paint';
-  return ui.timeTool;
-}
-
-/** 時間表要加的 class：塗色中／移除中 */
-export function toolClass() {
-  const t = tool();
-  return t === 'paint' ? 'is-painting' : t === 'erase' ? 'is-erasing' : '';
-}
-
-/** 放在時間表上方：查看／標記沒空／移除，以及目前工具的說明 */
-export function busyToolbar() {
-  const t = tool();
-  const hint = {
-    paint: L('在時間格上按住並向下拖，放手後替這段時間命名。讀書時段暫時變淡，方便看會不會撞到。', 'Press and drag down on the grid, then name the time when you let go. Study sessions are faded so you can see clashes.'),
-    erase: L('按一下灰色時段就可以移除（睡眠請在右邊修改）。', 'Press a gray block to remove it (change sleep on the right).'),
-    view: L('按一下灰色時段查看詳情；要新增，選「標記沒空」。', 'Press a gray block for details; to add one, choose "Mark busy".'),
-  }[t];
-  return `
-    <div class="tp__toolbar">
-      <div class="seg" role="group" aria-label="${L('工具', 'Tool')}">
-        <button class="seg__opt" type="button" data-action="tool" data-tool="view" aria-pressed="${t === 'view'}">${icon('eye')} ${L('查看', 'View')}</button>
-        <button class="seg__opt" type="button" data-action="tool" data-tool="paint" aria-pressed="${t === 'paint'}">${icon('pencil')} ${L('標記沒空', 'Mark busy')}</button>
-        <button class="seg__opt" type="button" data-action="tool" data-tool="erase" aria-pressed="${t === 'erase'}">${icon('eraser')} ${L('移除', 'Remove')}</button>
-      </div>
-      <div class="legend" aria-label="${L('圖例', 'Legend')}">
-        <span class="legend__item"><i class="sw sw--off sw--icon">${icon('repeat')}</i>${L('每週重複', 'Weekly')}</span>
-        <span class="legend__item"><i class="sw sw--off sw--icon">${icon('pin')}</i>${L('只限這天', 'One day')}</span>
-        <span class="legend__item"><i class="sw sw--sleep sw--icon">${icon('moon')}</i>${L('睡眠', 'Sleep')}</span>
-      </div>
-    </div>
-    <p class="tp__hint">${icon('info')} ${hint}</p>`;
+/** 放在時間表上方的一行說明 */
+export function busyHint() {
+  const hint = isMobile()
+    ? L('按空白處新增沒空的時間；按灰色時段可以移除。', 'Tap an empty spot to add busy time; tap a gray block to remove it.')
+    : L('按住向下拖，新增沒空的時間；在灰色時段按右鍵就移除。讀書時段暫時變淡，方便看會不會撞到。', 'Drag down on the grid to add busy time; right-click a gray block to remove it. Study sessions are faded so you can see clashes.');
+  return `<p class="tp__hint">${icon('info')} ${hint}</p>`;
 }
 
 /** 取代 AI 助手的右欄 */

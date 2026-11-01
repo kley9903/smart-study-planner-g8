@@ -12,7 +12,7 @@ import { md, span, hm, hShort, num, addDays, dayNum, wd, wk, mdNum, isWeekend, d
 import { HORIZON_DAYS, WINDOW_DAYS } from '../demo-data.js';
 import { L } from '../i18n.js';
 import { renderMonth } from './month.js';
-import { busyToolbar, busySide, toolClass } from './availability.js';
+import { busyHint, busySide } from './availability.js';
 
 export const isMobile = () => window.innerWidth < 760;
 
@@ -25,16 +25,15 @@ export function render(s) {
   return `
     <div class="week ${editing ? 'is-busy-edit' : ''}">
       <div class="week__main">
-        ${getMode() === 'mine' ? mineBar(s) : ''}
         <section class="sheet week__sheet" aria-label="${L('未來 7 日讀書計劃', 'Study plan for the next 7 days')}">
           ${head(s, dates, editing)}
           ${ui.calendarView === 'month' ? renderMonth(s) : `
-          ${editing ? busyToolbar() : nextBar(s)}
+          ${editing ? busyHint() : nextBar(s)}
           ${mobile ? dayPicker(s, dates) : ''}
           ${renderPlanner(s, {
             dates: mobile ? [ui.day] : dates, mode: 'week',
             hlTask: editing ? null : ui.hlTask, hlRule: editing ? ui.hlRule : null, showGaps: !editing && ui.showGaps,
-            justInked: ui.justInked, colMin: mobile ? 240 : null, extraClass: editing ? `is-busy-edit ${toolClass()}` : '',
+            justInked: ui.justInked, colMin: mobile ? 240 : null, extraClass: editing ? 'is-busy-edit is-painting' : '',
           })}
           ${!editing && s.tasks.length ? horizon(s) : ''}`}
         </section>
@@ -43,31 +42,6 @@ export function render(s) {
       </div>
       ${editing ? busySide(s) : ''}
     </div>`;
-}
-
-/* ---------- 我的計劃：下一步該做甚麼 ---------- */
-function mineBar(s) {
-  const left = unplannedSteps(s);
-  const pending = pendingProposal(s);
-  let text;
-  if (!s.tasks.length) text = L('先加入功課和 deadline，再標記沒空的時間，然後按「自動排程」。', 'Add your tasks and deadlines, mark when you are busy, then press "Auto-schedule".');
-  else if (pending) text = L('自動排程的建議在下面，確認後才會生效。', 'The suggested schedule is below; it takes effect once you confirm.');
-  else if (left.length) {
-    const h = hoursText(left.reduce((a, x) => a + x.step.min, 0));
-    text = L(`還有 ${left.length} 段未排（共 ${h}）。`, `${left.length} part${left.length === 1 ? '' : 's'} not scheduled yet (${h}).`);
-  } else text = L('全部功課都已排好。', 'Everything is scheduled.');
-  return `
-    <section class="guide mine-bar" aria-label="${L('我的計劃', 'My plan')}">
-      <div class="guide__head">
-        <span class="guide__badge">${icon('calendar')} ${L('我的計劃', 'My plan')}</span>
-        <b>${text}</b>
-      </div>
-      <div class="guide__acts">
-        <a class="btn btn--sm ${s.tasks.length ? '' : 'btn--ink'}" href="#/add-task">${icon('plus')} ${L('新增功課', 'Add task')}</a>
-        <button class="btn btn--sm" type="button" data-action="busy-edit" data-on="${ui.editBusy ? 0 : 1}" aria-pressed="${!!ui.editBusy}">${icon('hatch')} ${ui.editBusy ? L('完成', 'Done') : L('沒空的時間', 'Busy times')}</button>
-        ${s.tasks.length && left.length && !pending ? `<button class="btn btn--sm btn--ink" type="button" data-action="auto-plan">${icon('clock')} ${L('自動排程', 'Auto-schedule')}</button>` : ''}
-      </div>
-    </section>`;
 }
 
 /* ---------- 示範導覽 ---------- */
@@ -147,29 +121,29 @@ function head(s, dates, editing) {
   const pc = pendingCount(s);
   const total = plannedTotal(s);
   const far = s.tasks.filter((t) => diffDays(s.today, t.due.date) <= HORIZON_DAYS).length;
+  // 自己的計劃：未排的段數、新增功課和自動排程都放在頁頭，不另開一列
+  const mine = getMode() === 'mine';
+  const left = mine ? unplannedSteps(s) : [];
+  const canPlan = mine && !editing && s.tasks.length && left.length && !pendingProposal(s);
   return `
     <header class="wk-head">
       <div>
         <h1 class="wk-title">${ui.calendarView === 'month' ? L('截止日期總覽', 'Deadlines at a glance') : `${md(dates[0])}<span class="wk-title__dash">—</span>${md(dates[dates.length - 1])}`}</h1>
         <p class="wk-sum">
-          <span>${L(`已排 <b>${num(total / 60)}</b> 小時讀書`, `<b>${num(total / 60)}</b> h of study planned`)}</span>
-          <span>${L(`${far} 個 deadline 在 20 日內`, `${far} deadline${far === 1 ? '' : 's'} within 20 days`)}</span>
+          ${mine && !s.tasks.length
+            ? `<span>${L('先加入功課和 deadline，再按「自動排程」。', 'Add your tasks and deadlines, then press "Auto-schedule".')}</span>`
+            : `<span>${L(`已排 <b>${num(total / 60)}</b> 小時讀書`, `<b>${num(total / 60)}</b> h of study planned`)}</span>
+          <span>${L(`${far} 個 deadline 在 20 日內`, `${far} deadline${far === 1 ? '' : 's'} within 20 days`)}</span>`}
+          ${canPlan ? `<span class="is-alert">${L(`<b>${left.length}</b> 段未排（共 ${hoursText(left.reduce((a, x) => a + x.step.min, 0))}）`, `<b>${left.length}</b> part${left.length === 1 ? '' : 's'} not scheduled`)}</span>` : ''}
           ${pc ? `<span class="is-alert">${L(`<b>${pc}</b> 項等你決定`, `<b>${pc}</b> waiting for you`)}</span>` : ''}
         </p>
       </div>
       <div class="wk-head__side">
-        <div class="seg" role="group" aria-label="${L('日曆視圖', 'Calendar view')}">
-          <button class="seg__opt" data-action="calendar-view" data-view="week" aria-pressed="${ui.calendarView === 'week'}">${L('週', 'Week')}</button>
-          <button class="seg__opt" data-action="calendar-view" data-view="month" aria-pressed="${ui.calendarView === 'month'}">${L('月', 'Month')}</button>
-        </div>
-        <div class="legend" ${ui.calendarView === 'month' ? 'hidden' : ''} aria-label="${L('圖例', 'Legend')}">
-          <span class="legend__item"><i class="sw sw--ink"></i>${L('實色：已確認', 'Solid: confirmed')}</span>
-          <span class="legend__item"><i class="sw sw--pencil"></i>${L('虛線：AI 建議（未確認）', 'Dashed: suggested (not confirmed)')}</span>
-          <span class="legend__item"><i class="sw sw--off"></i>${L('灰色：沒空', 'Gray: busy')}</span>
-        </div>
         <div class="wk-tools" ${ui.calendarView === 'month' ? 'hidden' : ''}>
+          ${mine && !editing ? `<a class="btn btn--sm ${s.tasks.length ? 'btn--ghost' : 'btn--ink'}" href="#/add-task">${icon('plus')} ${L('新增功課', 'Add task')}</a>` : ''}
           ${editing ? '' : `<button class="btn btn--sm btn--ghost" type="button" data-action="toggle-gaps" aria-pressed="${ui.showGaps}">${icon('eye')} ${ui.showGaps ? L('隱藏空檔', 'Hide free time') : L('顯示空檔', 'Show free time')}</button>`}
           <button class="btn btn--sm ${editing ? 'btn--ink' : 'btn--ghost'}" type="button" data-action="busy-edit" data-on="${editing ? 0 : 1}" aria-pressed="${editing}">${editing ? `${icon('check')} ${L('完成', 'Done')}` : `${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}`}</button>
+          ${canPlan ? `<button class="btn btn--sm btn--ink" type="button" data-action="auto-plan">${icon('clock')} ${L('自動排程', 'Auto-schedule')}</button>` : ''}
         </div>
       </div>
     </header>`;
