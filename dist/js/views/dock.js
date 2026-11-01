@@ -74,19 +74,29 @@ export function renderDock(s, { quiet = false } = {}) {
   const open = !!ui.dockOpen;
   const b = !open && !quiet ? bubbleFor(s) : null;
   const bubble = b && !ui.dockDismissed.includes(b.id) ? b : null;
+  const minimize = L(`縮小${assistantName()}`, `Minimize ${assistantName()}`);
   return {
     open,
-    bubble: !!bubble,
+    bubble: bubble?.id || '',
     html: `
-      ${open ? `<div class="dock__panel" role="dialog" aria-modal="false" aria-label="${assistantName()}">${renderMargin(s)}</div>` : ''}
+      ${open ? `
+        <div class="dock__panel" role="dialog" aria-modal="false" aria-label="${assistantName()}">
+          <button class="dock__perch" type="button" data-action="dock-toggle" aria-label="${minimize}">${mascotImg('', 122, 189, 'mascot-rest')}</button>
+          ${renderMargin(s)}
+        </div>` : ''}
       ${bubble ? `
         <div class="dock__bubble" role="status">
           ${bubble.html}
+          <svg class="dock__tail" viewBox="0 0 20 18" aria-hidden="true"><path d="M1 0 L19 17 L12 0"/><path class="dock__tail-cover" d="M2.4 0.75 H11.4"/></svg>
           <button class="dock__x" type="button" data-action="dock-dismiss" data-id="${bubble.id}" aria-label="${L('先不理', 'Dismiss')}">${icon('x')}</button>
         </div>` : ''}
-      <button class="dock__me" type="button" data-action="dock-toggle" aria-expanded="${open}" aria-label="${open ? L(`縮小${assistantName()}`, `Minimize ${assistantName()}`) : L(`打開${assistantName()}`, `Open ${assistantName()}`)}">
+      <button class="dock__me" type="button" data-action="dock-toggle" aria-expanded="${open}" aria-label="${open ? minimize : L(`打開${assistantName()}`, `Open ${assistantName()}`)}">
         <span class="dock__tag"><b>${assistantName()}</b><span>${status(s)}</span></span>
-        ${mascotImg('dock__fig', 122, 189)}
+        <span class="dock__fig">
+          ${mascotImg('dock__stand', 122, 189)}
+          <span class="dock__drop" aria-hidden="true"></span>
+          ${mascotImg('dock__rest', 122, 189, 'mascot-rest')}
+        </span>
       </button>`,
   };
 }

@@ -1,5 +1,5 @@
 // AI 助手：AI 的回覆、建議改動（① 選做法 ② 看改動 ③ 確認）、進度回報和輸入框。
-// 放在右下角角色展開的面板裡（views/dock.js）。
+// 放在右下角角色展開的面板裡（views/dock.js），角色趴在面板右上角。
 import { esc, icon } from '../ui.js';
 import { ui, availableChips, getMode } from '../store.js';
 import { HERO } from '../scenarios.js';
@@ -7,8 +7,8 @@ import { taskOf, stepOf, inkOf } from '../model.js';
 import { span, dayShort, md, hm, hoursText } from '../time.js';
 import { L } from '../i18n.js';
 
-/** 角色：平時播待機動畫；系統設定「減少動態效果」時只顯示第一格 */
-export const mascotImg = (cls, w, h) => `<picture class="${cls}"><source srcset="img/mascot.png" media="(prefers-reduced-motion: reduce)"><img src="img/mascot.webp" alt="" width="${w}" height="${h}"></picture>`;
+/** 角色動畫（mascot 站著、mascot-rest 趴著）；系統設定「減少動態效果」時改用同名的靜止圖 */
+export const mascotImg = (cls, w, h, name = 'mascot') => `<picture class="${cls}"><source srcset="img/${name}.png" media="(prefers-reduced-motion: reduce)"><img src="img/${name}.webp" alt="" width="${w}" height="${h}"></picture>`;
 
 // 只讓「新」訊息有淡入動畫；第一次打開頁面時已有的訊息不動
 const seen = new Set();
@@ -22,7 +22,6 @@ export function renderMargin(s) {
   return `
   <aside class="margin" id="margin" aria-label="${mine ? L('排程助手', 'Planning assistant') : L('AI 助手（示範）', 'AI assistant (demo)')}">
     <header class="margin__head">
-      ${mascotImg('margin__avatar', 40, 62)}
       <div class="margin__title">
         <h2>${mine ? L('排程助手', 'Planning assistant') : L('AI 助手', 'AI assistant')}
         ${mine

@@ -172,9 +172,26 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .dock > * { pointer-events: auto; }
 .dock__me { display: flex; align-items: flex-end; gap: 8px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
 .dock__me:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 12px; }
-.dock__fig { display: block; height: 197px; overflow: hidden; transition: height 0.25s var(--ease); }
-.dock__fig img { display: block; width: 122px; height: 189px; image-rendering: pixelated; transition: transform 0.15s; }
-.dock__me:hover .dock__fig img { transform: translateY(-3px); }
+/* 角色：站著（mascot.webp）→ 腳下一空直直掉下去 → 雙手抓住畫面底邊（mascot-drop.webp，8 格 sprite）→ 趴著（mascot-rest.webp）。
+   三者同一個 122×189 框，框的底邊就是畫面底邊；抓住和趴著的每一格雙手底部都在 y=154。
+   趴著時框縮成 84px、內容上移 70px，只露出頭和雙手 */
+.dock__fig { position: relative; display: block; width: 122px; height: 197px; overflow: hidden; }
+.dock__fig > * { position: absolute; left: 0; top: 0; width: 122px; height: 189px; }
+.dock__fig img { display: block; width: 122px; height: 189px; image-rendering: pixelated; }
+.dock__drop { display: none; background: url(../img/mascot-drop.webp) 0 0 / 976px 189px no-repeat; image-rendering: pixelated; transform: translateY(43px); }
+.dock__rest { display: none; }
+.dock.is-rest .dock__stand { display: none; }
+.dock.is-dropping .dock__stand { animation: mascot-fall 0.28s cubic-bezier(0.55, 0, 1, 0.45) forwards; }
+.dock.is-dropping .dock__drop { display: block; visibility: hidden; animation: mascot-show 0s 0.28s forwards, mascot-catch 0.56s steps(7) 0.28s forwards; }
+.dock.is-rest .dock__rest { display: block; }
+.dock.is-rest .dock__fig { height: 84px; }
+.dock.is-rest .dock__fig > * { transform: translateY(-70px); }
+.dock.is-waking .dock__stand { animation: mascot-rise 0.32s cubic-bezier(0.2, 0.8, 0.3, 1) backwards; }
+@keyframes mascot-fall { to { transform: translateY(104px); visibility: hidden; } }
+@keyframes mascot-rise { from { transform: translateY(104px); } }
+@keyframes mascot-show { to { visibility: visible; } }
+@keyframes mascot-catch { to { background-position: -854px 0; } }
+.dock__me:hover .dock__stand img { transform: translateY(-3px); transition: transform 0.15s; }
 .dock__tag {
   display: grid; gap: 1px; margin-bottom: 46px; padding: 7px 12px; border-radius: 12px; white-space: nowrap; text-align: left;
   background: var(--paper); border: 1px solid var(--rule); box-shadow: var(--shadow-card);
@@ -182,33 +199,50 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 }
 .dock__tag b { font-size: 13px; font-weight: 700; color: var(--ink); }
 .dock__dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--seal); margin-right: 5px; vertical-align: 1px; }
+/* 說話泡泡：實線墨色邊框（虛線留給「AI 建議，未確認」），尾巴指向她的頭，從尾巴那一點彈出 */
 .dock__bubble {
-  position: relative; width: min(300px, calc(100vw - 36px)); margin-bottom: -2px; padding: 12px 36px 12px 14px; border-radius: 14px;
-  background: #fff; border: 1.5px dashed var(--graphite); box-shadow: var(--shadow-pop);
-  font-size: 13.5px; line-height: 1.6; color: var(--ink-2); animation: pop-in 0.2s var(--ease) both; transition: opacity 0.2s, transform 0.2s;
+  position: relative; width: min(300px, calc(100vw - 36px)); margin-bottom: 18px; padding: 12px 36px 12px 14px; border-radius: 16px;
+  background: #fff; border: 1.5px solid var(--ink); box-shadow: var(--shadow-pop);
+  font-size: 13.5px; line-height: 1.6; color: var(--ink-2); transform-origin: calc(100% - 46px) calc(100% + 16px);
+  animation: bubble-in 0.24s var(--ease) backwards; transition: opacity 0.2s, transform 0.2s;
 }
+@keyframes bubble-in { from { opacity: 0; transform: scale(0.6); } }
 .dock__bubble b { color: var(--ink); }
+.dock__tail { position: absolute; top: 100%; right: 46px; width: 20px; height: 18px; overflow: visible; }
+.dock__tail path { fill: #fff; stroke: var(--ink); stroke-width: 1.5; stroke-linejoin: round; }
+.dock__tail .dock__tail-cover { fill: none; stroke: #fff; stroke-width: 2.4; }
 .dock__acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .dock__x { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--ink-3); display: grid; place-items: center; }
 .dock__x:hover { background: var(--paper-2); color: var(--ink); }
-.dock.is-peek .dock__fig { height: 90px; }
-.dock.is-peek .dock__tag, .dock.is-peek .dock__bubble { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.dock.is-dropping .dock__tag, .dock.is-dropping .dock__bubble, .dock.is-rest .dock__tag, .dock.is-rest .dock__bubble { opacity: 0; transform: translateY(8px); pointer-events: none; }
 .dock.is-open .dock__me { display: none; }
-.dock__panel { width: min(400px, calc(100vw - 36px)); height: min(620px, calc(100vh - var(--header-h) - 36px)); margin-bottom: 18px; }
+/* 面板上方留 86px 給趴在右上角的她 */
+.dock__panel { position: relative; width: min(400px, calc(100vw - 36px)); height: min(620px, calc(100vh - var(--header-h) - 124px)); margin-bottom: 18px; }
 .dock__panel .margin { position: relative; top: auto; height: 100%; max-height: none; border: 1px solid var(--rule); box-shadow: var(--shadow-pop); }
+.dock__perch { position: absolute; right: 22px; bottom: 100%; z-index: 1; width: 122px; height: 84px; margin-bottom: -3px; padding: 0; border: 0; background: none; overflow: hidden; cursor: pointer; }
+.dock__perch img { display: block; width: 122px; height: 189px; image-rendering: pixelated; transform: translateY(-70px); }
 .margin__head { align-items: center; }
-.margin__avatar { flex: none; margin: -8px 0 -12px; }
 .margin__title { flex: 1; min-width: 0; }
 .margin__title h2 { font-size: 18px; flex-wrap: wrap; }
 @media (max-width: 759px) {
   .dock { right: 10px; }
   .dock__tag { display: none; }
-  .dock__fig { height: 80px; } /* 手機一直只露出頭 */
+  /* 手機一直趴著 */
+  .dock .dock__fig { height: 84px; }
+  .dock .dock__fig > * { transform: translateY(-70px); animation: none; }
+  .dock .dock__stand, .dock .dock__drop { display: none; }
+  .dock .dock__rest { display: block; }
   .dock.is-open { left: 0; right: 0; }
-  .dock__panel { width: 100%; height: 85vh; margin: 0; }
+  .dock__panel { width: 100%; height: calc(100vh - var(--header-h) - 140px); margin: 0; } /* 手機頁首會換行變高 */
   .dock__panel .margin { border-radius: 18px 18px 0 0; }
 }
-@media (prefers-reduced-motion: reduce) { .dock__fig, .dock__fig img, .dock__tag, .dock__bubble { transition: none; animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .dock__fig > *, .dock__tag, .dock__bubble { transition: none; animation: none; }
+  .dock.is-dropping .dock__stand, .dock.is-dropping .dock__drop { display: none; }
+  .dock.is-dropping .dock__rest { display: block; }
+  .dock.is-dropping .dock__fig { height: 84px; }
+  .dock.is-dropping .dock__fig > * { transform: translateY(-70px); }
+}
 
 
 /* =========================================================

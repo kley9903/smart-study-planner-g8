@@ -48,7 +48,9 @@
 | `dist/js/views/availability.js` | 「改沒空的時間」的說明行和右欄（睡眠、上課時間、你自己加的）；拖拉新增、右鍵移除、手機按空白處新增的處理在 `app.js`；不再是獨立頁面，由本週按「改沒空的時間」打開（`ui.editBusy`），舊網址 `#/time` 會轉到這裡 |
 | `dist/js/views/margin.js` | AI 助手的對話內容、建議及選擇方案的畫面（放在右下角角色展開的面板裡） |
 | `dist/js/views/dock.js` | 每頁右下角的角色入口：名牌狀態、有事時的泡泡（可直接回答）、展開／縮小；名字在 `assistantName` 改 |
-| `dist/img/mascot.webp`、`mascot.png` | 角色待機動畫（12 fps、62 格）和第一格靜止圖（「減少動態效果」時用） |
+| `dist/img/mascot.webp`、`mascot.png` | 角色站著的待機動畫（12 fps、62 格）和靜止圖（「減少動態效果」時用） |
+| `dist/img/mascot-drop.webp` | 「雙手抓住底邊」：8 格橫向 sprite（976×189），每格雙手底部對齊 y=154；站著的圖先直直掉下去，再用 CSS `steps(7)` 播一次 |
+| `dist/img/mascot-rest.webp`、`mascot-rest.png` | 趴著的循環動畫（12 fps）和靜止圖；捲動、打字、閒置 30 秒時，以及趴在打開的面板右上角 |
 | `dist/js/views/about.js` | 原型說明與使用說明頁 |
 
 ## 資料與功能邏輯
