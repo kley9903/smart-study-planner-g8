@@ -43,7 +43,19 @@ export function render(s) {
       </div>
 
       ${review(s, doc)}
+      ${confirmed(doc)}
     </div>`;
+}
+
+function confirmed(doc) {
+  const items = doc.items.filter((i) => i.state === 'ink');
+  return `
+    <section class="kept" aria-label="${L('已確認的項目', 'Confirmed items')}">
+      <h2 class="kept__title">${L('已確認、會用來排程', 'Confirmed for planning')} <span>${items.length}</span></h2>
+      ${items.length ? `<div class="kept__grid">${items.map((it) => `
+        <div class="kept__item"><span class="xtype">${esc(it.type)}</span><b>${esc(it.what)}</b><span class="kept__when">${esc(it.when)}</span></div>`).join('')}</div>`
+        : `<p class="muted">${L('還沒有確認任何項目。在上面的表核對後，會出現在這裡。', 'Nothing confirmed yet. Items you confirm in the table above appear here.')}</p>`}
+    </section>`;
 }
 
 function docCard(s, d, current) {

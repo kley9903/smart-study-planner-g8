@@ -429,11 +429,11 @@ function splitMinutes(total) {
   return out;
 }
 
-export function addTask({ title, course, kind, date, min, hours, requirements = '' }) {
-  const total = Math.max(30, Math.round(hours * 2) * 30);
+export function addTask({ title, course, kind, date, min, hours, requirements = '' }, ownSteps = []) {
   const id = nid('t');
-  const parts = splitMinutes(total);
-  const steps = parts.map((m, i) => ({ id: `${id}-${i + 1}`, title: parts.length > 1 ? L(`第 ${i + 1} 部分`, `Part ${i + 1}`) : L('全部', 'All'), min: m, progress: 'todo' }));
+  const total = ownSteps.length ? ownSteps.reduce((n, st) => n + st.min, 0) : Math.max(30, Math.round(hours * 2) * 30);
+  const parts = ownSteps.length ? ownSteps : splitMinutes(total).map((m, i, all) => ({ title: all.length > 1 ? L(`第 ${i + 1} 部分`, `Part ${i + 1}`) : L('全部', 'All'), min: m }));
+  const steps = parts.map((st, i) => ({ id: `${id}-${i + 1}`, title: st.title, min: st.min, progress: 'todo' }));
   state.tasks.push({
     id, course: courseFor(course), title, short: title.length > 14 ? `${title.slice(0, 13)}…` : title, kind,
     due: { date, min }, requirements, attachments: [], weight: '', source: null, estimateBy: 'me', estimateConfirmed: true, steps, aiNote: '',

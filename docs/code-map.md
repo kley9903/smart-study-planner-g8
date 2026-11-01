@@ -42,7 +42,7 @@
 | `dist/js/views/start.js` | 歡迎頁及首次使用的設定步驟 |
 | `dist/js/views/week.js` | 本週時間表、任務摘要、遠方截止日期 |
 | `dist/js/views/month.js` | 共用任務與忙碌資料的月曆、跨月切換及日期選擇 |
-| `dist/js/views/task-editor.js` | 新增／編輯任務表單、子任務與附件入口 |
+| `dist/js/views/task-editor.js` | 新增／編輯任務表單、子任務與附件入口；新增頁右邊的「建議拆法」（`suggestSteps`，示範用固定範本，未接 AI；接 AI 時改這裡） |
 | `dist/js/views/tasks.js` | 任務列表、任務細節、步驟和進度 |
 | `dist/js/views/import.js` | 課程資料匯入及核對畫面；真正的 PDF／Canvas 抽取尚未接通 |
 | `dist/js/views/availability.js` | 沒空時段與睡眠設定畫面 |
