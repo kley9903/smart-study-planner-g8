@@ -7,7 +7,7 @@ import {
 } from './store.js';
 import { editor } from './views/task-editor.js';
 import { renderMonth, shiftMonth } from './views/month.js';
-import { stepFields } from './views/task-editor.js';
+import { stepFields, stepHelper, suggestSteps } from './views/task-editor.js';
 import { saveAttachment, getAttachment } from './attachments.js';
 import { L, setLang, applyStatic } from './i18n.js';
 import { toast, openPopover, closePopover, place, esc, icon, remember, recall } from './ui.js';
@@ -27,7 +27,7 @@ import { renderMargin } from './views/margin.js';
 const views = {
   week, tasks,
   monthly: { render: (s) => `<div class="page-head"><div><h1 class="page-head__title">${L('月曆', 'Monthly')}</h1><p class="page-head__lede">${L('查看整個月的截止日期及忙碌時段，點選日期新增或查看內容。', 'View deadlines and busy times for the month. Select a date to view or add items.')}</p></div></div><section class="sheet monthly-page">${renderMonth(s)}</section>` },
-  'add-task': { render: (s) => `<div class="page-head"><h1 class="page-head__title">${L('新增任務', 'Add task')}</h1></div><div class="add-task-page">${editor(s, null, ui.taskDate)}<aside class="card add-task-help"><h2>${L('任務說明', 'Task details')}</h2><p>${L('填寫截止時間和預計時數，保存後可以修改子任務及加入作業說明附件。', 'Enter a deadline and an estimate. After saving, edit the steps and attach assignment guidelines.')}</p><p>${L('到本週產生排程建議，確認後才會生效。', 'Generate schedule suggestions on This week, then confirm to apply them.')}</p></aside></div>` },
+  'add-task': { render: (s) => `<div class="page-head"><h1 class="page-head__title">${L('新增任務', 'Add task')}</h1></div><div class="add-task-page">${editor(s, null, ui.taskDate)}${stepHelper()}</div>` },
   import: importView, time: availability, start, about,
   margin: { render: (s) => `<div class="margin-page">${renderMargin(s)}</div>` },
 };
@@ -451,6 +451,16 @@ const actions = {
   'task-form-close': () => { ui.taskForm = false; ui.editTask = null; if (current.name === 'add-task') location.hash = '#/tasks'; else render(); },
   'task-edit': (el) => { ui.editTask = el.dataset.task; ui.taskForm = false; render(); main.querySelector('.tform input')?.focus(); },
   'step-add': (el) => { const rows = el.closest('form').querySelector('[data-step-rows]'); rows.insertAdjacentHTML('beforeend', stepFields()); rows.lastElementChild.querySelector('input').focus(); },
+  'suggest-steps': () => {
+    const form = main.querySelector('form[data-form="task"]');
+    if (!form) return;
+    const f = new FormData(form);
+    const hours = Number(f.get('hours')) || 3;
+    const rows = form.querySelector('[data-step-rows]');
+    rows.innerHTML = suggestSteps(String(f.get('kind') || ''), String(f.get('title') || ''), hours).map(stepFields).join('');
+    rows.querySelector('input')?.focus();
+    toast(L(`已建議 ${rows.children.length} 個子任務，可以再修改`, `Suggested ${rows.children.length} steps; edit as needed`), 'pencil');
+  },
   'step-remove': (el) => { el.closest('.step-editor__row').remove(); },
   'file-download': async (el) => {
     try {
@@ -634,16 +644,21 @@ document.addEventListener('submit', (e) => {
       hours: Number(f.get('hours')), requirements: String(f.get('requirements') || '').trim(),
     };
     if (!fields.title || !fields.kind) { toast(L('請填寫名稱和類型', 'Enter a name and type'), 'alert'); return; }
+    const steps = [...form.querySelectorAll('[data-step-id]')].map((row) => ({
+      id: row.dataset.stepId, title: row.querySelector('[name="step-title"]').value.trim(),
+      min: Number(row.querySelector('[name="step-hours"]').value) * 60,
+    }));
+    if (steps.some((st) => !st.title)) { toast(L('請為每個子任務填名稱', 'Name every step'), 'alert'); return; }
     if (form.dataset.form === 'edit-task') {
-      const steps = [...form.querySelectorAll('[data-step-id]')].map((row) => ({
-        id: row.dataset.stepId, title: row.querySelector('[name="step-title"]').value.trim(),
-        min: Number(row.querySelector('[name="step-hours"]').value) * 60,
-      }));
-      if (!steps.length || steps.some((st) => !st.title)) { toast(L('請保留至少一個有名稱的子任務', 'Keep at least one named step'), 'alert'); return; }
+      if (!steps.length) { toast(L('請保留至少一個有名稱的子任務', 'Keep at least one named step'), 'alert'); return; }
       updateTask(form.dataset.task, fields, steps);
     } else {
-      addTask(fields);
-      location.hash = `#/tasks/${ui.taskId}`;
+      const files = [...(form.querySelector('[name="guide"]')?.files || [])];
+      if (files.some((file) => file.size > 10 * 1024 * 1024)) { toast(L('每份附件最多 10 MB', 'Each attachment must be 10 MB or smaller'), 'alert'); return; }
+      addTask(fields, steps.map(({ title, min }) => ({ title, min })));
+      const taskId = ui.taskId;
+      location.hash = `#/tasks/${taskId}`;
+      saveGuides(taskId, files);
     }
     return;
   }
@@ -670,6 +685,16 @@ document.addEventListener('submit', (e) => {
 document.addEventListener('input', (e) => {
   if (e.target.matches('[data-draft]')) { ui.draft = e.target.value; autosize(); }
 });
+
+async function saveGuides(taskId, files) {
+  for (const file of files) {
+    const id = crypto.randomUUID();
+    try {
+      await saveAttachment(id, file);
+      addTaskAttachment(taskId, { id, name: file.name, size: file.size });
+    } catch { toast(L('附件儲存失敗，請檢查瀏覽器儲存空間。', 'Could not save an attachment. Check browser storage space.'), 'alert'); return; }
+  }
+}
 
 function takeFiles(files) {
   const names = [...files].map((f) => f.name).join('、');
