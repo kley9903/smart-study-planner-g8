@@ -19,7 +19,6 @@ import { createDemoState } from './demo-data.js';
 import * as week from './views/week.js';
 import * as tasks from './views/tasks.js';
 import * as importView from './views/import.js';
-import * as availability from './views/availability.js';
 import * as start from './views/start.js';
 import * as about from './views/about.js';
 import { renderMargin } from './views/margin.js';
@@ -28,7 +27,8 @@ const views = {
   week, tasks,
   monthly: { render: (s) => `<div class="page-head"><div><h1 class="page-head__title">${L('月曆', 'Monthly')}</h1><p class="page-head__lede">${L('查看整個月的截止日期及忙碌時段，點選日期新增或查看內容。', 'View deadlines and busy times for the month. Select a date to view or add items.')}</p></div></div><section class="sheet monthly-page">${renderMonth(s)}</section>` },
   'add-task': { render: (s) => `<div class="page-head"><h1 class="page-head__title">${L('新增任務', 'Add task')}</h1></div><div class="add-task-page">${editor(s, null, ui.taskDate)}${stepHelper()}</div>` },
-  import: importView, time: availability, start, about,
+  import: importView, start, about,
+  time: { render: () => '' }, // 舊網址 #/time：在 render() 轉到本週的「改沒空的時間」
   margin: { render: (s) => `<div class="margin-page">${renderMargin(s)}</div>` },
 };
 
@@ -65,6 +65,12 @@ function render(info = {}) {
     location.replace(`#/week${q ? `?${q}` : ''}`);
     return;
   }
+  if (r.name === 'time') {
+    ui.editBusy = true;
+    location.replace('#/week');
+    return;
+  }
+  if (r.name !== 'week') ui.editBusy = false;
   if (r.name === 'week') ui.calendarView = 'week';
   if (r.name === 'add-task' && current.name !== 'add-task' && !r.query.get('add')) ui.taskDate = '';
   current = r;
@@ -258,7 +264,7 @@ function openHatch(el) {
   if (!r) return;
   const kind = r.type === 'single' ? `${icon('pin')} ${L('只限這天', 'One day')}` : `${icon('repeat')} ${L('每週重複', 'Weekly')}`;
   const src = r.src === 'syllabus' ? L('從課程大綱找到，你核對過。', 'Found in your syllabus and checked by you.') : L('你自己加的。', 'Added by you.');
-  if (current.name === 'time' && ui.timeTool === 'erase' && real) {
+  if (ui.editBusy && ui.timeTool === 'erase' && real) {
     openPopover(el, `
       <div class="pop__eyebrow">${icon('eraser')} ${L('移除沒空時間', 'Remove busy time')}</div>
       <div class="pop__title">${esc(r.label)}</div>
@@ -273,7 +279,7 @@ function openHatch(el) {
     <div class="pop__title">${esc(r.label)}</div>
     <div class="pop__time">${ruleWhen(r)}</div>
     <div class="pop__section"><p style="font-size:13.5px;color:var(--ink-2)">${real ? src : L('AI 從你說的話理解到的，還未確認。', 'The AI understood this from what you said; not confirmed yet.')}</p></div>
-    ${real ? `<div class="pop__actions"><a class="btn btn--sm" href="#/time">${icon('hatch')} ${L('到「不可用時段」修改', 'Edit in Busy times')}</a></div>` : proposalActions(p)}`);
+    ${real ? (ui.editBusy ? '' : `<div class="pop__actions"><button class="btn btn--sm" type="button" data-action="busy-edit" data-on="1">${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}</button></div>`) : proposalActions(p)}`);
 }
 
 /* ---------------- 拖拉標記沒空的時間 ---------------- */
@@ -500,6 +506,18 @@ const actions = {
   },
   'guide-decide': () => { closePopover(); focusDecision(); },
   tool: (el) => { ui.timeTool = el.dataset.tool; render(); },
+  'busy-edit': (el) => {
+    const on = el.dataset.on === '1';
+    // 右邊的 AI 助手會收起，所以有建議未決定時先處理建議
+    if (on && pendingProposal(getState())) { closePopover(); toast(L('先確認或不要目前的建議，再改沒空的時間', 'Confirm or discard the current suggestion first'), 'info'); return; }
+    ui.editBusy = on;
+    ui.hlRule = null;
+    ui.sleepEdit = false;
+    closePopover();
+    endTour();
+    if (current.name !== 'week') { location.hash = '#/week'; return; }
+    render();
+  },
   'hl-rule': (el) => {
     ui.hlRule = ui.hlRule === el.dataset.rule ? null : el.dataset.rule;
     render();

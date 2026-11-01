@@ -13,6 +13,7 @@ import { md, span, hm, hShort, num, addDays, dayNum, wd, wk, mdNum, isWeekend, d
 import { HORIZON_DAYS, WINDOW_DAYS } from '../demo-data.js';
 import { L } from '../i18n.js';
 import { renderMonth } from './month.js';
+import { busyToolbar, busySide, toolClass } from './availability.js';
 
 export const isMobile = () => window.innerWidth < 760;
 
@@ -20,25 +21,28 @@ export function render(s) {
   const dates = windowDates(s);
   if (!dates.includes(ui.day)) ui.day = s.today;
   const mobile = isMobile();
+  // 改沒空的時間：同一張時間表變成可以塗灰，右邊的 AI 助手換成睡眠和沒空時間清單
+  const editing = ui.editBusy && ui.calendarView !== 'month';
   return `
-    <div class="week">
+    <div class="week ${editing ? 'is-busy-edit' : ''}">
       <div class="week__main">
         ${getMode() === 'mine' ? mineBar(s) : ''}
         <section class="sheet week__sheet" aria-label="${L('未來 7 日讀書計劃', 'Study plan for the next 7 days')}">
-          ${head(s, dates)}
+          ${head(s, dates, editing)}
           ${ui.calendarView === 'month' ? renderMonth(s) : `
-          ${nextBar(s)}
+          ${editing ? busyToolbar() : nextBar(s)}
           ${mobile ? dayPicker(s, dates) : ''}
           ${renderPlanner(s, {
-            dates: mobile ? [ui.day] : dates, mode: 'week', hlTask: ui.hlTask, showGaps: ui.showGaps,
-            justInked: ui.justInked, colMin: mobile ? 240 : null,
+            dates: mobile ? [ui.day] : dates, mode: 'week',
+            hlTask: editing ? null : ui.hlTask, hlRule: editing ? ui.hlRule : null, showGaps: !editing && ui.showGaps,
+            justInked: ui.justInked, colMin: mobile ? 240 : null, extraClass: editing ? `is-busy-edit ${toolClass()}` : '',
           })}
-          ${s.tasks.length ? horizon(s) : ''}`}
+          ${!editing && s.tasks.length ? horizon(s) : ''}`}
         </section>
-        ${getMode() === 'mine' ? '' : guide(s)}
+        ${getMode() === 'mine' || editing ? '' : guide(s)}
         ${decisionBar(s)}
       </div>
-      ${renderMargin(s)}
+      ${editing ? busySide(s) : renderMargin(s)}
     </div>`;
 }
 
@@ -61,7 +65,7 @@ function mineBar(s) {
       </div>
       <div class="guide__acts">
         <a class="btn btn--sm ${s.tasks.length ? '' : 'btn--ink'}" href="#/add-task">${icon('plus')} ${L('新增功課', 'Add task')}</a>
-        <a class="btn btn--sm" href="#/time">${icon('hatch')} ${L('沒空的時間', 'Busy times')}</a>
+        <button class="btn btn--sm" type="button" data-action="busy-edit" data-on="${ui.editBusy ? 0 : 1}" aria-pressed="${!!ui.editBusy}">${icon('hatch')} ${ui.editBusy ? L('完成', 'Done') : L('沒空的時間', 'Busy times')}</button>
         ${s.tasks.length && left.length && !pending ? `<button class="btn btn--sm btn--ink" type="button" data-action="auto-plan">${icon('clock')} ${L('自動排程', 'Auto-schedule')}</button>` : ''}
       </div>
     </section>`;
@@ -140,7 +144,7 @@ function guide(s) {
     </section>`;
 }
 
-function head(s, dates) {
+function head(s, dates, editing) {
   const pc = pendingCount(s);
   const total = plannedTotal(s);
   const far = s.tasks.filter((t) => diffDays(s.today, t.due.date) <= HORIZON_DAYS).length;
@@ -165,8 +169,8 @@ function head(s, dates) {
           <span class="legend__item"><i class="sw sw--off"></i>${L('灰色：沒空', 'Gray: busy')}</span>
         </div>
         <div class="wk-tools" ${ui.calendarView === 'month' ? 'hidden' : ''}>
-          <button class="btn btn--sm btn--ghost" type="button" data-action="toggle-gaps" aria-pressed="${ui.showGaps}">${icon('eye')} ${ui.showGaps ? L('隱藏空檔', 'Hide free time') : L('顯示空檔', 'Show free time')}</button>
-          <a class="btn btn--sm btn--ghost" href="#/time">${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}</a>
+          ${editing ? '' : `<button class="btn btn--sm btn--ghost" type="button" data-action="toggle-gaps" aria-pressed="${ui.showGaps}">${icon('eye')} ${ui.showGaps ? L('隱藏空檔', 'Hide free time') : L('顯示空檔', 'Show free time')}</button>`}
+          <button class="btn btn--sm ${editing ? 'btn--ink' : 'btn--ghost'}" type="button" data-action="busy-edit" data-on="${editing ? 0 : 1}" aria-pressed="${editing}">${editing ? `${icon('check')} ${L('完成', 'Done')}` : `${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}`}</button>
         </div>
       </div>
     </header>`;

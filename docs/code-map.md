@@ -40,12 +40,12 @@
 | 檔案 | 對應畫面／用途 |
 |---|---|
 | `dist/js/views/start.js` | 歡迎頁及首次使用的設定步驟 |
-| `dist/js/views/week.js` | 本週時間表、任務摘要、遠方截止日期 |
+| `dist/js/views/week.js` | 本週時間表、任務摘要、遠方截止日期；「改沒空的時間」模式時讀書時段變淡，右欄由 AI 助手換成沒空時間清單 |
 | `dist/js/views/month.js` | 共用任務與忙碌資料的月曆、跨月切換及日期選擇 |
 | `dist/js/views/task-editor.js` | 新增／編輯任務表單、子任務與附件入口；新增頁右邊的「建議拆法」（`suggestSteps`，示範用固定範本，未接 AI；接 AI 時改這裡） |
 | `dist/js/views/tasks.js` | 任務列表、任務細節、步驟和進度 |
 | `dist/js/views/import.js` | 課程資料匯入及核對畫面；示範模式用預寫的抽取結果，自己的計劃只把 PDF 存在瀏覽器（`ownPanel`）；真正的 PDF／Canvas 抽取尚未接通 |
-| `dist/js/views/availability.js` | 沒空時段與睡眠設定畫面 |
+| `dist/js/views/availability.js` | 「改沒空的時間」的工具列和右欄（睡眠、上課時間、你自己加的）；不再是獨立頁面，由本週按「改沒空的時間」打開（`ui.editBusy`），舊網址 `#/time` 會轉到這裡 |
 | `dist/js/views/margin.js` | AI 助手區、建議及選擇方案的畫面 |
 | `dist/js/views/about.js` | 原型說明與使用說明頁 |
 

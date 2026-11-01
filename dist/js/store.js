@@ -77,7 +77,7 @@ export function relang() {
 function freshUi() {
   return {
     hlTask: null, showGaps: false, day: DEMO_TODAY, docId: 'stat', taskId: 'ps4',
-    timeTool: null, paintRepeat: 'single', hlRule: null, justInked: [], arrowFor: null,
+    editBusy: false, timeTool: null, paintRepeat: 'single', hlRule: null, justInked: [], arrowFor: null,
     draft: '', editItem: null, sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
   };
