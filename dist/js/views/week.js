@@ -1,9 +1,8 @@
-// 本週：示範導覽、未來 7 日的具體時間表、「下一段」、遠方 deadline，以及 AI 助手。
+// 本週：示範導覽、未來 7 日的具體時間表、「下一段」、遠方 deadline。AI 助手在每頁右下角（views/dock.js）。
 import { esc, icon } from '../ui.js';
 import { ui, canRun, getMode } from '../store.js';
 import { unplannedSteps } from '../scheduler.js';
 import { renderPlanner } from '../planner.js';
-import { renderMargin } from './margin.js';
 import { HERO } from '../scenarios.js';
 import {
   windowDates, plannedTotal, nextBlock, pendingCount, pendingProposal,
@@ -42,7 +41,7 @@ export function render(s) {
         ${getMode() === 'mine' || editing ? '' : guide(s)}
         ${decisionBar(s)}
       </div>
-      ${editing ? busySide(s) : renderMargin(s)}
+      ${editing ? busySide(s) : ''}
     </div>`;
 }
 
@@ -111,7 +110,7 @@ function guide(s) {
   }
   let act2 = '';
   if (current === 2) {
-    if (pending) act2 = `<span class="guide__note">${L('先在下面確認或不要目前的 AI 建議', 'First confirm or discard the current suggestion below')}</span>`;
+    if (pending) act2 = `<span class="guide__note">${L('先在右下角確認或不要目前的 AI 建議', 'First confirm or discard the current suggestion (bottom right)')}</span>`;
     else if (!canRun('hero')) act2 = `<button class="btn btn--sm" type="button" data-action="reset">${icon('reset')} ${L('重設示範再試', 'Reset demo')}</button>`;
     else act2 = `<button class="btn btn--sm btn--ink" type="button" data-action="guide-hero">${icon('send')} ${L('告訴 AI', 'Tell the AI')}</button>`;
   }

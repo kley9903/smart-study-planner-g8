@@ -21,7 +21,7 @@ import * as tasks from './views/tasks.js';
 import * as importView from './views/import.js';
 import * as start from './views/start.js';
 import * as about from './views/about.js';
-import { renderMargin } from './views/margin.js';
+import { renderDock } from './views/dock.js';
 
 const views = {
   week, tasks,
@@ -29,10 +29,11 @@ const views = {
   'add-task': { render: (s) => `<div class="page-head"><h1 class="page-head__title">${L('新增任務', 'Add task')}</h1></div><div class="add-task-page">${editor(s, null, ui.taskDate)}${stepHelper()}</div>` },
   import: importView, start, about,
   time: { render: () => '' }, // 舊網址 #/time：在 render() 轉到本週的「改沒空的時間」
-  margin: { render: (s) => `<div class="margin-page">${renderMargin(s)}</div>` },
+  margin: { render: () => '' }, // 舊網址 #/margin：在 render() 轉到本週並打開右下角的 AI 助手
 };
 
 const main = document.getElementById('main');
+const dock = document.getElementById('dock');
 const header = document.getElementById('app-header');
 let current = { name: '', params: [] };
 let lastKey = '';
@@ -60,8 +61,9 @@ function render(info = {}) {
   // 分享出去的示範情境連結（#/week?try=…）和新手導覽連結（#/week?tour=1）一律在導覽模式打開
   if ((r.query.get('try') || r.query.get('tour')) && getMode() !== 'demo') enterDemo();
   document.body.dataset.mode = getMode();
-  if (r.name === 'margin' && wide()) {
+  if (r.name === 'margin') {
     const q = r.query.toString();
+    setDockOpen(true);
     location.replace(`#/week${q ? `?${q}` : ''}`);
     return;
   }
@@ -83,7 +85,7 @@ function render(info = {}) {
   const key = `${r.name}/${r.params.join('/')}`;
   const changed = key !== lastKey;
 
-  const thread = main.querySelector('[data-thread-scroll]');
+  const thread = dock.querySelector('[data-thread-scroll]');
   const threadTop = thread ? thread.scrollTop : null;
   const scrollers = [...main.querySelectorAll('.planner__scroll, .horizon__scroll')].map((el) => el.scrollLeft);
   const focusId = document.activeElement?.id;
@@ -92,29 +94,22 @@ function render(info = {}) {
   main.innerHTML = views[r.name].render(s, r.params);
   document.body.dataset.route = r.name;
   updateNav(r.name === 'add-task' ? 'tasks' : r.name, s);
+  drawDock(s, r);
 
   if (changed) {
-    if (r.name !== 'margin') window.scrollTo(0, 0);
+    window.scrollTo(0, 0);
     lastKey = key;
   } else {
     main.querySelectorAll('.planner__scroll, .horizon__scroll').forEach((el, i) => { if (scrollers[i] != null) el.scrollLeft = scrollers[i]; });
   }
 
   // AI 助手：新訊息很長（例如要選做法）就由它的開頭看起，否則捲到最底
-  const t = main.querySelector('[data-thread-scroll]');
-  const notes = main.querySelectorAll('.thread > .note');
+  const t = dock.querySelector('[data-thread-scroll]');
+  const notes = dock.querySelectorAll('.thread > .note');
   const last = notes[notes.length - 1];
-  if (r.name === 'margin') {
-    if (info.scrollThread || changed) {
-      requestAnimationFrame(() => {
-        const top = last ? last.getBoundingClientRect().top + window.scrollY - header.offsetHeight - 12 : 0;
-        const tall = last && last.offsetHeight > window.innerHeight * 0.7;
-        window.scrollTo(0, tall ? top : document.documentElement.scrollHeight);
-      });
-    }
-  } else if (t) {
+  if (t) {
     if (info.scrollThread && last && last.offsetHeight > t.clientHeight * 0.8) t.scrollTop = last.offsetTop - 12;
-    else t.scrollTop = info.scrollThread || changed || threadTop == null ? t.scrollHeight : threadTop;
+    else t.scrollTop = info.scrollThread || threadTop == null ? t.scrollHeight : threadTop;
   }
   if (focusId) document.getElementById(focusId)?.focus({ preventScroll: true });
 
@@ -157,6 +152,47 @@ function updateNav(name, s) {
     el.textContent = n;
   });
 }
+
+/* ---------------- 右下角的 AI 助手 ---------------- */
+let readyKey = '';
+function drawDock(s, r) {
+  // AI 建議可以確認時，面板自動縮小讓出時間表，泡泡留下「確認／不要」
+  const p = pendingProposal(s);
+  const key = p && !(p.kind === 'hero' && !p.option) ? `${p.id}:${p.option || ''}` : '';
+  if (key && key !== readyKey && ui.dockOpen) setDockOpen(false);
+  readyKey = key;
+  dock.hidden = r.name === 'start';
+  if (dock.hidden) return;
+  const d = renderDock(s, { quiet: r.name === 'add-task' || !!ui.editTask });
+  dock.innerHTML = d.html;
+  dock.classList.toggle('is-open', d.open);
+  dock.classList.toggle('has-bubble', d.bubble);
+  if (d.open) dock.classList.remove('is-peek');
+}
+
+function setDockOpen(open) {
+  ui.dockOpen = open;
+  remember('dock', open ? '1' : '0');
+}
+
+function toggleDock(open) {
+  setDockOpen(open);
+  render({ scrollThread: open });
+  if (open) setTimeout(() => (document.getElementById('say-input') || dock.querySelector('.margin__close'))?.focus({ preventScroll: true }), 0);
+  else dock.querySelector('.dock__me')?.focus({ preventScroll: true });
+}
+
+// 你在捲動、點選或打字時，角色縮成只露出頭，停下來才站起來
+let peekTimer = null;
+function peek(hold = false) {
+  if (ui.dockOpen || dock.hidden) return;
+  dock.classList.add('is-peek');
+  clearTimeout(peekTimer);
+  if (!hold) peekTimer = setTimeout(() => dock.classList.remove('is-peek'), 2500);
+}
+main.addEventListener('pointerdown', () => peek());
+main.addEventListener('focusin', (e) => { if (e.target.matches('input, textarea, select')) peek(true); });
+main.addEventListener('focusout', (e) => { if (e.target.matches('input, textarea, select')) peek(); });
 
 function autosize() {
   const ta = document.getElementById('say-input');
@@ -393,6 +429,7 @@ function locate(date, blockId, fromId) {
   ui.calendarView = 'week';
   if (date) ui.day = date;
   ui.arrowFor = fromId || null;
+  if (window.innerWidth < 900 && ui.dockOpen) setDockOpen(false); // 窄螢幕的面板會蓋住時間表
   const go = () => {
     const el = (blockId && main.querySelector(`[data-block="${CSS.escape(blockId)}"]`)) || main.querySelector(`.pcol[data-date="${date}"]`);
     if (!el) return;
@@ -413,15 +450,12 @@ function locate(date, blockId, fromId) {
 }
 
 function focusDecision() {
-  if (current.name === 'week') {
-    const box = main.querySelector('.margin .decide');
-    if (box) {
-      box.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      box.querySelector('.opt, .btn--ink')?.focus({ preventScroll: true });
-    }
-    return;
+  if (!ui.dockOpen) { setDockOpen(true); render(); }
+  const box = dock.querySelector('.decide');
+  if (box) {
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    box.querySelector('.opt, .btn--ink')?.focus({ preventScroll: true });
   }
-  location.hash = '#/margin';
 }
 
 /* ---------------- 按鈕動作 ---------------- */
@@ -506,6 +540,9 @@ const actions = {
   },
   'guide-decide': () => { closePopover(); focusDecision(); },
   tool: (el) => { ui.timeTool = el.dataset.tool; render(); },
+  'dock-toggle': () => toggleDock(!ui.dockOpen),
+  'dock-dismiss': (el) => { ui.dockDismissed.push(el.dataset.id); render(); },
+  'dock-decide': () => focusDecision(),
   'busy-edit': (el) => {
     const on = el.dataset.on === '1';
     // 右邊的 AI 助手會收起，所以有建議未決定時先處理建議
@@ -640,7 +677,10 @@ document.addEventListener('keydown', (e) => {
     else if (e.key === 'ArrowLeft') tourStep(-1);
     return;
   }
-  if (e.key === 'Escape') closePopover();
+  if (e.key === 'Escape') {
+    if (!document.getElementById('popover').hidden) closePopover();
+    else if (ui.dockOpen) toggleDock(false);
+  }
   const t = e.target;
   if ((e.key === 'Enter' || e.key === ' ') && t.matches?.('li[data-action]')) { e.preventDefault(); t.click(); }
   if (t.id === 'say-input' && e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
@@ -786,10 +826,12 @@ window.addEventListener('resize', () => {
 });
 window.addEventListener('scroll', () => {
   header.classList.toggle('is-scrolled', window.scrollY > 4);
+  peek();
   place();
   placeTour();
 }, { passive: true });
 
 window.addEventListener('hashchange', () => render());
+ui.dockOpen = recall('dock') === '1';
 applyStatic();
 render();

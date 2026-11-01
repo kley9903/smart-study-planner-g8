@@ -165,10 +165,51 @@
 .composer__send .i { font-size: 17px; }
 .composer__note { font-size: 11.5px; color: var(--ink-3); margin-top: 7px; display: flex; align-items: center; gap: 5px; }
 
-/* AI 助手頁（窄螢幕） */
-.margin-page .margin { position: static; max-height: none; overflow: visible; min-height: calc(100vh - var(--header-h) - var(--bottom-nav-h) - 40px); }
-.margin-page .margin__body { overflow: visible; }
-.margin-page .composer { position: sticky; bottom: var(--bottom-nav-h); border-radius: 0 0 var(--radius-lg) var(--radius-lg); box-shadow: 0 -10px 20px -14px rgba(48, 40, 24, 0.25); }
+/* 右下角的 AI 助手（每頁都有）：站著 → 你操作時探頭 → 有事冒泡泡 → 按角色展開面板 */
+body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
+.dock { position: fixed; right: 18px; bottom: 0; z-index: 50; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; pointer-events: none; }
+.dock[hidden] { display: none; }
+.dock > * { pointer-events: auto; }
+.dock__me { display: flex; align-items: flex-end; gap: 8px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.dock__me:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 12px; }
+.dock__fig { display: block; height: 197px; overflow: hidden; transition: height 0.25s var(--ease); }
+.dock__fig img { display: block; width: 122px; height: 189px; image-rendering: pixelated; transition: transform 0.15s; }
+.dock__me:hover .dock__fig img { transform: translateY(-3px); }
+.dock__tag {
+  display: grid; gap: 1px; margin-bottom: 46px; padding: 7px 12px; border-radius: 12px; white-space: nowrap; text-align: left;
+  background: var(--paper); border: 1px solid var(--rule); box-shadow: var(--shadow-card);
+  font-size: 12px; line-height: 1.4; color: var(--ink-3); transition: opacity 0.2s, transform 0.2s;
+}
+.dock__tag b { font-size: 13px; font-weight: 700; color: var(--ink); }
+.dock__dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--seal); margin-right: 5px; vertical-align: 1px; }
+.dock__bubble {
+  position: relative; width: min(300px, calc(100vw - 36px)); margin-bottom: -2px; padding: 12px 36px 12px 14px; border-radius: 14px;
+  background: #fff; border: 1.5px dashed var(--graphite); box-shadow: var(--shadow-pop);
+  font-size: 13.5px; line-height: 1.6; color: var(--ink-2); animation: pop-in 0.2s var(--ease) both; transition: opacity 0.2s, transform 0.2s;
+}
+.dock__bubble b { color: var(--ink); }
+.dock__acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.dock__x { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--ink-3); display: grid; place-items: center; }
+.dock__x:hover { background: var(--paper-2); color: var(--ink); }
+.dock.is-peek .dock__fig { height: 90px; }
+.dock.is-peek .dock__tag, .dock.is-peek .dock__bubble { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.dock.is-open .dock__me { display: none; }
+.dock__panel { width: min(400px, calc(100vw - 36px)); height: min(620px, calc(100vh - var(--header-h) - 36px)); margin-bottom: 18px; }
+.dock__panel .margin { position: relative; top: auto; height: 100%; max-height: none; border: 1px solid var(--rule); box-shadow: var(--shadow-pop); }
+.margin__head { align-items: center; }
+.margin__avatar { flex: none; margin: -8px 0 -12px; }
+.margin__title { flex: 1; min-width: 0; }
+.margin__title h2 { font-size: 18px; flex-wrap: wrap; }
+@media (max-width: 759px) {
+  .dock { right: 10px; }
+  .dock__tag { display: none; }
+  .dock__fig { height: 80px; } /* 手機一直只露出頭 */
+  .dock.is-open { left: 0; right: 0; }
+  .dock__panel { width: 100%; height: 85vh; margin: 0; }
+  .dock__panel .margin { border-radius: 18px 18px 0 0; }
+}
+@media (prefers-reduced-motion: reduce) { .dock__fig, .dock__fig img, .dock__tag, .dock__bubble { transition: none; animation: none; } }
+
 
 /* =========================================================
    任務
@@ -499,7 +540,6 @@
 
 @media (max-width: 1179px) {
   .week { grid-template-columns: 1fr; }
-  .week > .margin { display: none; }
   .dbar {
     display: grid; gap: 8px;
     position: sticky; bottom: calc(var(--bottom-nav-h) + 10px); z-index: 30;
@@ -604,7 +644,6 @@
   .rules-grid { grid-template-columns: 1fr; }
   .scenario { grid-template-columns: 36px minmax(0, 1fr); }
   .scenario .btn { grid-column: 1 / -1; }
-  .margin-page .margin { border-radius: 16px; }
 }
 
 /* ---------- 任務：新增功課（自己的計劃） ---------- */
