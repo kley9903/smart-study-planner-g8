@@ -12,6 +12,7 @@ import {
 import { md, span, hm, hShort, num, addDays, dayNum, wd, wk, mdNum, isWeekend, diffDays, hoursText } from '../time.js';
 import { HORIZON_DAYS, WINDOW_DAYS } from '../demo-data.js';
 import { L } from '../i18n.js';
+import { renderMonth } from './month.js';
 
 export const isMobile = () => window.innerWidth < 760;
 
@@ -25,13 +26,14 @@ export function render(s) {
         ${getMode() === 'mine' ? mineBar(s) : guide(s)}
         <section class="sheet week__sheet" aria-label="${L('未來 7 日讀書計劃', 'Study plan for the next 7 days')}">
           ${head(s, dates)}
+          ${ui.calendarView === 'month' ? renderMonth(s) : `
           ${nextBar(s)}
           ${mobile ? dayPicker(s, dates) : ''}
           ${renderPlanner(s, {
             dates: mobile ? [ui.day] : dates, mode: 'week', hlTask: ui.hlTask, showGaps: ui.showGaps,
             justInked: ui.justInked, colMin: mobile ? 240 : null,
           })}
-          ${s.tasks.length ? horizon(s) : ''}
+          ${s.tasks.length ? horizon(s) : ''}`}
         </section>
         ${decisionBar(s)}
       </div>
@@ -144,7 +146,7 @@ function head(s, dates) {
   return `
     <header class="wk-head">
       <div>
-        <h1 class="wk-title">${md(dates[0])}<span class="wk-title__dash">—</span>${md(dates[dates.length - 1])}</h1>
+        <h1 class="wk-title">${ui.calendarView === 'month' ? L('截止日期總覽', 'Deadlines at a glance') : `${md(dates[0])}<span class="wk-title__dash">—</span>${md(dates[dates.length - 1])}`}</h1>
         <p class="wk-sum">
           <span>${L(`已排 <b>${num(total / 60)}</b> 小時讀書`, `<b>${num(total / 60)}</b> h of study planned`)}</span>
           <span>${L(`${far} 個 deadline 在 20 日內`, `${far} deadline${far === 1 ? '' : 's'} within 20 days`)}</span>
@@ -152,12 +154,16 @@ function head(s, dates) {
         </p>
       </div>
       <div class="wk-head__side">
-        <div class="legend" aria-label="${L('圖例', 'Legend')}">
+        <div class="seg" role="group" aria-label="${L('日曆視圖', 'Calendar view')}">
+          <button class="seg__opt" data-action="calendar-view" data-view="week" aria-pressed="${ui.calendarView === 'week'}">${L('週', 'Week')}</button>
+          <button class="seg__opt" data-action="calendar-view" data-view="month" aria-pressed="${ui.calendarView === 'month'}">${L('月', 'Month')}</button>
+        </div>
+        <div class="legend" ${ui.calendarView === 'month' ? 'hidden' : ''} aria-label="${L('圖例', 'Legend')}">
           <span class="legend__item"><i class="sw sw--ink"></i>${L('實色：已確認', 'Solid: confirmed')}</span>
           <span class="legend__item"><i class="sw sw--pencil"></i>${L('虛線：AI 建議（未確認）', 'Dashed: suggested (not confirmed)')}</span>
           <span class="legend__item"><i class="sw sw--off"></i>${L('灰色：沒空', 'Gray: busy')}</span>
         </div>
-        <div class="wk-tools">
+        <div class="wk-tools" ${ui.calendarView === 'month' ? 'hidden' : ''}>
           <button class="btn btn--sm btn--ghost" type="button" data-action="toggle-gaps" aria-pressed="${ui.showGaps}">${icon('eye')} ${ui.showGaps ? L('隱藏空檔', 'Hide free time') : L('顯示空檔', 'Show free time')}</button>
           <a class="btn btn--sm btn--ghost" href="#/time">${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}</a>
         </div>
@@ -284,7 +290,7 @@ function horizon(s) {
   return `
     <section class="horizon" aria-label="${L('較遠的 deadline', 'Later deadlines')}">
       <div class="horizon__head">
-        <h3>${L('遠方', 'Further ahead')}</h3>
+        <h3>${L('遠方', 'Further ahead')}</h3><button class="link-btn" data-action="calendar-view" data-view="month">${icon('calendar')} ${L('查看月曆', 'View calendar')}</button>
         <p>${L('7 日之後的 deadline，排程時一樣會考慮，較遠的功課可以提早開始。', 'Deadlines after these 7 days are still considered; later work can start early.')}${ui.hlTask ? ` <button class="link-btn" type="button" data-action="hl-task" data-task="">${L('取消標示', 'Clear highlight')}</button>` : L('按一行可在時間表標示該科時段。', ' Press a row to highlight its sessions.')}</p>
       </div>
       <div class="horizon__scroll">

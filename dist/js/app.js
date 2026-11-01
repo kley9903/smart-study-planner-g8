@@ -3,8 +3,11 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang,
+  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment,
 } from './store.js';
+import { shiftMonth } from './views/month.js';
+import { stepFields } from './views/task-editor.js';
+import { saveAttachment, getAttachment } from './attachments.js';
 import { L, setLang, applyStatic } from './i18n.js';
 import { toast, openPopover, closePopover, place, esc, icon, remember, recall } from './ui.js';
 import { drawArrows, forgetPencils } from './planner.js';
@@ -65,6 +68,11 @@ function render(info = {}) {
   }
   current = r;
   const s = getState();
+  const addDate = r.name === 'tasks' && r.query.get('add');
+  if (addDate && /^\d{4}-\d{2}-\d{2}$/.test(addDate)) {
+    ui.taskForm = true; ui.taskDate = addDate; ui.editTask = null;
+    history.replaceState(null, '', '#/tasks');
+  }
   const key = `${r.name}/${r.params.join('/')}`;
   const changed = key !== lastKey;
 
@@ -375,6 +383,7 @@ function finishOnboarding() {
 
 /* ---------------- 本週：定位、導覽 ---------------- */
 function locate(date, blockId, fromId) {
+  ui.calendarView = 'week';
   if (date) ui.day = date;
   ui.arrowFor = fromId || null;
   const go = () => {
@@ -417,7 +426,46 @@ function focusDecision() {
 /* ---------------- 按鈕動作 ---------------- */
 const $ = (sel) => document.querySelector(sel);
 
+function openBusyForm(el) {
+  const date = el.dataset.date || getState().today;
+  openPopover(el, `<form data-form="busy">
+    <h2 class="pop__title">${L('新增忙碌時段', 'Add busy time')}</h2>
+    <label class="field"><span class="field__label">${L('名稱', 'Name')}</span><input class="input" name="label" maxlength="80" required></label>
+    <label class="field"><span class="field__label">${L('日期', 'Date')}</span><input class="input" name="date" type="date" value="${date}" required></label>
+    <label class="field"><span class="field__label">${L('開始時間', 'Start time')}</span><input class="input" type="time" name="start" value="09:00" required></label>
+    <label class="field"><span class="field__label">${L('結束時間', 'End time')}</span><input class="input" type="time" name="end" value="10:00" required></label>
+    <label class="field"><span class="field__label">${L('重複方式', 'Repeat')}</span><select class="select" name="repeat"><option value="single">${L('只限這天', 'One day')}</option><option value="weekly">${L('每週同一天', 'Weekly on this day')}</option></select></label>
+    <p class="demo-note">${L('跨午夜的時段請分成兩天新增。', 'For overnight events, add a separate time on each day.')}</p>
+    <button class="btn btn--ink" type="submit">${L('保存', 'Save')}</button>
+  </form>`);
+}
+
 const actions = {
+  'calendar-view': (el) => {
+    ui.calendarView = el.dataset.view;
+    ui.month ||= getState().today;
+    render();
+    main.querySelector('.week__sheet')?.scrollIntoView({ block: 'start' });
+  },
+  'month-move': (el) => { ui.month = shiftMonth(ui.month || getState().today, Number(el.dataset.delta)); ui.monthDay = ui.month; render(); },
+  'month-today': () => { ui.month = ui.monthDay = getState().today; render(); },
+  'month-day': (el) => { ui.monthDay = el.dataset.date; render(); },
+  'new-busy': (el) => openBusyForm(el),
+  'rules-toggle': (el) => { ui.rulesOpen[el.dataset.src] = !ui.rulesOpen[el.dataset.src]; render(); },
+  'task-form-open': () => { ui.taskForm = true; ui.editTask = null; render(); main.querySelector('.tform input')?.focus(); },
+  'task-form-close': () => { ui.taskForm = false; ui.editTask = null; render(); },
+  'task-edit': (el) => { ui.editTask = el.dataset.task; ui.taskForm = false; render(); main.querySelector('.tform input')?.focus(); },
+  'step-add': (el) => { const rows = el.closest('form').querySelector('[data-step-rows]'); rows.insertAdjacentHTML('beforeend', stepFields()); rows.lastElementChild.querySelector('input').focus(); },
+  'step-remove': (el) => { el.closest('.step-editor__row').remove(); },
+  'file-download': async (el) => {
+    try {
+      const file = await getAttachment(el.dataset.fileId);
+      if (!file) throw new Error('missing');
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a'); link.href = url; link.download = file.name; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch { toast(L('無法讀取附件，請重新加入原檔。', 'Cannot read this attachment. Attach the original file again.'), 'alert'); }
+  },
   reset: () => resetDemo(),
   'pop-close': () => closePopover(),
   block: (el) => openBlock(el),
@@ -493,7 +541,7 @@ const actions = {
     enterDemo();
     forgetPencils();
     remember('visited', '1');
-    ui.guideOpen = true;
+    ui.guideOpen = false;
     // 等切到「本週」並畫好畫面才開始（不用 requestAnimationFrame：分頁在背景時它會暫停）
     setTimeout(() => { if (current.name === 'week') startTour(); }, 200);
   },
@@ -580,18 +628,40 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.addEventListener('submit', (e) => {
-  if (e.target.matches('[data-form="task"]')) {
+  if (e.target.matches('[data-form="task"], [data-form="edit-task"]')) {
+    e.preventDefault();
+    const form = e.target;
+    const f = new FormData(form);
+    const [h, m] = String(f.get('time')).split(':').map(Number);
+    const fields = {
+      title: String(f.get('title')).trim(), course: String(f.get('course') || '').trim(),
+      kind: String(f.get('kind')).trim(), date: String(f.get('date')), min: h * 60 + m,
+      hours: Number(f.get('hours')), requirements: String(f.get('requirements') || '').trim(),
+    };
+    if (!fields.title || !fields.kind) { toast(L('請填寫名稱和類型', 'Enter a name and type'), 'alert'); return; }
+    if (form.dataset.form === 'edit-task') {
+      const steps = [...form.querySelectorAll('[data-step-id]')].map((row) => ({
+        id: row.dataset.stepId, title: row.querySelector('[name="step-title"]').value.trim(),
+        min: Number(row.querySelector('[name="step-hours"]').value) * 60,
+      }));
+      if (!steps.length || steps.some((st) => !st.title)) { toast(L('請保留至少一個有名稱的子任務', 'Keep at least one named step'), 'alert'); return; }
+      updateTask(form.dataset.task, fields, steps);
+    } else {
+      addTask(fields);
+      location.hash = `#/tasks/${ui.taskId}`;
+    }
+    return;
+  }
+  if (e.target.matches('[data-form="busy"]')) {
     e.preventDefault();
     const f = new FormData(e.target);
-    const [h, m] = String(f.get('time') || '23:59').split(':').map(Number);
-    addTask({
-      title: String(f.get('title')).trim(),
-      course: String(f.get('course') || ''),
-      kind: String(f.get('kind') || L('功課', 'Assignment')),
-      date: String(f.get('date')),
-      min: h * 60 + m,
-      hours: Number(f.get('hours')),
-    });
+    const minutes = (v) => { const [h, m] = v.split(':').map(Number); return h * 60 + m; };
+    const start = minutes(String(f.get('start'))), end = minutes(String(f.get('end')));
+    const label = String(f.get('label')).trim();
+    if (end <= start || !label) { toast(L('請填寫名稱，結束時間必須晚於開始時間。', 'Enter a name and an end time after the start.'), 'alert'); return; }
+    const date = String(f.get('date')), type = String(f.get('repeat'));
+    closePopover();
+    addRule({ label, type, start, end, ...(type === 'weekly' ? { days: [weekday(date)] } : { date }) });
     return;
   }
   if (e.target.matches('[data-form="say"]')) {
@@ -619,8 +689,20 @@ function takeFiles(files) {
   render();
 }
 
-document.addEventListener('change', (e) => {
+document.addEventListener('change', async (e) => {
   const t = e.target;
+  if (t.matches('[data-task-file]')) {
+    const file = t.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast(L('每份附件最多 10 MB', 'Each attachment must be 10 MB or smaller'), 'alert'); t.value = ''; return; }
+    t.disabled = true;
+    const id = crypto.randomUUID();
+    try {
+      await saveAttachment(id, file);
+      addTaskAttachment(t.dataset.taskFile, { id, name: file.name, size: file.size });
+    } catch { toast(L('儲存失敗，請檢查瀏覽器儲存空間。', 'Could not save. Check browser storage space.'), 'alert'); t.disabled = false; t.value = ''; }
+    return;
+  }
   if (t.matches('[data-file]')) takeFiles(t.files);
   if (t.matches('[data-ob-sleep]')) {
     ob.sleep[t.dataset.obSleep] = Number(t.value);

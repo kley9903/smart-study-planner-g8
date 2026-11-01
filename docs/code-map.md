@@ -40,6 +40,8 @@
 |---|---|
 | `dist/js/views/start.js` | 歡迎頁及首次使用的設定步驟 |
 | `dist/js/views/week.js` | 本週時間表、任務摘要、遠方截止日期 |
+| `dist/js/views/month.js` | 共用任務與忙碌資料的月曆、跨月切換及日期選擇 |
+| `dist/js/views/task-editor.js` | 新增／編輯任務表單、子任務與附件入口 |
 | `dist/js/views/tasks.js` | 任務列表、任務細節、步驟和進度 |
 | `dist/js/views/import.js` | 課程資料匯入及核對畫面；真正的 PDF／Canvas 抽取尚未接通 |
 | `dist/js/views/availability.js` | 沒空時段與睡眠設定畫面 |
@@ -52,6 +54,7 @@
 |---|---|
 | `dist/js/app.js` | JavaScript 入口；按網址切頁、更新畫面、接收點擊與表單等操作 |
 | `dist/js/store.js` | 管理目前狀態與修改資料的動作；自己的計劃存在瀏覽器 localStorage，示範狀態主要存在記憶體 |
+| `dist/js/attachments.js` | 附件保存在本瀏覽器 IndexedDB；沒有伺服器上傳或 AI 文件分析 |
 | `dist/js/model.js` | 從狀態推算每日畫面、空檔、課程／任務資料和 AI 建議疊加結果 |
 | `dist/js/scheduler.js` | 固定規則排程：按截止時間找空檔、避開沒空時段、限制每日讀書量等；不是 AI 模型 |
 | `dist/js/planner.js` | 多頁共用的時間表繪製元件、時段和變動箭嘴 |
@@ -69,6 +72,7 @@
 | `serve.mjs` | 在本機提供 `dist/` 檔案的預覽伺服器；沒有業務 API，**不是應用程式後端**。一般畫面修改不用改它 |
 | `package.json` | 定義 `npm start`、`npm run check` 等命令；目前沒有第三方套件依賴 |
 | `scripts/check.mjs` | 檢查 JS 語法、檔案引用、網站回應及 MIME；加新功能時可視需要擴充 |
+| `scripts/check-planner.mjs` | 檢查月曆邊界、排程確認、編輯後失效處理及本機資料保存 |
 | `scripts/start-preview.mjs` | 舊雲端流程的預覽助手；下載後本機開發用 `npm start` 就好 |
 | `CONTRIBUTING.md` | 下載、執行、修改及交件步驟 |
 | `CONTRIBUTORS.md` | 小組角色、實際貢獻及 GitHub 自動署名的說明 |
