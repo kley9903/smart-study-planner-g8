@@ -1,10 +1,14 @@
 // AI 助手：AI 的回覆、建議改動（① 選做法 ② 看改動 ③ 確認）、進度回報和輸入框。
+// 放在右下角角色展開的面板裡（views/dock.js）。
 import { esc, icon } from '../ui.js';
 import { ui, availableChips, getMode } from '../store.js';
 import { HERO } from '../scenarios.js';
 import { taskOf, stepOf, inkOf } from '../model.js';
 import { span, dayShort, md, hm, hoursText } from '../time.js';
 import { L } from '../i18n.js';
+
+/** 角色：平時播待機動畫；系統設定「減少動態效果」時只顯示第一格 */
+export const mascotImg = (cls, w, h) => `<picture class="${cls}"><source srcset="img/mascot.png" media="(prefers-reduced-motion: reduce)"><img src="img/mascot.webp" alt="" width="${w}" height="${h}"></picture>`;
 
 // 只讓「新」訊息有淡入動畫；第一次打開頁面時已有的訊息不動
 const seen = new Set();
@@ -18,13 +22,15 @@ export function renderMargin(s) {
   return `
   <aside class="margin" id="margin" aria-label="${mine ? L('排程助手', 'Planning assistant') : L('AI 助手（示範）', 'AI assistant (demo)')}">
     <header class="margin__head">
-      <div>
-        <h2>${icon('note')} ${mine ? L('排程助手', 'Planning assistant') : L('AI 助手', 'AI assistant')}</h2>
+      ${mascotImg('margin__avatar', 40, 62)}
+      <div class="margin__title">
+        <h2>${mine ? L('排程助手', 'Planning assistant') : L('AI 助手', 'AI assistant')}
+        ${mine
+          ? `<span class="demo-stamp" title="${L('自動排程用固定規則計算；AI 對話之後接上', 'Auto-schedule uses fixed rules; AI chat comes later')}">${L('規則排程', 'Rule-based')}</span>`
+          : `<span class="demo-stamp" title="${L('預先寫好的示範回覆，沒有連接 AI', 'Pre-written demo replies, not connected to AI')}">${L('示範回覆', 'Demo replies')}</span>`}</h2>
         <p>${L('建議先用虛線顯示；你按「確認」才會生效。', 'Suggestions are dashed first; they take effect when you press "Confirm".')}</p>
       </div>
-      ${mine
-        ? `<span class="demo-stamp" title="${L('自動排程用固定規則計算；AI 對話之後接上', 'Auto-schedule uses fixed rules; AI chat comes later')}">${L('規則排程', 'Rule-based')}</span>`
-        : `<span class="demo-stamp" title="${L('預先寫好的示範回覆，沒有連接 AI', 'Pre-written demo replies, not connected to AI')}">${L('示範回覆', 'Demo replies')}</span>`}
+      <button class="icon-btn margin__close" type="button" data-action="dock-toggle" aria-label="${L('縮小', 'Minimize')}">${icon('minus')}</button>
     </header>
     <div class="margin__body" data-thread-scroll>
       <div class="thread" aria-live="polite">

@@ -14,7 +14,7 @@
 .page-head__lede { margin-top: 6px; max-width: 88ch; }
 
 /* 本週 */
-.week { grid-template-columns: minmax(0, 3fr) minmax(260px, 1fr); gap: 24px; }
+.week { grid-template-columns: minmax(0, 1fr); gap: 24px; }
 .week__main { gap: 14px; }
 .week__sheet { border-radius: var(--radius-lg); }
 .wk-head { padding: 20px 22px 14px; gap: 10px; }
@@ -27,7 +27,6 @@
 .mine-bar .guide__acts { margin-top: 6px; }
 .figma-guide { margin-top: 4px; font-size: 12.5px; color: var(--ink-3); }
 .figma-guide > summary { cursor: pointer; }
-.margin { top: calc(var(--header-h) + 14px); max-height: 640px; }
 
 /* 月曆 */
 .monthly-page { max-width: 1120px; min-height: 680px; overflow: hidden; }
@@ -106,8 +105,8 @@
   .top-nav__link { padding-inline: 10px; font-size: 14px; }
   .demo-badge .i, .demo-badge__long { display: none; }
   .demo-badge__short { display: inline; }
-  .week { grid-template-columns: minmax(0, 2.6fr) minmax(250px, 1fr); gap: 18px; }
-  .week > .margin { display: flex; }
+  .week { gap: 18px; }
+  .week.is-busy-edit { grid-template-columns: minmax(0, 2.6fr) minmax(250px, 1fr); }
   .tp { grid-template-columns: minmax(0, 2.6fr) minmax(240px, 1fr); gap: 18px; }
   .tp__side { grid-template-columns: 1fr; }
   .wk-head__side { grid-template-columns: 1fr; justify-items: start; }
@@ -116,8 +115,7 @@
   .app-main { padding-inline: 22px; }
 }
 @media (max-width: 899px) {
-  .week, .tp, .add-task-page { grid-template-columns: 1fr; }
-  .week > .margin { position: static; max-height: 560px; }
+  .week, .week.is-busy-edit, .tp, .add-task-page { grid-template-columns: 1fr; }
   .tasks { grid-template-columns: 220px minmax(0, 1fr); gap: 18px; }
   .tasks.has-detail .tlist { display: block; }
   .tasks:not(.has-detail) .tdetail { display: block; }
@@ -141,7 +139,6 @@
   .top-nav .lbl-long { display: inline; }
   .top-nav .lbl-short { display: none; }
   .app-main { padding: 14px 14px 36px; }
-  .week > .margin { display: flex; }
   .wk-head { padding: 16px; }
   .wk-head .legend { display: flex; flex-wrap: wrap; }
   .wk-tools { justify-content: flex-start; }
@@ -156,7 +153,6 @@
   .month__day { min-height: 85px; }
   .month__weekday { font-size: 11px; }
   .side-card { padding: 18px; }
-  .margin-page { padding-top: 0; }
   .btn, .seg__opt { min-height: 44px; }
   .tp__toolbar .seg__opt { flex: 1 0 auto; }
 }
