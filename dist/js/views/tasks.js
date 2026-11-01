@@ -137,7 +137,7 @@ function stepRow(s, t, step) {
     ...blocks.map((b) => `<button class="slot" type="button" data-action="locate" data-date="${b.date}" data-block="${b.id}">${icon('calendar')} ${dayShort(b.date)} ${span(b.start, b.end)}</button>`),
   ];
   if (step.later && ss !== 'done') slots.push(`<span class="slot slot--later">${icon('clock')} ${esc(step.later)}</span>`);
-  if (step.dropped) slots.push(`<span class="slot slot--later">${icon('minus')} ${L('你選擇不做（簡化）', 'You chose to skip this (simplified)')}</span>`);
+  if (step.dropped) slots.push(`<span class="slot slot--later">${icon('minus')} ${step.retired ? L('已封存，保留原進度紀錄', 'Archived; original progress kept') : L('你選擇不做（簡化）', 'You chose to skip this (simplified)')}</span>`);
   const est = step.estBy === 'me' || t.estimateBy === 'me' ? L('你填的', 'your estimate') : step.estNote ? L(`已調整：${esc(step.estNote)}`, `adjusted: ${esc(step.estNote)}`) : L('AI 估算', 'AI estimate');
   const seg = step.dropped ? '' : `
     <div class="seg seg--sm" role="group" aria-label="${esc(step.title)}">

@@ -464,8 +464,8 @@ export function updateTask(id, fields, steps) {
   const retained = steps.map((st) => ({ progress: 'todo', ...task.steps.find((old) => old.id === st.id), ...st, id: st.id || nid('st'), estBy: 'me' }));
   const removed = task.steps.filter((old) => !retained.some((st) => st.id === old.id));
   // Keep retired steps when past sessions/history still refer to them.
-  const archived = removed.filter((st) => state.history.some((h) => h.step === st.id) || state.blocks.some((b) => b.step === st.id && (b.date < state.today || (b.date === state.today && b.start <= state.now))))
-    .map((st) => ({ ...st, dropped: true }));
+  const archived = removed.filter((st) => ['done', 'doing'].includes(st.progress) || state.history.some((h) => h.step === st.id) || state.blocks.some((b) => b.step === st.id && (b.date < state.today || (b.date === state.today && b.start <= state.now))))
+    .map((st) => ({ ...st, dropped: true, retired: true }));
   if (changed) {
     state.blocks = state.blocks.filter((b) => b.task !== id || b.date < state.today || (b.date === state.today && b.start <= state.now));
     const pending = pendingProposal(state);
