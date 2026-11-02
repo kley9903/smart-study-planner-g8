@@ -29,7 +29,7 @@ http
       const request = new Request(url, { method: 'POST', headers: req.headers, body: Readable.toWeb(req), duplex: 'half' });
       const reply = await readSyllabus({ request, env: process.env });
       res.writeHead(reply.status, Object.fromEntries(reply.headers));
-      return res.end(Buffer.from(await reply.arrayBuffer()));
+      return Readable.fromWeb(reply.body).pipe(res); // 逐行轉送，網頁才看得到每一步的進度
     }
     try {
       let path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);

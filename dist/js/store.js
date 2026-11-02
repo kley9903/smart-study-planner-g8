@@ -79,7 +79,7 @@ function freshUi() {
   return {
     hlTask: null, showGaps: false, day: DEMO_TODAY, docId: 'stat', taskId: 'ps4',
     editBusy: false, dockOpen: false, dockDismissed: [], hlRule: null, justInked: [], arrowFor: null,
-    draft: '', editItem: null, docReading: null, syllabusDraft: '', sleepEdit: false, dropMsg: '', guideOpen: false,
+    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, syllabusDraft: '', sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
   };
 }
@@ -537,13 +537,14 @@ export function addOwnDoc({ id, name, size }) {
 }
 
 /** AI 讀完一份自己的大綱：放入待核對的項目（已確認的保留，未確認的換成這次的結果）。 */
-export function setOwnItems(docId, { course, items, notes }) {
+export function setOwnItems(docId, { course, items, notes, weightTotal = null }) {
   const doc = state.docs.find((d) => d.id === docId);
   if (!doc) return;
   const kept = doc.items.filter((i) => i.state === 'ink');
   doc.items = [...kept, ...items.map((it) => ({ ...it, id: nid(`${it.id}-`) }))];
   doc.courseName = course;
   doc.notes = notes;
+  doc.weightTotal = weightTotal;
   ui.docId = docId;
   emit({ toast: L(`AI 找到 ${items.length} 項，請逐項核對`, `AI found ${items.length} items. Check each one.`), keepScroll: true });
 }

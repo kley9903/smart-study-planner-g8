@@ -5,11 +5,20 @@ import { L } from './i18n.js';
 /** 伺服器（Dify 雲端）接受的單檔上限 */
 export const AI_MAX_MB = 15;
 
+/** AI 讀大綱的步驟，順序同伺服器送來的 stage */
+export const STAGES = ['read', 'extract', 'check', 'tidy'];
+export const stageLabel = (stage) => ({
+  read: L('讀取大綱', 'Reading the syllabus'),
+  extract: L('AI 找出功課、考試和上課時間', 'AI finds assignments, exams and class times'),
+  check: L('逐項核對比重和日期', 'Checking weights and dates one by one'),
+  tidy: L('整理結果', 'Putting the results together'),
+}[stage]);
+
 /**
- * 把大綱檔案交給 AI 整理（貼上的文字存成 .txt，以文字送出）。成功回傳 Dify 的課程 JSON；
- * 失敗丟出帶 reason 的錯誤：'too-big'、'no-key'（伺服器未設定金鑰）、'offline'、'dify'、'invalid'。
+ * 把大綱檔案交給 AI 整理（貼上的文字存成 .txt，以文字送出）。onStage(stage) 在 AI 走到下一步時呼叫。
+ * 成功回傳 Dify 的課程 JSON；失敗丟出帶 reason 的錯誤：'too-big'、'no-key'（伺服器未設定金鑰）、'offline'、'dify'、'invalid'。
  */
-export async function readSyllabus(file, { fetcher = fetch } = {}) {
+export async function readSyllabus(file, { fetcher = fetch, onStage = () => {} } = {}) {
   if (file.size > AI_MAX_MB * 1024 * 1024) throw Object.assign(new Error('too big'), { reason: 'too-big' });
   const body = new FormData();
   if (file.type.startsWith('text/')) body.append('text', await file.text());
@@ -20,10 +29,35 @@ export async function readSyllabus(file, { fetcher = fetch } = {}) {
   } catch (cause) {
     throw Object.assign(new Error('offline', { cause }), { reason: 'offline' });
   }
-  const out = await res.json().catch(() => null);
+  let out = null;
+  if ((res.headers.get('Content-Type') || '').includes('ndjson')) {
+    try {
+      await eachLine(res.body, (msg) => { if (msg.stage) onStage(msg.stage); else out = msg; });
+    } catch (cause) {
+      throw Object.assign(new Error('offline', { cause }), { reason: 'offline' });
+    }
+  } else {
+    out = await res.json().catch(() => null);
+  }
   if (!out) throw Object.assign(new Error(`HTTP ${res.status}`), { reason: res.status === 404 ? 'no-server' : 'dify' });
   if (!out.ok) throw Object.assign(new Error(out.message || 'failed'), { reason: out.reason || 'dify' });
   return out.result;
+}
+
+async function eachLine(body, fn) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const take = (line) => { if (line.trim()) fn(JSON.parse(line)); };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    lines.forEach(take);
+  }
+  take(buffer);
 }
 
 const TYPES = {
@@ -136,7 +170,65 @@ export function toItems(result) {
 
   const describe = (x) => (typeof x === 'string' ? x : x?.reason || x?.message || x?.description || x?.question || JSON.stringify(x));
   const notes = [...missing.filter((m) => !used.has(m)), ...(r.conflicts || []), ...(r.warnings || [])].map(describe).filter(Boolean);
-  return { course, items, notes };
+  const weights = (r.assessment_components || []).map((c) => c.weight_percent).filter((w) => typeof w === 'number');
+  return { course, items, notes, weightTotal: weights.length ? weights.reduce((a, b) => a + b, 0) : null };
+}
+
+const EXAMS = new Set(['exam', 'quiz', 'test']);
+
+/**
+ * 檢查視窗的逐項清單。stage 是這一行在 AI 哪一步進行（用來轉圈）；
+ * state 是讀完後的結果：'ok'（找到／對得上）、'warn'（要核對）、'none'（沒找到）。
+ */
+export function checklist(doc) {
+  const items = doc.items.filter((i) => i.state !== 'erased');
+  const count = (pick) => items.filter(pick).length;
+  const found = (n, unit) => (n ? { state: 'ok', text: L(`找到 ${n} ${unit[0]}`, `${n} found`) } : { state: 'none', text: L('沒找到', 'None found') });
+  const work = count((i) => i.plan?.kind === 'task' && !EXAMS.has(i.key));
+  const exams = count((i) => EXAMS.has(i.key));
+  const classes = count((i) => i.key === 'class');
+  const undated = count((i) => i.plan?.kind === 'task' && !i.plan.date);
+  const total = doc.weightTotal;
+  const gaps = (doc.notes || []).length;
+  return [
+    { stage: 'read', label: L('讀取大綱', 'Read the syllabus'), state: 'ok', text: L('完成', 'Done') },
+    { stage: 'extract', label: L('功課', 'Assignments'), ...found(work, ['項']) },
+    { stage: 'extract', label: L('考試／測驗', 'Exams and quizzes'), ...found(exams, ['項']) },
+    { stage: 'extract', label: L('上課時間', 'Class times'), ...found(classes, ['段']) },
+    { stage: 'check', label: L('比重', 'Weights'), ...(total == null ? { state: 'none', text: L('大綱沒寫比重', 'No weights given') }
+      : Math.abs(total - 100) <= 0.5 ? { state: 'ok', text: L(`合計 ${total}%`, `${total}% in total`) }
+        : { state: 'warn', text: L(`合計 ${total}%，不是 100%`, `${total}% in total, not 100%`) }) },
+    { stage: 'check', label: L('日期', 'Dates'), ...(undated ? { state: 'warn', text: L(`${undated} 項沒有日期`, `${undated} without a date`) } : { state: 'ok', text: L('都有日期', 'All dated') }) },
+    { stage: 'check', label: L('原文對照', 'Against the syllabus'), ...(gaps ? { state: 'warn', text: L(`${gaps} 處要核對`, `${gaps} to check`) } : { state: 'ok', text: L('沒有發現對不上的地方', 'Nothing out of line') }) },
+  ];
+}
+/**
+ * AI 讀完一份大綱的報告：have（找到了甚麼）和 missing（沒有或要核對甚麼），都是目前語言的文字。
+ * 已刪除的項目不算。missing 包括 Dify 的硬性檢查（原文有、結果沒有）和衝突。
+ */
+export function report(doc) {
+  const items = doc.items.filter((i) => i.state !== 'erased');
+  const exams = items.filter((i) => EXAMS.has(i.key));
+  const work = items.filter((i) => i.plan?.kind === 'task' && !EXAMS.has(i.key));
+  const classes = items.filter((i) => i.key === 'class');
+  const have = [
+    L(`功課 ${work.length} 項`, `${work.length} assignment${work.length === 1 ? '' : 's'}`),
+    L(`考試／測驗 ${exams.length} 項`, `${exams.length} exam${exams.length === 1 ? '' : 's'} or quiz${exams.length === 1 ? '' : 'zes'}`),
+    L(`上課時間 ${classes.length} 段`, `${classes.length} class time${classes.length === 1 ? '' : 's'}`),
+  ];
+  if (doc.weightTotal != null) have.push(L(`比重合計 ${doc.weightTotal}%`, `Weights add up to ${doc.weightTotal}%`));
+  const missing = [];
+  if (!classes.length) missing.push(L('沒找到上課時間', 'No class times found'));
+  if (!exams.length) missing.push(L('沒找到考試或測驗', 'No exams or quizzes found'));
+  if (doc.weightTotal != null && Math.abs(doc.weightTotal - 100) > 0.5) {
+    missing.push(L(`比重合計 ${doc.weightTotal}%，不是 100%：可能漏了評核項目`, `Weights add up to ${doc.weightTotal}%, not 100%: an assessment may be missing`));
+  }
+  for (const it of items) {
+    if (it.plan?.kind === 'task' && !it.plan.date) missing.push(L(`${it.what}：沒有日期（${it.raw || '大綱沒寫'}）`, `${it.what}: no date (${it.raw || 'not in the syllabus'})`));
+    else if (it.flag === 'no-time') missing.push(L(`${it.what}：沒寫時間，暫定 ${hm(it.plan.min)}`, `${it.what}: no time, set to ${hm(it.plan.min)}`));
+    else if (it.flag === 'no-day') missing.push(L(`${it.what}：看不出星期幾或時間`, `${it.what}: day or time unclear`));
+  }
+  return { have, missing: [...missing, ...(doc.notes || [])] };
 }
 
 /** 一個 AI 項目在核對表上顯示的文字（目前的介面語言）。 */

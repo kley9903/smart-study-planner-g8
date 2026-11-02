@@ -11,7 +11,7 @@ const { blockPopover, hatchPopover, busyForm } = await import('../dist/js/views/
 const { snap, paintRange } = await import('../dist/js/busy-paint.js');
 const { keepFile, fits, LIMIT_MB } = await import('../dist/js/attachments.js');
 const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem } = await import('../dist/js/store.js');
-const { toItems, rowText, parseDays, parseWhen, readSyllabus } = await import('../dist/js/syllabus-ai.js');
+const { toItems, rowText, report, checklist, parseDays, parseWhen, readSyllabus } = await import('../dist/js/syllabus-ai.js');
 const { setLang } = await import('../dist/js/i18n.js');
 const { onRequestPost } = await import('../functions/api/syllabus.js');
 
@@ -197,6 +197,21 @@ assert.deepEqual([rowText(a1).type, rowText(lecture).when], ['Assignment', 'Mon,
 delete globalThis.document;
 assert.deepEqual(found.notes, [], 'missing information tied to a row is not repeated as a note');
 assert.ok(found.items.every((i) => i.state === 'pencil'), 'nothing is confirmed automatically');
+assert.equal(found.weightTotal, 100);
+{
+  const r = report({ items: found.items, notes: ['原文有「25%」…'], weightTotal: 90 });
+  assert.deepEqual(r.have, ['3 assignments', '2 exams or quizzes', '1 class time', 'Weights add up to 90%']);
+  assert.ok(r.missing.some((t) => t.includes('90%')), 'weights that do not add up to 100% are reported');
+  assert.ok(r.missing.some((t) => t.startsWith('Final exam: no date')), 'items with no date are reported');
+  assert.ok(r.missing.some((t) => t.startsWith('Midterm exam: no time')));
+  assert.equal(r.missing.at(-1), '原文有「25%」…', 'the workflow coverage check is part of the report');
+  const empty = report({ items: [found.items[1]], notes: [], weightTotal: null });
+  assert.deepEqual(empty.missing, ['No class times found', 'No exams or quizzes found']);
+  const rows = checklist({ items: found.items, notes: [], weightTotal: 100 });
+  assert.deepEqual(rows.map((r) => r.state), ['ok', 'ok', 'ok', 'ok', 'ok', 'warn', 'ok'], 'check window rows: read, work, exams, classes, weights, dates (final TBA), syllabus');
+  assert.deepEqual(rows.map((r) => r.stage), ['read', 'extract', 'extract', 'extract', 'check', 'check', 'check']);
+  assert.deepEqual(checklist({ items: [], notes: ['x'], weightTotal: null }).slice(1).map((r) => r.state), ['none', 'none', 'none', 'none', 'ok', 'warn']);
+}
 
 enterMine();
 const mine = getState();
@@ -223,18 +238,23 @@ assert.equal(doc.items.filter((i) => i.state === 'ink').length, 5, 'reading agai
 
 // Server relay with a fake Dify: uploads the file, runs the workflow in streaming mode, unwraps the output.
 const sse = (events) => new Response(events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('event: ping\n\n'));
+const node = (node_type) => ({ event: 'node_started', data: { node_type } });
 const calls = [];
 const fakeDify = async (url, init) => {
   calls.push({ url, init });
   if (url.endsWith('/files/upload')) return Response.json({ id: 'file-9' });
-  return sse([{ event: 'workflow_started' }, { event: 'workflow_finished', data: { status: 'succeeded', outputs: { result: JSON.stringify({ valid: true, data: sample, errors: [] }) } } }]);
+  return sse([{ event: 'workflow_started' }, node('start'), node('document-extractor'), node('llm'), node('code'), node('end'),
+    { event: 'workflow_finished', data: { status: 'succeeded', outputs: { result: JSON.stringify({ valid: true, data: sample, errors: [] }) } } }]);
 };
+// The relay answers in NDJSON once the workflow starts: progress lines, then the result.
+const lines = async (res) => (await res.text()).trim().split('\n').map((l) => JSON.parse(l));
 const post = (form, headers = {}) => new Request('https://planner.test/api/syllabus', { method: 'POST', body: form, headers });
 const withFile = () => { const f = new FormData(); f.append('file', new File(['%PDF'], 'c.pdf', { type: 'application/pdf' })); return f; };
 let res = await onRequestPost({ request: post(withFile()), env: { DIFY_API_KEY: 'k' }, fetcher: fakeDify });
-let out = await res.json();
-assert.equal(res.status, 200);
-assert.equal(out.result.course.code, 'COMP1010');
+assert.match(res.headers.get('Content-Type'), /ndjson/);
+let all = await lines(res);
+assert.deepEqual(all.slice(0, -1).map((l) => l.stage), ['read', 'extract', 'check', 'tidy'], 'each workflow step is reported once, in order');
+assert.equal(all.at(-1).result.course.code, 'COMP1010');
 assert.equal(calls[0].url, 'https://api.dify.ai/v1/files/upload');
 assert.equal(calls[0].init.headers.Authorization, 'Bearer k');
 assert.deepEqual(JSON.parse(calls[1].init.body).inputs.document, { type: 'document', transfer_method: 'local_file', upload_file_id: 'file-9' });
@@ -249,14 +269,16 @@ res = await onRequestPost({
   request: post(withFile()), env: { DIFY_API_KEY: 'k' },
   fetcher: async (url) => (url.endsWith('/files/upload') ? Response.json({ id: 'f' }) : sse([{ event: 'workflow_finished', data: { status: 'succeeded', outputs: { result: '{"valid": false, "data": null, "errors": ["not a syllabus"]}' } } }])),
 });
-assert.deepEqual([res.status, (await res.json()).reason], [502, 'invalid']);
+assert.deepEqual((await lines(res)).at(-1), { ok: false, reason: 'invalid', message: 'not a syllabus' });
 
 // The browser side passes the relay's reason through.
 await assert.rejects(readSyllabus({ name: 'big.pdf', size: 16 * mb }), { reason: 'too-big' });
 const relay = async (url, init) => onRequestPost({ request: new Request(`https://planner.test${url}`, init), env: {}, fetcher: fakeDify });
 await assert.rejects(readSyllabus(new File(['x'], 'a.pdf'), { fetcher: relay }), { reason: 'no-key' });
 const ok = async (url, init) => onRequestPost({ request: new Request(`https://planner.test${url}`, init), env: { DIFY_API_KEY: 'k' }, fetcher: fakeDify });
-assert.equal((await readSyllabus(new File(['x'], 'a.pdf'), { fetcher: ok })).course.code, 'COMP1010');
+const seen = [];
+assert.equal((await readSyllabus(new File(['x'], 'a.pdf'), { fetcher: ok, onStage: (st) => seen.push(st) })).course.code, 'COMP1010');
+assert.deepEqual(seen, ['read', 'extract', 'check', 'tidy'], 'the page hears every step');
 calls.length = 0;
 await readSyllabus(new File(['COMP1010 lectures Mon 10:30-12:00'], 'pasted.txt', { type: 'text/plain' }), { fetcher: ok });
 assert.equal(calls.length, 1, 'pasted text is sent as text, with no file upload');

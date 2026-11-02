@@ -3,7 +3,7 @@
 import { esc, icon } from '../ui.js';
 import { ui, getMode } from '../store.js';
 import { L } from '../i18n.js';
-import { AI_MAX_MB, rowText } from '../syllabus-ai.js';
+import { AI_MAX_MB, rowText, report, checklist, STAGES, stageLabel } from '../syllabus-ai.js';
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
@@ -54,8 +54,89 @@ export function render(s) {
         ${s.docs.map((d) => docCard(s, d, d.id === doc.id)).join('')}
       </div>` : `<p class="docs-empty muted">${L('還沒有放入大綱。', 'No syllabus added yet.')}</p>`}
 
-      ${!doc ? '' : doc.own ? `${ownPanel(doc)}${doc.items.length ? `${review(s, doc)}${confirmed(doc)}` : ''}` : `${review(s, doc)}${confirmed(doc)}`}
+      ${!doc ? '' : doc.own ? `${ownPanel(doc)}${doc.items.length && ui.docReading !== doc.id ? `${reportCard(doc)}${review(s, doc)}${confirmed(doc)}` : ''}` : `${review(s, doc)}${confirmed(doc)}`}
+    </div>
+    ${ui.aiModal ? aiModal(s) : ''}`;
+}
+
+/**
+ * 檢查視窗：蓋在頁面上，後面模糊。像一張有紅色邊線的筆記紙：
+ * run：AI 還在讀，每一行跟著 Dify 實際走到的步驟轉圈（ui.readStage）；
+ * reveal：結果到了，逐行揭曉找到／找不到（ui.aiModal.step）；done：蓋上「已核對」印章，下面出報告。
+ */
+function aiModal(s) {
+  const m = ui.aiModal;
+  const doc = s.docs.find((d) => d.id === m.doc);
+  if (!doc) return '';
+  const now = STAGES.indexOf(ui.readStage);
+  const rows = checklist(m.phase === 'run' ? { items: [], notes: [], weightTotal: null } : doc);
+  const stateOf = (r, i) => {
+    if (m.phase !== 'run') return i < m.step ? r.state : 'spin';
+    const at = STAGES.indexOf(r.stage);
+    if (at < now) return r.stage === 'read' ? 'ok' : 'spin'; // 找出的數目要等結果到了才知道
+    return at === now ? 'spin' : 'todo';
+  };
+  const states = rows.map(stateOf);
+  const settled = states.filter((st) => st !== 'spin' && st !== 'todo').length;
+  const mark = { ok: icon('check'), warn: '!', none: icon('x'), spin: '', todo: '' };
+  const done = m.phase === 'done';
+  const fresh = m.fresh; // 只有第一次畫出視窗時播淡入；之後每一步重畫不再播
+  m.fresh = false;
+  return `
+    <div class="ai-modal ${fresh ? 'is-fresh' : ''}" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title">
+      <section class="ai-modal__card ${done ? 'is-done' : ''}">
+        <header class="ai-modal__head">
+          <div>
+            <p class="ai-modal__eyebrow">${L('AI 核對', 'AI check')} · ${settled} / ${rows.length}</p>
+            <h2 class="ai-modal__title" id="ai-modal-title">${done ? L('核對完成', 'Check complete') : L('正在逐項核對大綱', 'Checking the syllabus')}</h2>
+            <p class="ai-modal__file">${icon('file')}<span>${esc(doc.name)}</span></p>
+          </div>
+          <button class="ai-modal__close" type="button" data-action="ai-modal-close" aria-label="${L('關閉', 'Close')}">${icon('x')}</button>
+        </header>
+        ${done ? `<div class="ai-stamp" aria-hidden="true">${L('已核對', 'Checked')}</div>` : ''}
+        <div class="ai-meter" role="progressbar" aria-label="${L('核對進度', 'Progress')}" aria-valuemin="0" aria-valuemax="${rows.length}" aria-valuenow="${settled}">
+          <span style="--p:${settled / rows.length}"></span>
+        </div>
+        <ol class="ai-checks" aria-live="polite">
+          ${rows.map((r, i) => {
+            const st = states[i];
+            const text = st === 'spin' ? L('檢查中', 'Checking') : st === 'todo' ? L('等待', 'Waiting') : r.text;
+            return `<li class="ai-check is-${st} ${m.phase === 'reveal' && i === m.step - 1 ? 'is-new' : ''}">
+              <span class="ai-check__n">${String(i + 1).padStart(2, '0')}</span>
+              <span class="ai-check__mark">${mark[st]}</span>
+              <span class="ai-check__label">${r.label}</span>
+              <span class="ai-check__text">${esc(text)}</span></li>`;
+          }).join('')}
+        </ol>
+        ${done ? `
+        ${ledger(doc, true)}
+        <footer class="ai-modal__foot">
+          <button class="btn btn--ink" type="button" data-action="ai-modal-close">${L('去逐項核對', 'Check the items')} ${icon('arrow')}</button>
+        </footer>` : `
+        <footer class="ai-modal__foot">
+          <span class="ai-modal__hint">${icon('clock')} ${L('通常要半分鐘到一分鐘', 'Usually 30–60 seconds')}</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-action="ai-modal-close">${L('在背景繼續', 'Keep going in the background')}</button>
+        </footer>`}
+      </section>
     </div>`;
+}
+
+/** 報告的帳目：左邊「找到」用墨水寫，右邊「找不到／要核對」放在鉛筆虛線框裡，等你處理。 */
+function ledger(doc, animate) {
+  const { have, missing } = report(doc);
+  let n = 0;
+  const line = (cls, sign, text) => `<li class="ai-line ${cls}" ${animate ? `style="--i:${n++}"` : ''}>${icon(sign)}<span>${esc(text)}</span></li>`;
+  return `
+        <div class="ai-ledger ${animate ? 'is-animated' : ''}">
+          <div class="ai-ledger__col">
+            <h3>${L('找到', 'Found')}</h3>
+            <ul>${have.map((t) => line('is-ok', 'check', t)).join('')}</ul>
+          </div>
+          <div class="ai-ledger__col ai-ledger__col--check ${missing.length ? '' : 'is-clear'}">
+            <h3>${L('找不到／要核對', 'Missing or to check')} <span class="ai-ledger__count">${missing.length}</span></h3>
+            <ul>${missing.length ? missing.map((t) => line('is-warn', 'alert', t)).join('') : line('is-ok', 'check', L('沒有發現缺漏', 'Nothing missing found'))}</ul>
+          </div>
+        </div>`;
 }
 
 /** 自己的計劃：可以直接打字／貼上大綱文字，也可以放入檔案。框是空的時候中間顯示「貼上」「上傳檔案」。 */
@@ -73,11 +154,34 @@ function pasteBox() {
             <p class="drop__sub">${L(`檔案保存在這個瀏覽器（每份最多 20 MB）。按「用 AI 找出項目」時才會交給 AI 讀（檔案最多 ${AI_MAX_MB} MB）。`, `Files are kept in this browser (up to 20 MB each). Nothing goes to the AI until you press "Find items with AI" (files up to ${AI_MAX_MB} MB).`)}</p>
           </div>
           <div class="paste__bar">
+            <span class="paste__count" data-syllabus-count>${L(`${ui.syllabusDraft.length} 字`, `${ui.syllabusDraft.length} characters`)}</span>
             <button class="btn btn--ghost btn--sm" type="button" data-action="syllabus-clear">${icon('x')} ${L('清除', 'Clear')}</button>
             <button class="btn btn--ink" type="button" data-action="syllabus-read" ${ui.docReading ? 'disabled' : ''}>${icon('eye')} ${L('用 AI 找出項目', 'Find items with AI')}</button>
           </div>
           ${ui.dropMsg ? `<p class="drop__msg" role="status">${esc(ui.dropMsg)}</p>` : ''}
         </div>`;
+}
+
+/** AI 正在讀：每一步是 Dify 實際走到的節點（伺服器即時送來），不是計時器。 */
+function readingSteps() {
+  const now = STAGES.indexOf(ui.readStage);
+  return `
+          <div class="ai-run" role="status" aria-live="polite">
+            <ol class="ai-steps">
+              ${STAGES.map((st, i) => `<li class="ai-step ${i < now ? 'is-done' : i === now ? 'is-now' : ''}">
+                <span class="ai-step__mark">${i < now ? icon('check') : ''}</span>${stageLabel(st)}${i === now ? '…' : ''}</li>`).join('')}
+            </ol>
+            <p class="muted">${L('通常要半分鐘到一分鐘，可以先做別的事。', 'This usually takes 30–60 seconds. You can do other things meanwhile.')}</p>
+          </div>`;
+}
+
+/** 讀完的報告留在頁面上：有甚麼、沒有甚麼（剛讀完時在檢查視窗裡逐項揭曉）。 */
+function reportCard(doc) {
+  return `
+    <section class="sheet ai-report" aria-label="${L('AI 讀取報告', 'AI reading report')}">
+      <p class="ai-report__eyebrow">${L('AI 讀取報告', 'AI reading report')}</p>
+      ${ledger(doc, false)}
+    </section>`;
 }
 
 function ownPanel(doc) {
@@ -97,8 +201,7 @@ function ownPanel(doc) {
       <div class="own-doc__body">
         <div class="own-doc__ai">
           ${ui.docReading === doc.id
-            ? `<button class="btn btn--ink" type="button" disabled aria-busy="true">${icon('clock')} ${L('AI 正在讀…', 'AI is reading…')}</button>
-               <span class="muted" role="status">${L('通常要半分鐘到一分鐘，可以先做別的事。', 'This usually takes 30–60 seconds. You can do other things meanwhile.')}</span>`
+            ? readingSteps()
             : `<button class="btn btn--ink" type="button" data-action="doc-read" data-doc="${doc.id}" ${ui.docReading ? 'disabled' : ''}>${icon('eye')} ${doc.items.length ? L('再讓 AI 讀一次', 'Ask AI again') : L('用 AI 找出項目', 'Find items with AI')}</button>
                <span class="muted">${doc.items.length
                 ? L('再讀一次會換掉未確認的項目，已確認的保留。', 'Reading again replaces unconfirmed items; confirmed ones stay.')
@@ -158,7 +261,6 @@ function review(s, doc) {
           ? `<button class="btn btn--ink" type="button" data-action="ink-all" data-doc="${doc.id}">${icon('check')} ${L(`全部確認（${pending} 項）`, `Confirm all (${pending})`)}</button>`
           : `<span class="chip chip--ok">${icon('check')} ${L('全部已核對', 'All checked')}</span>`}
       </header>
-      ${doc.notes?.length ? `<ul class="xnotes">${doc.notes.map((n) => `<li>${icon('alert')}<span>${esc(n)}</span></li>`).join('')}</ul>` : ''}
       <table class="xtable">
         <thead><tr><th>${L('類型', 'Type')}</th><th>${L('內容', 'Item')}</th><th>${L('日期／時間', 'Date / time')}</th><th>${L('比重', 'Weight')}</th><th>${L('出處', 'Source')}</th><th>${L('預計時數', 'Estimate')}</th><th><span class="sr-only">${L('操作', 'Actions')}</span></th></tr></thead>
         <tbody>${doc.items.map((it) => (ui.editItem === it.id ? editRow(doc, view(doc, it)) : itemRow(doc, view(doc, it)))).join('')}</tbody>

@@ -5,7 +5,9 @@ import {
   addRule, removeRule, setSleep, obRestart, obFinish,
   getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems,
 } from './store.js';
-import { readSyllabus, toItems, AI_MAX_MB } from './syllabus-ai.js';
+import { readSyllabus, toItems, checklist, AI_MAX_MB } from './syllabus-ai.js';
+
+const REVEAL_STEP_MS = 450; // 檢查視窗逐行揭曉的間隔
 import { editor } from './views/task-editor.js';
 import { renderMonth, shiftMonth } from './views/month.js';
 import { stepFields, stepHelper, suggestSteps } from './views/task-editor.js';
@@ -159,6 +161,7 @@ function updateNav(name, s) {
 
 /* ---------------- 右下角的 AI 助手 ---------------- */
 let readyKey = '';
+let dockHtml = '';
 const mascot = createMascot(dock, { main });
 function drawDock(s, r, navigated) {
   // AI 建議可以確認時，面板自動縮小讓出時間表，泡泡留下「確認／不要」
@@ -169,7 +172,8 @@ function drawDock(s, r, navigated) {
   dock.hidden = r.name === 'start';
   if (dock.hidden) return;
   const d = renderDock(s, { quiet: r.name === 'add-task' || !!ui.editTask });
-  dock.innerHTML = d.html;
+  // 內容沒變就不重建：重建會讓正在播的撐起來／掉下去／打哈欠動畫從第一格重來，然後被計時器中途切斷
+  if (d.html !== dockHtml) { dock.innerHTML = d.html; dockHtml = d.html; }
   dock.classList.toggle('is-open', d.open);
   dock.classList.toggle('has-bubble', !!d.bubble);
   mascot.shown({ hidden: false, open: d.open, bubble: d.bubble, navigated });
@@ -389,7 +393,7 @@ const actions = {
     if (ui.docReading) return;
     if (text.length < 30) { toast(L('文字太短了，請貼上整份或整段大綱（至少 30 個字）。', 'That is too short. Paste the whole syllabus or a full section (30 characters or more).'), 'alert'); return; }
     const line = text.split('\n')[0].replace(/[\\/:*?"<>|]/g, ' ').trim();
-    const first = (line.length > 40 ? line.slice(0, 40).replace(/\s+\S*$/, '') : line) || L('貼上的大綱', 'Pasted syllabus');
+    const first = (line.length > 40 ? line.slice(0, 40).replace(/\s+\S*$/, '') : line).replace(/[\s.,;:，。；：]+$/, '') || L('貼上的大綱', 'Pasted syllabus');
     let saved;
     try {
       saved = await keepFile(new File([text], `${first}.txt`, { type: 'text/plain' }), LIMIT_MB.syllabus);
@@ -402,18 +406,28 @@ const actions = {
     const id = el.dataset.doc;
     if (ui.docReading) return;
     ui.docReading = id;
+    ui.readStage = 'read';
+    ui.aiModal = { doc: id, phase: 'run', fresh: true };
     render();
     try {
       const file = await getAttachment(id);
       if (!file) throw Object.assign(new Error('missing'), { reason: 'missing' });
-      const found = toItems(await readSyllabus(file));
+      const found = toItems(await readSyllabus(file, { onStage: (stage) => { ui.readStage = stage; render(); } }));
       ui.docReading = null;
       setOwnItems(id, found);
+      revealChecks(id);
     } catch (err) {
       ui.docReading = null;
+      ui.aiModal = null;
       render();
       toast(readProblem(err), 'alert');
     }
+  },
+  'ai-modal-close': () => {
+    const done = ui.aiModal?.phase === 'done';
+    ui.aiModal = null;
+    render();
+    if (done) document.querySelector('.xtable')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   },
   'demo-docs': () => {
     document.getElementById('review')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -510,6 +524,7 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') {
     if (!document.getElementById('popover').hidden) closePopover();
+    else if (ui.aiModal) actions['ai-modal-close']();
     else if (ui.dockOpen) toggleDock(false);
   }
   const t = e.target;
@@ -574,13 +589,35 @@ document.addEventListener('submit', (e) => {
 
 document.addEventListener('input', (e) => {
   if (e.target.matches('[data-draft]')) { ui.draft = e.target.value; autosize(); }
-  if (e.target.matches('[data-syllabus-text]')) ui.syllabusDraft = e.target.value;
+  if (e.target.matches('[data-syllabus-text]')) {
+    ui.syllabusDraft = e.target.value;
+    const count = document.querySelector('[data-syllabus-count]');
+    if (count) count.textContent = L(`${e.target.value.length} 字`, `${e.target.value.length} characters`);
+  }
 });
 
 /* ---------------- 附件：存進這個瀏覽器（attachments.js 的 keepFile） ---------------- */
 const fileProblem = (err, file) => (err.reason === 'too-big'
   ? L(`「${file.name}」超過 ${err.maxMB} MB`, `"${file.name}" is over ${err.maxMB} MB`)
   : L('儲存失敗，請檢查瀏覽器儲存空間。', 'Could not save. Check browser storage space.'));
+
+/** 結果到了：檢查視窗逐行揭曉找到／找不到，最後出報告。視窗被關掉就停。 */
+function revealChecks(id) {
+  if (ui.aiModal?.doc !== id) return;
+  const doc = getState().docs.find((d) => d.id === id);
+  const rows = checklist(doc).length;
+  ui.aiModal = { doc: id, phase: 'reveal', step: 1 }; // 第一行「讀取大綱」已經完成
+  const tick = () => {
+    const m = ui.aiModal;
+    if (m?.doc !== id) return;
+    m.step += 1;
+    if (m.step >= rows) m.phase = 'done';
+    render();
+    if (m.phase !== 'done') setTimeout(tick, REVEAL_STEP_MS);
+  };
+  render();
+  setTimeout(tick, REVEAL_STEP_MS);
+}
 
 const readProblem = (err) => ({
   'too-big': L(`AI 只能讀 ${AI_MAX_MB} MB 以內的檔案，請先壓縮或只放有日期的那幾頁。`, `The AI can only read files up to ${AI_MAX_MB} MB. Compress it or keep only the pages with dates.`),
