@@ -1,7 +1,8 @@
 /* 基本排版、頁首、導覽 */
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--header-h) + 12px); }
+/* scrollbar-gutter：短頁沒有捲軸時也留出捲軸的位置，換頁時右下角的角色和版面才不會左右跳 */
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: calc(var(--header-h) + 12px); scrollbar-gutter: stable; }
 
 body {
   margin: 0;

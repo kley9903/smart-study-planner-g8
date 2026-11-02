@@ -172,26 +172,46 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .dock > * { pointer-events: auto; }
 .dock__me { display: flex; align-items: flex-end; gap: 8px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
 .dock__me:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 12px; }
-/* 角色：站著（mascot.webp）→ 腳下一空直直掉下去 → 雙手抓住畫面底邊（mascot-drop.webp，8 格 sprite）→ 趴著（mascot-rest.webp）。
-   三者同一個 122×189 框，框的底邊就是畫面底邊；抓住和趴著的每一格雙手底部都在 y=154。
-   趴著時框縮成 84px、內容上移 70px，只露出頭和雙手 */
+/* 角色全部是橫向 sprite（scratchpad build_all.py 從原片產生：頭髮顏色統一成站著的，每個切換點頭尾對齊）：
+   站著循環（mascot.webp）→ 腳下一空直直掉下去 → 雙手抓住畫面底邊（mascot-drop.webp）→ 趴著循環（mascot-rest.webp）
+   → 偶爾打哈欠（mascot-yawn.webp）→ 撐起來站好（mascot-rise.webp）。
+   都在同一個 122×197 框，框的底邊就是畫面底邊；抓住、趴著、打哈欠的雙手底部都在 y=154。
+   趴著時框縮成 88px、內容上移 66px，只露出 y 66–154（頭和雙手）。
+   兩個循環每次重新顯示（display: none → block）都從第 1 格開始，剛好接上切換動畫的最後一格 */
 .dock__fig { position: relative; display: block; width: 122px; height: 197px; overflow: hidden; }
-.dock__fig > * { position: absolute; left: 0; top: 0; width: 122px; height: 189px; }
-.dock__fig img { display: block; width: 122px; height: 189px; image-rendering: pixelated; }
-.dock__drop { display: none; background: url(../img/mascot-drop.webp) 0 0 / 976px 189px no-repeat; image-rendering: pixelated; transform: translateY(43px); }
-.dock__rest { display: none; }
+.dock__fig > * { position: absolute; left: 0; top: 0; width: 122px; height: 189px; background-repeat: no-repeat; image-rendering: pixelated; }
+.dock__stand { background-image: url(../img/mascot.webp); background-size: 4026px 189px; animation: mascot-stand 2.75s steps(33) infinite; }
+.dock__rest { display: none; background-image: url(../img/mascot-rest.webp); background-size: 4026px 88px; animation: mascot-rest 2.75s steps(33) infinite; }
+.dock__fig > .dock__rest, .dock__fig > .dock__yawn { top: 66px; height: 88px; }
+.dock__drop { display: none; background-image: url(../img/mascot-drop.webp); background-size: 976px 189px; transform: translateY(43px); }
 .dock.is-rest .dock__stand { display: none; }
-.dock.is-dropping .dock__stand { animation: mascot-fall 0.28s cubic-bezier(0.55, 0, 1, 0.45) forwards; }
-.dock.is-dropping .dock__drop { display: block; visibility: hidden; animation: mascot-show 0s 0.28s forwards, mascot-catch 0.56s steps(7) 0.28s forwards; }
+.dock.is-dropping .dock__stand { animation: mascot-stand 2.75s steps(33) infinite, mascot-fall 0.48s cubic-bezier(0.45, 0, 0.9, 0.55) forwards; }
+.dock.is-dropping .dock__drop { display: block; visibility: hidden; animation: mascot-show 0s 0.48s forwards, mascot-catch 0.84s steps(7) 0.48s forwards; }
 .dock.is-rest .dock__rest { display: block; }
-.dock.is-rest .dock__fig { height: 84px; }
-.dock.is-rest .dock__fig > * { transform: translateY(-70px); }
-.dock.is-waking .dock__stand { animation: mascot-rise 0.32s cubic-bezier(0.2, 0.8, 0.3, 1) backwards; }
+.dock.is-rest .dock__fig { height: 88px; }
+.dock.is-rest .dock__fig > * { transform: translateY(-66px); }
+/* 撐起來 25 格：前 2 格從趴著補幀、中間 19 格原片、後 4 格補幀到站著第 1 格（光流補幀，build_all.py 的 morph） */
+.dock__rise { display: none; height: 197px; background-image: url(../img/mascot-rise.webp); background-size: 3050px 197px; }
+.dock.is-waking .dock__stand { display: none; }
+.dock.is-waking .dock__rise { display: block; animation: mascot-rise 1.07s steps(24) forwards; }
+@keyframes mascot-stand { to { background-position: -4026px 0; } }
+@keyframes mascot-rest { to { background-position: -4026px 0; } }
 @keyframes mascot-fall { to { transform: translateY(104px); visibility: hidden; } }
-@keyframes mascot-rise { from { transform: translateY(104px); } }
 @keyframes mascot-show { to { visibility: visible; } }
 @keyframes mascot-catch { to { background-position: -854px 0; } }
-.dock__me:hover .dock__stand img { transform: translateY(-3px); transition: transform 0.15s; }
+@keyframes mascot-rise { to { background-position: -2928px 0; } }
+/* 打哈欠：趴著或趴在面板上時偶爾播一次，由 app.js 加 is-yawning；播完趴著的循環從第 1 格重新開始 */
+.dock__yawn { display: none; background: url(../img/mascot-yawn.webp) 0 0 / 2074px 88px no-repeat; image-rendering: pixelated; }
+.dock.is-rest.is-yawning .dock__fig .dock__yawn, .dock.is-open.is-yawning .dock__perch .dock__yawn { display: block; animation: mascot-yawn 1.5s step-end forwards; }
+.dock.is-rest.is-yawning .dock__fig .dock__rest, .dock.is-open.is-yawning .dock__perch .dock__rest { display: none; }
+/* 像真人打哈欠：張嘴（第 1–3 格）0.15 秒 → 嘴巴張著（第 4–12 格，每格約 0.13 秒）1.2 秒 → 閉嘴（第 13–17 格）0.15 秒 */
+@keyframes mascot-yawn {
+  0% { background-position: 0 0; } 3.33% { background-position: -122px 0; } 6.67% { background-position: -244px 0; }
+  10% { background-position: -366px 0; } 18.89% { background-position: -488px 0; } 27.78% { background-position: -610px 0; } 36.67% { background-position: -732px 0; } 45.56% { background-position: -854px 0; }
+  54.44% { background-position: -976px 0; } 63.33% { background-position: -1098px 0; } 72.22% { background-position: -1220px 0; } 81.11% { background-position: -1342px 0; }
+  90% { background-position: -1464px 0; } 92% { background-position: -1586px 0; } 94% { background-position: -1708px 0; } 96% { background-position: -1830px 0; } 98%, 100% { background-position: -1952px 0; }
+}
+.dock__me:hover .dock__stand { translate: 0 -3px; transition: translate 0.15s; }
 .dock__tag {
   display: grid; gap: 1px; margin-bottom: 46px; padding: 7px 12px; border-radius: 12px; white-space: nowrap; text-align: left;
   background: var(--paper); border: 1px solid var(--rule); box-shadow: var(--shadow-card);
@@ -201,26 +221,29 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .dock__dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--seal); margin-right: 5px; vertical-align: 1px; }
 /* 說話泡泡：實線墨色邊框（虛線留給「AI 建議，未確認」），尾巴指向她的頭，從尾巴那一點彈出 */
 .dock__bubble {
-  position: relative; width: min(300px, calc(100vw - 36px)); margin-bottom: 18px; padding: 12px 36px 12px 14px; border-radius: 16px;
+  position: relative; width: min(300px, calc(100vw - 36px)); margin-bottom: 12px; padding: 12px 36px 12px 14px; border-radius: 16px;
   background: #fff; border: 1.5px solid var(--ink); box-shadow: var(--shadow-pop);
-  font-size: 13.5px; line-height: 1.6; color: var(--ink-2); transform-origin: calc(100% - 46px) calc(100% + 16px);
+  font-size: 13.5px; line-height: 1.6; color: var(--ink-2); transform-origin: calc(100% - 61px) calc(100% + 23px);
   animation: bubble-in 0.24s var(--ease) backwards; transition: opacity 0.2s, transform 0.2s;
 }
 @keyframes bubble-in { from { opacity: 0; transform: scale(0.6); } }
 .dock__bubble b { color: var(--ink); }
-.dock__tail { position: absolute; top: 100%; right: 46px; width: 20px; height: 18px; overflow: visible; }
+/* 尾巴尖端在 (19, 23)：right 60px 讓尖端對準她頭的中心（角色框右邊往左 61px），離頭頂約 5px */
+.dock__tail { position: absolute; top: 100%; right: 60px; width: 20px; height: 24px; overflow: visible; }
 .dock__tail path { fill: #fff; stroke: var(--ink); stroke-width: 1.5; stroke-linejoin: round; }
 .dock__tail .dock__tail-cover { fill: none; stroke: #fff; stroke-width: 2.4; }
 .dock__acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .dock__x { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--ink-3); display: grid; place-items: center; }
 .dock__x:hover { background: var(--paper-2); color: var(--ink); }
-.dock.is-dropping .dock__tag, .dock.is-dropping .dock__bubble, .dock.is-rest .dock__tag, .dock.is-rest .dock__bubble { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.dock.is-dropping .dock__tag, .dock.is-dropping .dock__bubble, .dock.is-rest .dock__tag, .dock.is-rest .dock__bubble,
+.dock.is-waking .dock__tag, .dock.is-waking .dock__bubble { opacity: 0; transform: translateY(8px); pointer-events: none; }
 .dock.is-open .dock__me { display: none; }
 /* 面板上方留 86px 給趴在右上角的她 */
 .dock__panel { position: relative; width: min(400px, calc(100vw - 36px)); height: min(620px, calc(100vh - var(--header-h) - 124px)); margin-bottom: 18px; }
 .dock__panel .margin { position: relative; top: auto; height: 100%; max-height: none; border: 1px solid var(--rule); box-shadow: var(--shadow-pop); }
-.dock__perch { position: absolute; right: 22px; bottom: 100%; z-index: 1; width: 122px; height: 84px; margin-bottom: -3px; padding: 0; border: 0; background: none; overflow: hidden; cursor: pointer; }
-.dock__perch img { display: block; width: 122px; height: 189px; image-rendering: pixelated; transform: translateY(-70px); }
+.dock__perch { position: absolute; right: 22px; bottom: 100%; z-index: 1; width: 122px; height: 88px; margin-bottom: -3px; padding: 0; border: 0; background: none; overflow: hidden; cursor: pointer; }
+.dock__perch .dock__rest, .dock__perch .dock__yawn { position: absolute; left: 0; top: 0; width: 122px; height: 88px; }
+.dock__perch .dock__rest { display: block; }
 .margin__head { align-items: center; }
 .margin__title { flex: 1; min-width: 0; }
 .margin__title h2 { font-size: 18px; flex-wrap: wrap; }
@@ -228,20 +251,21 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
   .dock { right: 10px; }
   .dock__tag { display: none; }
   /* 手機一直趴著 */
-  .dock .dock__fig { height: 84px; }
-  .dock .dock__fig > * { transform: translateY(-70px); animation: none; }
-  .dock .dock__stand, .dock .dock__drop { display: none; }
+  .dock .dock__fig { height: 88px; }
+  .dock .dock__fig > * { transform: translateY(-66px); }
+  .dock .dock__stand, .dock .dock__drop, .dock .dock__rise { display: none; }
   .dock .dock__rest { display: block; }
   .dock.is-open { left: 0; right: 0; }
   .dock__panel { width: 100%; height: calc(100vh - var(--header-h) - 140px); margin: 0; } /* 手機頁首會換行變高 */
   .dock__panel .margin { border-radius: 18px 18px 0 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .dock__fig > *, .dock__tag, .dock__bubble { transition: none; animation: none; }
-  .dock.is-dropping .dock__stand, .dock.is-dropping .dock__drop { display: none; }
+  .dock__fig > *, .dock__perch > *, .dock__tag, .dock__bubble { transition: none; animation: none; }
+  .dock.is-dropping .dock__stand, .dock.is-dropping .dock__drop, .dock.is-waking .dock__rise { display: none; }
+  .dock.is-waking .dock__stand { visibility: visible; }
   .dock.is-dropping .dock__rest { display: block; }
-  .dock.is-dropping .dock__fig { height: 84px; }
-  .dock.is-dropping .dock__fig > * { transform: translateY(-70px); }
+  .dock.is-dropping .dock__fig { height: 88px; }
+  .dock.is-dropping .dock__fig > * { transform: translateY(-66px); }
 }
 
 

@@ -7,9 +7,6 @@ import { taskOf, stepOf, inkOf } from '../model.js';
 import { span, dayShort, md, hm, hoursText } from '../time.js';
 import { L } from '../i18n.js';
 
-/** 角色動畫（mascot 站著、mascot-rest 趴著）；系統設定「減少動態效果」時改用同名的靜止圖 */
-export const mascotImg = (cls, w, h, name = 'mascot') => `<picture class="${cls}"><source srcset="img/${name}.png" media="(prefers-reduced-motion: reduce)"><img src="img/${name}.webp" alt="" width="${w}" height="${h}"></picture>`;
-
 // 只讓「新」訊息有淡入動畫；第一次打開頁面時已有的訊息不動
 const seen = new Set();
 let primed = false;

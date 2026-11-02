@@ -48,9 +48,12 @@
 | `dist/js/views/availability.js` | 「改沒空的時間」的說明行和右欄（睡眠、上課時間、你自己加的）；拖拉新增、右鍵移除、手機按空白處新增的處理在 `app.js`；不再是獨立頁面，由本週按「改沒空的時間」打開（`ui.editBusy`），舊網址 `#/time` 會轉到這裡 |
 | `dist/js/views/margin.js` | AI 助手的對話內容、建議及選擇方案的畫面（放在右下角角色展開的面板裡） |
 | `dist/js/views/dock.js` | 每頁右下角的角色入口：名牌狀態、有事時的泡泡（可直接回答）、展開／縮小；名字在 `assistantName` 改 |
-| `dist/img/mascot.webp`、`mascot.png` | 角色站著的待機動畫（12 fps、62 格）和靜止圖（「減少動態效果」時用） |
-| `dist/img/mascot-drop.webp` | 「雙手抓住底邊」：8 格橫向 sprite（976×189），每格雙手底部對齊 y=154；站著的圖先直直掉下去，再用 CSS `steps(7)` 播一次 |
-| `dist/img/mascot-rest.webp`、`mascot-rest.png` | 趴著的循環動畫（12 fps）和靜止圖；捲動、打字、閒置 30 秒時，以及趴在打開的面板右上角 |
+| `dist/img/mascot*.webp` | 角色動畫，全部是橫向 sprite，由 CSS（`pages.css` 的 `.dock__*`）播放。「減少動態效果」時停在第 1 格。各組頭髮顏色統一成站著的顏色，切換點頭尾對齊；產生腳本放在專案的 `src/mascot-tools/build_all.py`（讀 `0_inbox` 的原片，不在本倉庫） |
+| `dist/img/mascot.webp` | 站著的循環：33 格 122×189，一次完整擺動，2.75 秒 |
+| `dist/img/mascot-drop.webp` | 「雙手抓住底邊」：8 格 122×189，每格雙手底部對齊 y=154；站著的圖先直直掉下去，再播一次這段 |
+| `dist/img/mascot-rest.webp` | 趴著的循環：33 格 122×88（只有露出來的頭和雙手）；捲動、打字、閒置 30 秒時，以及趴在打開的面板右上角 |
+| `dist/img/mascot-yawn.webp` | 打哈欠：17 格 122×88，1.5 秒（張嘴 0.15 秒、張著 1.2 秒、閉嘴 0.15 秒，各格時間寫在 `@keyframes mascot-yawn`）；趴著 20 秒後第一次，之後每次隨機隔 20–60 秒（`app.js` 的 `syncYawn`） |
+| `dist/img/mascot-rise.webp` | 「撐起來站好」：25 格 122×197（每格就是角色框，底邊＝畫面底邊）：前 2 格從趴著補幀、原片 19 格、後 4 格補幀到站著第 1 格；叫醒時播 1.07 秒 |
 | `dist/js/views/about.js` | 原型說明與使用說明頁 |
 
 ## 資料與功能邏輯

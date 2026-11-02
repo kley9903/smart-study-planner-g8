@@ -173,6 +173,7 @@ function drawDock(s, r) {
   // 打開面板、或有新的話要說時，她站起來
   if (d.open || (d.bubble && d.bubble !== lastBubble)) wake();
   lastBubble = d.bubble;
+  syncYawn();
 }
 
 function setDockOpen(open) {
@@ -188,9 +189,10 @@ function toggleDock(open) {
 }
 
 // 你捲動、打字或很久沒動時，她腳下一空掉下去、雙手抓住畫面底邊（is-dropping 播一次 → is-rest 趴著）；
-// 停止捲動 4 秒、你回來動滑鼠或按鍵、滑過她、或她有話要說時再爬上來站好（is-waking）
-const DROP_MS = 850;
-const RISE_MS = 320;
+// 捲動後一直趴著，直到滑鼠移到她身上；閒置趴下的話你一動滑鼠或按鍵就站起來；
+// 她有新的話要說、或你打開面板時也會站起來（is-waking，泡泡等她站好才出現）
+const DROP_MS = 1350;
+const RISE_MS = 1090;
 const IDLE_MS = 30000;
 let dropTimer = null;
 let wakeTimer = null;
@@ -204,7 +206,7 @@ function rest(reason, wakeAfter = 0) {
     clearTimeout(risenTimer);
     dock.classList.remove('is-waking');
     dock.classList.add('is-dropping');
-    dropTimer = setTimeout(() => dock.classList.replace('is-dropping', 'is-rest'), DROP_MS);
+    dropTimer = setTimeout(() => { dock.classList.replace('is-dropping', 'is-rest'); syncYawn(); }, DROP_MS);
   }
   clearTimeout(wakeTimer);
   if (wakeAfter) wakeTimer = setTimeout(wake, wakeAfter);
@@ -218,6 +220,32 @@ function wake() {
     dock.classList.add('is-waking');
     risenTimer = setTimeout(() => dock.classList.remove('is-waking'), RISE_MS);
   }
+  syncYawn();
+}
+
+// 趴著（畫面底邊或面板上）20 秒後打第一次哈欠，之後每次播完再隨機等 20–60 秒；站起來或縮小面板就重新計時
+const YAWN_MS = 1520;
+const YAWN_FIRST = 20000;
+let yawnTimer = null;
+let yawnArmed = false;
+const lying = () => !dock.hidden && (ui.dockOpen || dock.classList.contains('is-rest'));
+function syncYawn() {
+  if (!lying()) {
+    clearTimeout(yawnTimer);
+    yawnArmed = false;
+    dock.classList.remove('is-yawning');
+  } else if (!yawnArmed) {
+    yawnArmed = true;
+    yawnTimer = setTimeout(yawn, YAWN_FIRST);
+  }
+}
+function yawn() {
+  if (!lying()) return syncYawn();
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) dock.classList.add('is-yawning');
+  yawnTimer = setTimeout(() => {
+    dock.classList.remove('is-yawning');
+    yawnTimer = setTimeout(yawn, 20000 + Math.random() * 40000);
+  }, YAWN_MS);
 }
 function active() {
   if (restReason === 'idle') wake();
@@ -884,7 +912,8 @@ window.addEventListener('resize', () => {
 });
 window.addEventListener('scroll', () => {
   header.classList.toggle('is-scrolled', window.scrollY > 4);
-  if (performance.now() > quietScrollUntil) rest('scroll', 4000);
+  // 滑鼠停在她身上時捲動不趴下：否則趴下換圖會觸發 pointerover 叫醒她，再捲又趴下，來回抽搐
+  if (performance.now() > quietScrollUntil && !dock.querySelector('.dock__me:hover')) rest('scroll');
   place();
   placeTour();
 }, { passive: true });

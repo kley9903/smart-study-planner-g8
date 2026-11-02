@@ -2,7 +2,7 @@
 import { icon, esc } from '../ui.js';
 import { ui, getMode } from '../store.js';
 import { pendingProposal, pendingCount, nextBlock, taskOf, stepOf } from '../model.js';
-import { renderMargin, mascotImg } from './margin.js';
+import { renderMargin } from './margin.js';
 import { span, hm, dayShort, dayLabel } from '../time.js';
 import { L } from '../i18n.js';
 
@@ -81,21 +81,23 @@ export function renderDock(s, { quiet = false } = {}) {
     html: `
       ${open ? `
         <div class="dock__panel" role="dialog" aria-modal="false" aria-label="${assistantName()}">
-          <button class="dock__perch" type="button" data-action="dock-toggle" aria-label="${minimize}">${mascotImg('', 122, 189, 'mascot-rest')}</button>
+          <button class="dock__perch" type="button" data-action="dock-toggle" aria-label="${minimize}"><span class="dock__rest"></span><span class="dock__yawn"></span></button>
           ${renderMargin(s)}
         </div>` : ''}
       ${bubble ? `
         <div class="dock__bubble" role="status">
           ${bubble.html}
-          <svg class="dock__tail" viewBox="0 0 20 18" aria-hidden="true"><path d="M1 0 L19 17 L12 0"/><path class="dock__tail-cover" d="M2.4 0.75 H11.4"/></svg>
+          <svg class="dock__tail" viewBox="0 0 20 24" aria-hidden="true"><path d="M1 0 L19 23 L12 0"/><path class="dock__tail-cover" d="M2.4 0.75 H11.4"/></svg>
           <button class="dock__x" type="button" data-action="dock-dismiss" data-id="${bubble.id}" aria-label="${L('先不理', 'Dismiss')}">${icon('x')}</button>
         </div>` : ''}
       <button class="dock__me" type="button" data-action="dock-toggle" aria-expanded="${open}" aria-label="${open ? minimize : L(`打開${assistantName()}`, `Open ${assistantName()}`)}">
         <span class="dock__tag"><b>${assistantName()}</b><span>${status(s)}</span></span>
-        <span class="dock__fig">
-          ${mascotImg('dock__stand', 122, 189)}
-          <span class="dock__drop" aria-hidden="true"></span>
-          ${mascotImg('dock__rest', 122, 189, 'mascot-rest')}
+        <span class="dock__fig" aria-hidden="true">
+          <span class="dock__stand"></span>
+          <span class="dock__drop"></span>
+          <span class="dock__rest"></span>
+          <span class="dock__rise"></span>
+          <span class="dock__yawn"></span>
         </span>
       </button>`,
   };
