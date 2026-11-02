@@ -12,6 +12,19 @@
 4. production 的 Deployment branches 限定 main；可加 Required reviewers，只讓指定發布負責人批准。
 5. 執行 **Actions → Publish website → Run workflow → main**。如果設定了審批，發布負責人還要批准該次 deployment。
 
+## 大綱 AI（Dify）的金鑰
+
+「課程資料」頁的「用 AI 找出項目」經 `functions/api/syllabus.js` 呼叫 Dify 工作流程。這支程式隨 `wrangler pages deploy` 一起發布，需要一個環境變數：
+
+1. 在 Dify 工作流程的「存取點 → 後端服務 API → API 金鑰」取得金鑰（`app-` 開頭）。
+2. Cloudflare → Workers & Pages → `smart-study-planner-g8` → Settings → Variables and Secrets → Production，新增 **Secret** `DIFY_API_KEY`，貼上金鑰。不要貼到聊天、程式或 README。
+3. 重新發布一次（Publish website），新設定才會生效。
+4. 選填：自架 Dify 時加 `DIFY_API_BASE`（預設 `https://api.dify.ai/v1`）。
+
+沒有設定時，網站其他部分照常運作，按「用 AI 找出項目」會顯示「AI 還沒在伺服器設定好」。本機試用：先在終端機設定 `DIFY_API_KEY` 環境變數，再 `node serve.mjs`。
+
+這個轉接只接受同一網站發出的請求、單檔 15 MB 以內；任何打開網站的人都可以使用，會用到 Dify 帳戶的額度。
+
 ## 協作保護
 
 目前由負責人統一整合組員交回的檔案。main 要求 Pull Request 及 **Project checks** 通過；不強制另一位成員審核，負責人可以自行合併。禁止強制推送及刪除分支，規則也套用到管理者。

@@ -9,6 +9,7 @@ import { planSteps } from './scheduler.js';
 import { md, span, dayShort, hoursText } from './time.js';
 import { recall, remember, esc } from './ui.js';
 import { L } from './i18n.js';
+import { parseWhen, parseHours, typeLabel } from './syllabus-ai.js';
 
 const MINE_KEY = 'mine';
 const INKS = ['blue', 'amber', 'green', 'plum'];
@@ -77,8 +78,8 @@ export function relang() {
 function freshUi() {
   return {
     hlTask: null, showGaps: false, day: DEMO_TODAY, docId: 'stat', taskId: 'ps4',
-    editBusy: false, dockOpen: false, dockDismissed: [], paintRepeat: 'single', hlRule: null, justInked: [], arrowFor: null,
-    draft: '', editItem: null, sleepEdit: false, dropMsg: '', guideOpen: false,
+    editBusy: false, dockOpen: false, dockDismissed: [], hlRule: null, justInked: [], arrowFor: null,
+    draft: '', editItem: null, docReading: null, syllabusDraft: '', sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
   };
 }
@@ -359,32 +360,74 @@ export function confirmEstimate(taskId) {
 function itemOf(docId, itemId) {
   return state.docs.find((d) => d.id === docId)?.items.find((i) => i.id === itemId);
 }
+/** 自己的大綱：確認一項時，把它的 plan 變成任務或沒空時段（每項只做一次）。回傳加了什麼。 */
+function applyItem(doc, it) {
+  const p = it.plan;
+  if (!doc.own || it.applied || !p) return null;
+  if (p.kind === 'task' && p.date) {
+    createTask({ title: p.title, course: doc.courseName || '', kind: typeLabel(p.key), date: p.date, min: p.min, hours: p.hours });
+    it.applied = 'task';
+  } else if (p.kind === 'busy') {
+    pushRule({ type: p.type, ...(p.type === 'weekly' ? { days: p.days } : { date: p.date }), start: p.start, end: p.end, label: p.label });
+    it.applied = 'busy';
+  }
+  return it.applied || null;
+}
+function appliedText(kinds) {
+  const t = kinds.filter((k) => k === 'task').length, b = kinds.filter((k) => k === 'busy').length;
+  if (!t && !b) return '';
+  return L(`；加入 ${[t && `${t} 項任務`, b && `${b} 段沒空時間`].filter(Boolean).join('、')}`,
+    `; added ${[t && `${t} task${t === 1 ? '' : 's'}`, b && `${b} busy time${b === 1 ? '' : 's'}`].filter(Boolean).join(' and ')}`);
+}
+
 export function setItemState(docId, itemId, value) {
+  const doc = state.docs.find((d) => d.id === docId);
   const it = itemOf(docId, itemId);
   if (!it) return;
   it.state = value;
   ui.editItem = null;
-  emit({ toast: value === 'ink' ? L('已確認這一項', 'Item confirmed') : value === 'erased' ? L('已刪除這一項（之後不會用來排程）', 'Item removed (it will not be used for planning)') : undefined, keepScroll: true });
+  const added = value === 'ink' ? appliedText([applyItem(doc, it)]) : '';
+  emit({ toast: value === 'ink' ? L('已確認這一項', 'Item confirmed') + added : value === 'erased' ? L('已刪除這一項（之後不會用來排程）', 'Item removed (it will not be used for planning)') : undefined, keepScroll: true });
 }
 export function inkAllItems(docId) {
   const doc = state.docs.find((d) => d.id === docId);
   const pending = doc.items.filter((i) => i.state === 'pencil');
   pending.forEach((i) => { i.state = 'ink'; });
-  emit({ toast: pending.length ? L(`已確認 ${pending.length} 項`, `Confirmed ${pending.length} items`) : L('這份大綱沒有待核對的項目', 'Nothing left to check in this syllabus'), keepScroll: true });
+  const added = appliedText(pending.map((i) => applyItem(doc, i)));
+  emit({ toast: pending.length ? L(`已確認 ${pending.length} 項`, `Confirmed ${pending.length} items`) + added : L('這份大綱沒有待核對的項目', 'Nothing left to check in this syllabus'), keepScroll: true });
 }
 export function saveItem(docId, itemId, fields) {
+  const doc = state.docs.find((d) => d.id === docId);
   const it = itemOf(docId, itemId);
   if (!it) return;
+  if (doc.own && it.plan && !it.applied) {
+    // 自己的大綱：讀回改過的日期和時數，讀不懂就留在編輯狀態。
+    const plan = fields.when === '—' ? { ...it.plan, date: null } : parseWhen(it.plan, fields.when);
+    const hours = it.plan.kind === 'task' ? parseHours(fields.hours) : null;
+    if (!plan || (plan.kind === 'task' && plan.date && !hours)) {
+      emit({ toast: it.plan.kind === 'busy'
+        ? L('看不懂這個時間，請寫成「每週一、三 10:30–12:00」', 'Cannot read that time. Write it like "Mon, Wed 10:30–12:00"')
+        : L('看不懂，日期請寫成「2026-11-20 23:59」，時數寫數字', 'Cannot read that. Write the date like "2026-11-20 23:59" and hours as a number'), toastIcon: 'alert', keepScroll: true });
+      return;
+    }
+    if (hours) plan.hours = hours;
+    Object.assign(it, { plan, reasons: [], flag: null, hoursDefault: false });
+    fields = {}; // 顯示文字由 rowText(plan) 產生
+  }
   Object.assign(it, fields, { state: 'ink', edited: true });
   delete it.warn;
   ui.editItem = null;
-  emit({ toast: L('已按你的修改確認', 'Confirmed with your edits'), keepScroll: true });
+  emit({ toast: L('已按你的修改確認', 'Confirmed with your edits') + appliedText([applyItem(doc, it)]), keepScroll: true });
 }
 
 /* ---------------- 不可用時段 ---------------- */
-export function addRule(rule) {
+function pushRule(rule) {
   const r = { id: nid('u-'), src: 'me', ...rule };
   state.unavailable.push(r);
+  return r;
+}
+export function addRule(rule) {
+  const r = pushRule(rule);
   const days = r.type === 'weekly' ? null : r.date;
   const clash = state.blocks.filter((b) => (days ? b.date === days : r.days.includes(new Date(b.date + 'T00:00:00Z').getUTCDay())) && b.start < r.end && b.end > r.start);
   const n = clash.length;
@@ -429,7 +472,7 @@ function splitMinutes(total) {
   return out;
 }
 
-export function addTask({ title, course, kind, date, min, hours, requirements = '' }, ownSteps = []) {
+function createTask({ title, course, kind, date, min, hours, requirements = '' }, ownSteps = []) {
   const id = nid('t');
   const total = ownSteps.length ? ownSteps.reduce((n, st) => n + st.min, 0) : Math.max(30, Math.round(hours * 2) * 30);
   const parts = ownSteps.length ? ownSteps : splitMinutes(total).map((m, i, all) => ({ title: all.length > 1 ? L(`第 ${i + 1} 部分`, `Part ${i + 1}`) : L('全部', 'All'), min: m }));
@@ -438,6 +481,11 @@ export function addTask({ title, course, kind, date, min, hours, requirements = 
     id, course: courseFor(course), title, short: title.length > 14 ? `${title.slice(0, 13)}…` : title, kind,
     due: { date, min }, requirements, attachments: [], weight: '', source: null, estimateBy: 'me', estimateConfirmed: true, steps, aiNote: '',
   });
+  return { id, total };
+}
+export function addTask(fields, ownSteps = []) {
+  const { id, total } = createTask(fields, ownSteps);
+  const { title } = fields;
   ui.taskId = id;
   ui.taskForm = false;
   emit({ toast: L(`已加入「${title}」，共 ${hoursText(total)}`, `Added "${title}" (${hoursText(total)})`), keepScroll: true });
@@ -486,6 +534,18 @@ export function addOwnDoc({ id, name, size }) {
   state.docs.push({ id, name, size, own: true, pages: null, course: null, items: [] });
   ui.docId = id;
   emit({ toast: L(`已保存「${name}」`, `Saved "${name}"`), keepScroll: true });
+}
+
+/** AI 讀完一份自己的大綱：放入待核對的項目（已確認的保留，未確認的換成這次的結果）。 */
+export function setOwnItems(docId, { course, items, notes }) {
+  const doc = state.docs.find((d) => d.id === docId);
+  if (!doc) return;
+  const kept = doc.items.filter((i) => i.state === 'ink');
+  doc.items = [...kept, ...items.map((it) => ({ ...it, id: nid(`${it.id}-`) }))];
+  doc.courseName = course;
+  doc.notes = notes;
+  ui.docId = docId;
+  emit({ toast: L(`AI 找到 ${items.length} 項，請逐項核對`, `AI found ${items.length} items. Check each one.`), keepScroll: true });
 }
 
 export function removeOwnDoc(id) {

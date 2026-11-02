@@ -3,18 +3,19 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc,
+  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems,
 } from './store.js';
+import { readSyllabus, toItems, AI_MAX_MB } from './syllabus-ai.js';
 import { editor } from './views/task-editor.js';
 import { renderMonth, shiftMonth } from './views/month.js';
 import { stepFields, stepHelper, suggestSteps } from './views/task-editor.js';
-import { saveAttachment, getAttachment, removeAttachment } from './attachments.js';
+import { keepFile, fits, LIMIT_MB, getAttachment, removeAttachment } from './attachments.js';
 import { L, setLang, applyStatic } from './i18n.js';
-import { toast, openPopover, closePopover, place, esc, icon, remember, recall } from './ui.js';
+import { toast, openPopover, closePopover, place, remember, recall } from './ui.js';
 import { drawArrows, forgetPencils } from './planner.js';
 import { startTour, endTour, tourStep, tourActive, placeTour } from './tour.js';
-import { blockOf, stepOf, taskOf, overlay, pendingProposal, pendingCount, courseOf, inkOf } from './model.js';
-import { dayLabel, span, hoursText, hm, wdName, weekday, mdNum, dayShort, md } from './time.js';
+import { taskOf, pendingProposal, pendingCount } from './model.js';
+import { hm, weekday } from './time.js';
 import { createDemoState } from './demo-data.js';
 import * as week from './views/week.js';
 import * as tasks from './views/tasks.js';
@@ -22,6 +23,9 @@ import * as importView from './views/import.js';
 import * as start from './views/start.js';
 import * as about from './views/about.js';
 import { renderDock } from './views/dock.js';
+import { blockPopover, hatchPopover, busyForm } from './views/popovers.js';
+import { createMascot } from './mascot.js';
+import { attachBusyPainting } from './busy-paint.js';
 
 const views = {
   week, tasks,
@@ -94,10 +98,9 @@ function render(info = {}) {
   main.innerHTML = views[r.name].render(s, r.params);
   document.body.dataset.route = r.name;
   updateNav(r.name === 'add-task' ? 'tasks' : r.name, s);
-  drawDock(s, r);
+  drawDock(s, r, changed);
 
   if (changed) {
-    quietScrollUntil = performance.now() + 200; // 換頁回到頂部不算你在捲動
     window.scrollTo(0, 0);
     lastKey = key;
   } else {
@@ -156,9 +159,8 @@ function updateNav(name, s) {
 
 /* ---------------- 右下角的 AI 助手 ---------------- */
 let readyKey = '';
-let lastBubble = '';
-let quietScrollUntil = 0;
-function drawDock(s, r) {
+const mascot = createMascot(dock, { main });
+function drawDock(s, r, navigated) {
   // AI 建議可以確認時，面板自動縮小讓出時間表，泡泡留下「確認／不要」
   const p = pendingProposal(s);
   const key = p && !(p.kind === 'hero' && !p.option) ? `${p.id}:${p.option || ''}` : '';
@@ -170,10 +172,7 @@ function drawDock(s, r) {
   dock.innerHTML = d.html;
   dock.classList.toggle('is-open', d.open);
   dock.classList.toggle('has-bubble', !!d.bubble);
-  // 打開面板、或有新的話要說時，她站起來
-  if (d.open || (d.bubble && d.bubble !== lastBubble)) wake();
-  lastBubble = d.bubble;
-  syncYawn();
+  mascot.shown({ hidden: false, open: d.open, bubble: d.bubble, navigated });
 }
 
 function setDockOpen(open) {
@@ -187,76 +186,6 @@ function toggleDock(open) {
   if (open) setTimeout(() => (document.getElementById('say-input') || dock.querySelector('.margin__close'))?.focus({ preventScroll: true }), 0);
   else dock.querySelector('.dock__me')?.focus({ preventScroll: true });
 }
-
-// 你捲動、打字或很久沒動時，她腳下一空掉下去、雙手抓住畫面底邊（is-dropping 播一次 → is-rest 趴著）；
-// 捲動後一直趴著，直到滑鼠移到她身上；閒置趴下的話你一動滑鼠或按鍵就站起來；
-// 她有新的話要說、或你打開面板時也會站起來（is-waking，泡泡等她站好才出現）
-const DROP_MS = 1350;
-const RISE_MS = 1090;
-const IDLE_MS = 30000;
-let dropTimer = null;
-let wakeTimer = null;
-let risenTimer = null;
-let idleTimer = null;
-let restReason = '';
-function rest(reason, wakeAfter = 0) {
-  if (ui.dockOpen || dock.hidden) return;
-  restReason = reason;
-  if (!dock.classList.contains('is-rest') && !dock.classList.contains('is-dropping')) {
-    clearTimeout(risenTimer);
-    dock.classList.remove('is-waking');
-    dock.classList.add('is-dropping');
-    dropTimer = setTimeout(() => { dock.classList.replace('is-dropping', 'is-rest'); syncYawn(); }, DROP_MS);
-  }
-  clearTimeout(wakeTimer);
-  if (wakeAfter) wakeTimer = setTimeout(wake, wakeAfter);
-}
-function wake() {
-  clearTimeout(dropTimer);
-  clearTimeout(wakeTimer);
-  restReason = '';
-  if (dock.classList.contains('is-dropping') || dock.classList.contains('is-rest')) {
-    dock.classList.remove('is-dropping', 'is-rest');
-    dock.classList.add('is-waking');
-    risenTimer = setTimeout(() => dock.classList.remove('is-waking'), RISE_MS);
-  }
-  syncYawn();
-}
-
-// 趴著（畫面底邊或面板上）20 秒後打第一次哈欠，之後每次播完再隨機等 20–60 秒；站起來或縮小面板就重新計時
-const YAWN_MS = 1520;
-const YAWN_FIRST = 20000;
-let yawnTimer = null;
-let yawnArmed = false;
-const lying = () => !dock.hidden && (ui.dockOpen || dock.classList.contains('is-rest'));
-function syncYawn() {
-  if (!lying()) {
-    clearTimeout(yawnTimer);
-    yawnArmed = false;
-    dock.classList.remove('is-yawning');
-  } else if (!yawnArmed) {
-    yawnArmed = true;
-    yawnTimer = setTimeout(yawn, YAWN_FIRST);
-  }
-}
-function yawn() {
-  if (!lying()) return syncYawn();
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) dock.classList.add('is-yawning');
-  yawnTimer = setTimeout(() => {
-    dock.classList.remove('is-yawning');
-    yawnTimer = setTimeout(yawn, 20000 + Math.random() * 40000);
-  }, YAWN_MS);
-}
-function active() {
-  if (restReason === 'idle') wake();
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => rest('idle'), IDLE_MS);
-}
-['pointermove', 'pointerdown', 'keydown'].forEach((t) => document.addEventListener(t, active, { passive: true }));
-dock.addEventListener('pointerover', (e) => { if (e.target.closest('.dock__me') && restReason !== 'typing') wake(); });
-main.addEventListener('focusin', (e) => { if (e.target.matches('input, textarea, select')) rest('typing'); });
-main.addEventListener('focusout', (e) => { if (e.target.matches('input, textarea, select')) rest('typing', 1500); });
-active();
 
 function autosize() {
   const ta = document.getElementById('say-input');
@@ -275,218 +204,17 @@ subscribe((info) => {
   render(info);
 });
 
-/* ---------------- 彈出框內容 ---------------- */
-function findBlock(s, id) {
-  const ov = overlay(s);
-  const real = blockOf(s, id);
-  if (real) return { b: real, variant: ov.ghosts.has(id) ? 'ghost' : 'ink' };
-  const add = ov.adds.find((x) => x.id === id);
-  return add ? { b: add, variant: 'pencil' } : {};
+/* ---------------- 時間表上的彈出框、拖拉標記沒空的時間 ---------------- */
+function openBusyForm(el, start) {
+  openPopover(el, busyForm(el.dataset.date || getState().today, start));
 }
 
-function ghostText(s, b, p) {
-  const c = p?.changes.find((x) => x.block === b.id);
-  if (!c) return L('AI 建議改動這一段。', 'The AI suggests changing this session.');
-  if (c.kind === 'move') return L(`AI 建議移到 ${dayShort(c.to.date)} ${span(c.to.start, c.to.end)}。`, `The AI suggests moving it to ${dayShort(c.to.date)} ${span(c.to.start, c.to.end)}.`);
-  if (c.kind === 'split') {
-    const parts = c.to.map((t) => `${dayShort(t.date)} ${span(t.start, t.end)}`);
-    return L(`AI 建議分兩段：${parts.join('、')}。`, `The AI suggests two sessions: ${parts.join(', ')}.`);
-  }
-  if (c.kind === 'remove') return L('AI 建議不做這一段（簡化）。', 'The AI suggests skipping this (simplified).');
-  if (c.kind === 'defer') return L(`AI 建議移到 ${md(c.toDate)}，具體時間下次排程再定。`, `The AI suggests moving it to ${md(c.toDate)}; the exact time is set in the next round.`);
-  return L('AI 建議改動這一段。', 'The AI suggests changing this session.');
-}
-
-function proposalActions(p) {
-  if (!p) return '';
-  if (p.kind === 'hero' && !p.option) {
-    return `<div class="pop__actions"><button class="btn btn--sm btn--ink" type="button" data-action="guide-decide">${icon('arrow')} ${L('去選做法', 'Choose an option')}</button></div>`;
-  }
-  return `<div class="pop__actions"><button class="btn btn--sm btn--ink" type="button" data-action="ink">${icon('check')} ${L(`確認全部改動（${p.changes.length} 項）`, `Confirm all (${p.changes.length})`)}</button><button class="btn btn--sm btn--ghost" type="button" data-action="erase">${icon('x')} ${L('不要', 'Discard')}</button></div>`;
-}
-
-function openBlock(el) {
-  const s = getState();
-  const { b, variant } = findBlock(s, el.dataset.block);
-  if (!b) return;
-  const task = taskOf(s, b.task);
-  const { step } = stepOf(s, b.step);
-  const p = pendingProposal(s);
-  const tag = variant === 'ink'
-    ? `<span class="chip chip--quiet">${icon('check')} ${L('已確認', 'Confirmed')}</span>`
-    : variant === 'pencil' ? `<span class="chip chip--pencil">${icon('pencil')} ${L('建議 · 未確認', 'Suggested · not confirmed')}</span>` : `<span class="chip chip--pencil">${icon('arrow')} ${L('AI 建議移走', 'Suggested to move')}</span>`;
-  let html = `
-    <div class="pop__eyebrow" data-ink="${inkOf(s, task)}"><span class="course-tag"><span class="dot"></span>${esc(courseOf(s, task).name)}</span>${tag}</div>
-    <div class="pop__title">${esc(task.short)} · ${esc(step.title)}</div>
-    <div class="pop__time">${dayLabel(b.date)} ${span(b.start, b.end)} · ${hoursText(b.end - b.start)}</div>
-    <div class="pop__section"><div class="pop__label">${icon('pencil')} ${L('為甚麼排在這裡', 'Why it is here')}</div><p class="pop__reason">${esc(b.reason || '')}</p></div>`;
-  if (variant === 'ink') {
-    html += `
-      <div class="pop__section">
-        <div class="pop__label">${icon('check')} ${L('進度 · 你回報的直接生效', 'Progress · takes effect right away')}</div>
-        <div class="seg seg--sm" role="group" aria-label="${L('進度', 'Progress')}">
-          ${[['todo', L('未開始', 'Not started')], ['doing', L('進行中', 'In progress')], ['done', L('已完成', 'Done')]].map(([k, t]) => `<button class="seg__opt" type="button" data-action="progress" data-step="${step.id}" data-p="${k}" aria-pressed="${step.progress === k}">${t}</button>`).join('')}
-        </div>
-        <p class="muted" style="font-size:12.5px;margin-top:8px">${step.progress === 'doing' && step.remain ? L(`你回報還差 ${hoursText(step.remain)}。`, `You reported ${hoursText(step.remain)} left. `) : ''}${L('時段結束不會自動當作完成。', 'A session ending is not counted as done.')}</p>
-      </div>
-      <div class="pop__actions"><a class="btn btn--sm" href="#/tasks/${task.id}">${icon('list')} ${L('在任務頁查看', 'Open in Tasks')}</a></div>`;
-  } else {
-    html += `
-      <div class="pop__section"><p style="font-size:13.5px;color:var(--ink-2)">${variant === 'pencil' ? L('這是建議的時段，還未確認。', 'This is a suggested session, not confirmed yet.') : esc(ghostText(s, b, p))}</p></div>
-      ${proposalActions(p)}`;
-  }
-  openPopover(el, html);
-}
-
-function ruleWhen(r) {
-  if (r.type === 'single') return `${dayLabel(r.date)} ${span(r.start, r.end)}`;
-  const days = r.days.length === 7 ? L('每天', 'Every day') : L(`每週${r.days.map((d) => wdName(d)).join('、')}`, `Every ${r.days.map((d) => wdName(d)).join(', ')}`);
-  return `${days} ${span(r.start, r.end)}`;
-}
-
-function openHatch(el) {
-  const s = getState();
-  const id = el.dataset.rule;
-  if (!id) {
-    const night = el.dataset.sleep;
-    const o = s.sleepOverrides.find((x) => x.night === night);
-    const pen = overlay(s).sleep.find((x) => x.night === night);
-    openPopover(el, `
-      <div class="pop__eyebrow">${icon('moon')} ${L('睡眠 · 每晚重複', 'Sleep · every night')}</div>
-      <div class="pop__title">${hm(s.sleep.start)}–${hm(s.sleep.end)}</div>
-      ${pen ? `<div class="pop__time">${L(`AI 建議：${md(night)}晚上 ${hm(pen.start)} 才睡（只限今晚）`, `AI suggests: bed at ${hm(pen.start)} on ${md(night)} (tonight only)`)}</div>` : o ? `<div class="pop__time">${L(`${md(night)}晚上 ${hm(o.start)} 才睡（只限這一晚）`, `${md(night)}: bed at ${hm(o.start)} (that night only)`)}</div>` : ''}
-      <div class="pop__section"><p class="pop__reason">${L('AI 不會把睡眠當作讀書時間。要遲睡，它會先問你，而且只限當晚，不會改每晚的設定。', 'Sleep is never used for study. A later bedtime is only suggested for one night, after asking you.')}</p></div>
-      <div class="pop__actions"><a class="btn btn--sm" href="#/time">${icon('pencil')} ${L('改睡眠時間', 'Change sleep time')}</a></div>`);
-    return;
-  }
-  const real = s.unavailable.find((x) => x.id === id);
-  const r = real || overlay(s).rules.find((x) => x.id === id);
-  if (!r) return;
-  const kind = r.type === 'single' ? `${icon('pin')} ${L('只限這天', 'One day')}` : `${icon('repeat')} ${L('每週重複', 'Weekly')}`;
-  const src = r.src === 'syllabus' ? L('從課程大綱找到，你核對過。', 'Found in your syllabus and checked by you.') : L('你自己加的。', 'Added by you.');
-  if (ui.editBusy && real) {
-    openPopover(el, `
-      <div class="pop__eyebrow">${icon('hatch')} ${L('沒空時間', 'Busy')} · ${kind}</div>
-      <div class="pop__title">${esc(r.label)}</div>
-      <div class="pop__time">${ruleWhen(r)}</div>
-      <div class="pop__section"><p style="font-size:13.5px;color:var(--ink-2)">${r.type === 'weekly' ? L('這是每週重複的沒空時間，移除後每週這段時間都會變回可以讀書。', 'This repeats weekly; removing it frees this time every week. ') : L('只會移除這一天。', 'Only this day is removed. ')}${r.src === 'syllabus' ? L('這是從課程大綱找到的上課時間。', 'This class time came from your syllabus.') : ''}</p></div>
-      <div class="pop__actions"><button class="btn btn--sm btn--ink" type="button" data-action="remove-rule" data-rule="${r.id}">${icon('eraser')} ${L('移除', 'Remove')}</button><button class="btn btn--sm btn--ghost" type="button" data-action="pop-close">${L('取消', 'Cancel')}</button></div>`);
-    return;
-  }
-  const p = pendingProposal(s);
-  openPopover(el, `
-    <div class="pop__eyebrow">${L('沒空時間', 'Busy')} · ${kind}${real ? '' : ` <span class="chip chip--pencil">${icon('pencil')} ${L('AI 建議', 'AI suggestion')}</span>`}</div>
-    <div class="pop__title">${esc(r.label)}</div>
-    <div class="pop__time">${ruleWhen(r)}</div>
-    <div class="pop__section"><p style="font-size:13.5px;color:var(--ink-2)">${real ? src : L('AI 從你說的話理解到的，還未確認。', 'The AI understood this from what you said; not confirmed yet.')}</p></div>
-    ${real ? (ui.editBusy ? '' : `<div class="pop__actions"><button class="btn btn--sm" type="button" data-action="busy-edit" data-on="1">${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}</button></div>`) : proposalActions(p)}`);
-}
-
-/* ---------------- 拖拉標記沒空的時間 ---------------- */
-let paint = null;
-let swallowUntil = 0;
-const snap = (m) => Math.floor(m / 30) * 30;
-
-function cssNum(el, name) { return parseFloat(getComputedStyle(el).getPropertyValue(name)); }
-
-let lastPointer = 'mouse';
-document.addEventListener('pointerdown', (e) => {
-  lastPointer = e.pointerType;
-  const col = e.target.closest('.planner.is-painting .pcol');
-  // 手機拖拉會和捲動打架：改成按一下空白處用表格新增（見下面的 click）
-  if (!col || e.button !== 0 || e.pointerType === 'touch') return;
-  const pl = col.closest('.planner');
-  const ppm = cssNum(pl, '--ppm');
-  const pStart = cssNum(pl, '--p-start');
-  const pEnd = cssNum(pl, '--p-end');
-  const rect = col.getBoundingClientRect();
-  const toMin = (y) => Math.max(pStart, Math.min(pEnd - 30, pStart + (y - rect.top) / ppm));
-  const m = snap(toMin(e.clientY));
-  paint = { col, date: col.dataset.date, anchor: m, cur: m, moved: false, onHatch: !!e.target.closest('.hatch'), toMin, y0: e.clientY, sel: null };
-  try { col.setPointerCapture(e.pointerId); } catch { /* 某些瀏覽器不支援 */ }
-  e.preventDefault();
+// 要比下面的點擊處理先登記，拖拉放開後瀏覽器補的 click 才吞得掉
+const paintActions = attachBusyPainting({
+  isEditing: () => ui.editBusy,
+  isRule: (id) => getState().unavailable.some((r) => r.id === id),
+  addRule, removeRule, openBusyForm,
 });
-
-document.addEventListener('pointermove', (e) => {
-  if (!paint) return;
-  if (Math.abs(e.clientY - paint.y0) > 5) paint.moved = true;
-  if (!paint.moved) return;
-  paint.cur = snap(paint.toMin(e.clientY));
-  drawSel();
-});
-
-document.addEventListener('pointerup', () => {
-  if (!paint) return;
-  const p = paint;
-  paint = null;
-  if (!p.moved && p.onHatch) return; // 當作普通按一下灰色時段
-  swallowUntil = performance.now() + 300;
-  if (!p.moved) { p.cur = p.anchor + 30; }
-  paint = p;
-  drawSel();
-  paint = null;
-  openPaint(p);
-});
-
-// 手機：按一下空白處，用表格新增（開始時間預設為按下的那個鐘頭）
-document.addEventListener('click', (e) => {
-  if (lastPointer !== 'touch' || !ui.editBusy) return;
-  const col = e.target.closest('.planner.is-painting .pcol');
-  if (!col || e.target.closest('.hatch, .blk')) return;
-  const pl = col.closest('.planner');
-  const m = cssNum(pl, '--p-start') + (e.clientY - col.getBoundingClientRect().top) / cssNum(pl, '--ppm');
-  openBusyForm(col, Math.min(1380, Math.max(0, Math.floor(m / 60) * 60)));
-});
-
-// 電腦：在灰色時段按右鍵直接移除
-document.addEventListener('contextmenu', (e) => {
-  const h = ui.editBusy && e.target.closest('.planner.is-busy-edit .hatch');
-  if (!h) return;
-  e.preventDefault();
-  closePopover();
-  if (h.dataset.rule && getState().unavailable.some((r) => r.id === h.dataset.rule)) removeRule(h.dataset.rule);
-  else if (!h.dataset.rule) toast(L('睡眠請在右邊修改', 'Change sleep on the right'), 'moon');
-});
-
-function drawSel() {
-  const p = paint;
-  const s = Math.min(p.anchor, p.cur);
-  const e = Math.max(p.anchor, p.cur) + 30;
-  if (!p.sel) {
-    p.sel = document.createElement('div');
-    p.sel.className = 'paint-sel';
-    p.sel.tabIndex = -1;
-    p.col.append(p.sel);
-  }
-  p.start = s;
-  p.end = e;
-  p.sel.style.setProperty('--s', s);
-  p.sel.style.setProperty('--e', e);
-  p.sel.innerHTML = `<span>${span(s, e)}</span>`;
-}
-
-let painted = null;
-function openPaint(p) {
-  painted = { date: p.date, start: p.start, end: p.end, repeat: ui.paintRepeat };
-  const wdLabel = wdName(weekday(p.date));
-  openPopover(p.sel, `
-    <div class="pop__eyebrow">${icon('hatch')} ${L('新的沒空時間', 'New busy time')}</div>
-    <div class="pop__title">${dayLabel(p.date)}</div>
-    <div class="pop__time">${span(p.start, p.end)} · ${hoursText(p.end - p.start)}</div>
-    <div class="pop__section">
-      <label class="field"><span class="field__label">${L('這段時間在做甚麼', 'What is it?')}</span><input class="input" id="paint-label" maxlength="16" placeholder="${L('例如：小組會議', 'e.g. Group meeting')}"></label>
-      <div class="pop__label" style="margin-top:12px">${L('重複方式', 'Repeat')}</div>
-      <div class="seg seg--sm" role="group" aria-label="${L('重複方式', 'Repeat')}">
-        <button class="seg__opt" type="button" data-action="paint-repeat" data-repeat="single" aria-pressed="${painted.repeat === 'single'}">${icon('pin')} ${L(`只限 ${mdNum(p.date)}`, `Only ${mdNum(p.date)}`)}</button>
-        <button class="seg__opt" type="button" data-action="paint-repeat" data-repeat="weekly" aria-pressed="${painted.repeat === 'weekly'}">${icon('repeat')} ${L(`每週${wdLabel}`, `Every ${wdLabel}`)}</button>
-      </div>
-    </div>
-    <div class="pop__actions">
-      <button class="btn btn--sm btn--ink" type="button" data-action="paint-confirm">${icon('hatch')} ${L('標記為沒空', 'Mark as busy')}</button>
-      <button class="btn btn--sm btn--ghost" type="button" data-action="pop-close">${L('取消', 'Cancel')}</button>
-    </div>`, { onClose: () => p.sel?.remove() });
-  setTimeout(() => document.getElementById('paint-label')?.focus(), 30);
-}
 
 /* ---------------- 首次使用流程 ---------------- */
 function obGo(step) {
@@ -548,20 +276,6 @@ function focusDecision() {
 /* ---------------- 按鈕動作 ---------------- */
 const $ = (sel) => document.querySelector(sel);
 
-function openBusyForm(el, start = 540) {
-  const date = el.dataset.date || getState().today;
-  openPopover(el, `<form data-form="busy">
-    <h2 class="pop__title">${L('新增忙碌時段', 'Add busy time')}</h2>
-    <label class="field"><span class="field__label">${L('名稱', 'Name')}</span><input class="input" name="label" maxlength="80" required></label>
-    <label class="field"><span class="field__label">${L('日期', 'Date')}</span><input class="input" name="date" type="date" value="${date}" required></label>
-    <label class="field"><span class="field__label">${L('開始時間', 'Start time')}</span><input class="input" type="time" name="start" value="${hm(start)}" required></label>
-    <label class="field"><span class="field__label">${L('結束時間', 'End time')}</span><input class="input" type="time" name="end" value="${hm(start + 60)}" required></label>
-    <label class="field"><span class="field__label">${L('重複方式', 'Repeat')}</span><select class="select" name="repeat"><option value="single">${L('只限這天', 'One day')}</option><option value="weekly">${L('每週同一天', 'Weekly on this day')}</option></select></label>
-    <p class="demo-note">${L('跨午夜的時段請分成兩天新增。', 'For overnight events, add a separate time on each day.')}</p>
-    <button class="btn btn--ink" type="submit">${L('保存', 'Save')}</button>
-  </form>`);
-}
-
 const actions = {
   'calendar-view': (el) => { location.hash = el.dataset.view === 'month' ? '#/monthly' : '#/week'; },
   'month-move': (el) => { ui.month = shiftMonth(ui.month || getState().today, Number(el.dataset.delta)); ui.monthDay = ui.month; render(); },
@@ -595,8 +309,8 @@ const actions = {
   },
   reset: () => resetDemo(),
   'pop-close': () => closePopover(),
-  block: (el) => openBlock(el),
-  hatch: (el) => openHatch(el),
+  block: (el) => { const html = blockPopover(getState(), el.dataset.block); if (html) openPopover(el, html); },
+  hatch: (el) => { const html = hatchPopover(getState(), el.dataset, ui.editBusy); if (html) openPopover(el, html); },
   ink: (el) => {
     const p = pendingProposal(getState());
     if (p?.kind === 'hero' && !p.option) { closePopover(); inkProposal(); focusDecision(); return; }
@@ -649,26 +363,57 @@ const actions = {
   'sleep-edit': (el) => { ui.sleepEdit = el.dataset.on === '1'; render(); },
   'sleep-save': () => setSleep(Number($('#sleep-start').value), Number($('#sleep-end').value)),
   'remove-rule': (el) => { closePopover(); removeRule(el.dataset.rule); },
-  'paint-repeat': (el) => {
-    if (!painted) return;
-    painted.repeat = el.dataset.repeat;
-    ui.paintRepeat = painted.repeat;
-    el.parentElement.querySelectorAll('.seg__opt').forEach((b) => b.setAttribute('aria-pressed', String(b === el)));
-  },
-  'paint-confirm': () => {
-    if (!painted) return;
-    const label = ($('#paint-label')?.value || '').trim() || L('沒空', 'Busy');
-    const p = painted;
-    painted = null;
-    closePopover();
-    addRule({ type: p.repeat, ...(p.repeat === 'weekly' ? { days: [weekday(p.date)] } : { date: p.date }), start: p.start, end: p.end, label });
-  },
   doc: (el) => { ui.docId = el.dataset.doc; ui.editItem = null; render(); },
   'open-doc': (el) => { ui.docId = el.dataset.doc; },
   'doc-remove': (el) => {
     if (!confirm(L('從這個瀏覽器移除這份大綱？', 'Remove this syllabus from this browser?'))) return;
     removeAttachment(el.dataset.doc).catch(() => {});
     removeOwnDoc(el.dataset.doc);
+  },
+  'syllabus-paste': async () => {
+    const box = document.querySelector('[data-syllabus-text]');
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) throw new Error('empty');
+      ui.syllabusDraft = text;
+      render();
+      document.querySelector('[data-syllabus-text]')?.focus();
+    } catch {
+      box?.focus();
+      toast(L('請按 Ctrl+V（Mac 按 ⌘V）貼上', 'Press Ctrl+V (⌘V on a Mac) to paste'), 'info');
+    }
+  },
+  'syllabus-clear': () => { ui.syllabusDraft = ''; render(); },
+  'syllabus-read': async () => {
+    const text = ui.syllabusDraft.trim();
+    if (ui.docReading) return;
+    if (text.length < 30) { toast(L('文字太短了，請貼上整份或整段大綱（至少 30 個字）。', 'That is too short. Paste the whole syllabus or a full section (30 characters or more).'), 'alert'); return; }
+    const line = text.split('\n')[0].replace(/[\\/:*?"<>|]/g, ' ').trim();
+    const first = (line.length > 40 ? line.slice(0, 40).replace(/\s+\S*$/, '') : line) || L('貼上的大綱', 'Pasted syllabus');
+    let saved;
+    try {
+      saved = await keepFile(new File([text], `${first}.txt`, { type: 'text/plain' }), LIMIT_MB.syllabus);
+    } catch (err) { toast(fileProblem(err, { name: first }), 'alert'); return; }
+    ui.syllabusDraft = '';
+    addOwnDoc(saved);
+    actions['doc-read']({ dataset: { doc: saved.id } });
+  },
+  'doc-read': async (el) => {
+    const id = el.dataset.doc;
+    if (ui.docReading) return;
+    ui.docReading = id;
+    render();
+    try {
+      const file = await getAttachment(id);
+      if (!file) throw Object.assign(new Error('missing'), { reason: 'missing' });
+      const found = toItems(await readSyllabus(file));
+      ui.docReading = null;
+      setOwnItems(id, found);
+    } catch (err) {
+      ui.docReading = null;
+      render();
+      toast(readProblem(err), 'alert');
+    }
   },
   'demo-docs': () => {
     document.getElementById('review')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -744,10 +489,10 @@ const actions = {
     obLater(5, 1700, finishOnboarding);
   },
   'ob-finish': () => { clearTimeout(obTimer); finishOnboarding(); },
+  ...paintActions,
 };
 
 document.addEventListener('click', (e) => {
-  if (performance.now() < swallowUntil) { e.preventDefault(); e.stopPropagation(); return; }
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const fn = actions[el.dataset.action];
@@ -798,7 +543,8 @@ document.addEventListener('submit', (e) => {
       updateTask(form.dataset.task, fields, steps);
     } else {
       const files = [...(form.querySelector('[name="guide"]')?.files || [])];
-      if (files.some((file) => file.size > 10 * 1024 * 1024)) { toast(L('每份附件最多 10 MB', 'Each attachment must be 10 MB or smaller'), 'alert'); return; }
+      const big = files.find((file) => !fits(file, LIMIT_MB.task));
+      if (big) { toast(fileProblem({ reason: 'too-big', maxMB: LIMIT_MB.task }, big), 'alert'); return; }
       addTask(fields, steps.map(({ title, min }) => ({ title, min })));
       const taskId = ui.taskId;
       location.hash = `#/tasks/${taskId}`;
@@ -828,15 +574,28 @@ document.addEventListener('submit', (e) => {
 
 document.addEventListener('input', (e) => {
   if (e.target.matches('[data-draft]')) { ui.draft = e.target.value; autosize(); }
+  if (e.target.matches('[data-syllabus-text]')) ui.syllabusDraft = e.target.value;
 });
+
+/* ---------------- 附件：存進這個瀏覽器（attachments.js 的 keepFile） ---------------- */
+const fileProblem = (err, file) => (err.reason === 'too-big'
+  ? L(`「${file.name}」超過 ${err.maxMB} MB`, `"${file.name}" is over ${err.maxMB} MB`)
+  : L('儲存失敗，請檢查瀏覽器儲存空間。', 'Could not save. Check browser storage space.'));
+
+const readProblem = (err) => ({
+  'too-big': L(`AI 只能讀 ${AI_MAX_MB} MB 以內的檔案，請先壓縮或只放有日期的那幾頁。`, `The AI can only read files up to ${AI_MAX_MB} MB. Compress it or keep only the pages with dates.`),
+  missing: L('讀不到這份檔案，請重新放入原檔。', 'Cannot read this file. Add the original again.'),
+  offline: L('連不上 AI，請檢查網絡後再試。', 'Cannot reach the AI. Check your connection and try again.'),
+  'no-key': L('AI 還沒在伺服器設定好（缺少 DIFY_API_KEY）。', 'The AI is not set up on the server yet (DIFY_API_KEY is missing).'),
+  'no-server': L('這個網址沒有 AI 轉接服務。請用 node serve.mjs 預覽，或在已發布的網站使用。', 'No AI relay at this address. Preview with node serve.mjs or use the published site.'),
+  invalid: L('AI 讀不出課程資料。如果是掃描圖片，請換成可以選取文字的 PDF 或 Word。', 'The AI found no course data. If it is a scanned image, use a PDF or Word file with selectable text.'),
+}[err.reason] || L('AI 讀取失敗，請稍後再試。', 'The AI could not read it. Try again later.'));
 
 async function saveGuides(taskId, files) {
   for (const file of files) {
-    const id = crypto.randomUUID();
     try {
-      await saveAttachment(id, file);
-      addTaskAttachment(taskId, { id, name: file.name, size: file.size });
-    } catch { toast(L('附件儲存失敗，請檢查瀏覽器儲存空間。', 'Could not save an attachment. Check browser storage space.'), 'alert'); return; }
+      addTaskAttachment(taskId, await keepFile(file, LIMIT_MB.task));
+    } catch (err) { toast(fileProblem(err, file), 'alert'); return; }
   }
 }
 
@@ -845,12 +604,12 @@ async function takeFiles(files) {
   if (!names) return;
   if (getMode() === 'mine' && current.name === 'import') {
     for (const file of files) {
-      if (file.size > 20 * 1024 * 1024) { toast(L(`「${file.name}」超過 20 MB`, `"${file.name}" is over 20 MB`), 'alert'); continue; }
-      const id = crypto.randomUUID();
       try {
-        await saveAttachment(id, file);
-        addOwnDoc({ id, name: file.name, size: file.size });
-      } catch { toast(L('儲存失敗，請檢查瀏覽器儲存空間。', 'Could not save. Check browser storage space.'), 'alert'); return; }
+        addOwnDoc(await keepFile(file, LIMIT_MB.syllabus));
+      } catch (err) {
+        toast(fileProblem(err, file), 'alert');
+        if (err.reason !== 'too-big') return; // 太大的跳過，存不進去就停
+      }
     }
     return;
   }
@@ -869,13 +628,10 @@ document.addEventListener('change', async (e) => {
   if (t.matches('[data-task-file]')) {
     const file = t.files[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { toast(L('每份附件最多 10 MB', 'Each attachment must be 10 MB or smaller'), 'alert'); t.value = ''; return; }
     t.disabled = true;
-    const id = crypto.randomUUID();
     try {
-      await saveAttachment(id, file);
-      addTaskAttachment(t.dataset.taskFile, { id, name: file.name, size: file.size });
-    } catch { toast(L('儲存失敗，請檢查瀏覽器儲存空間。', 'Could not save. Check browser storage space.'), 'alert'); t.disabled = false; t.value = ''; }
+      addTaskAttachment(t.dataset.taskFile, await keepFile(file, LIMIT_MB.task));
+    } catch (err) { toast(fileProblem(err, file), 'alert'); t.disabled = false; t.value = ''; }
     return;
   }
   if (t.matches('[data-file]')) takeFiles(t.files);
@@ -912,8 +668,6 @@ window.addEventListener('resize', () => {
 });
 window.addEventListener('scroll', () => {
   header.classList.toggle('is-scrolled', window.scrollY > 4);
-  // 滑鼠停在她身上時捲動不趴下：否則趴下換圖會觸發 pointerover 叫醒她，再捲又趴下，來回抽搐
-  if (performance.now() > quietScrollUntil && !dock.querySelector('.dock__me:hover')) rest('scroll');
   place();
   placeTour();
 }, { passive: true });

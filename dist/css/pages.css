@@ -358,6 +358,19 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
   transition: border-color 0.15s, background 0.15s;
 }
 .drop.is-over { border-color: var(--ink); background: var(--paper); }
+.paste { display: block; padding: 0; text-align: left; min-height: 300px; }
+.paste__text {
+  display: block; width: 100%; min-height: 300px; resize: vertical; border: 0; outline: 0; background: transparent;
+  padding: 20px 22px 76px; font: inherit; font-size: 15px; line-height: 1.6; color: var(--ink); border-radius: inherit;
+}
+.paste__text::placeholder { color: var(--ink-3); }
+.paste:focus-within { border-color: var(--ink); background: var(--paper); }
+.paste__start { position: absolute; inset: 64px 20px 20px; display: grid; place-content: center; justify-items: center; gap: 12px; text-align: center; pointer-events: none; }
+.paste__start .btn { pointer-events: auto; }
+.paste__bar { position: absolute; right: 14px; bottom: 14px; display: none; gap: 8px; align-items: center; }
+.paste:has(.paste__text:not(:placeholder-shown)) .paste__start { display: none; }
+.paste:has(.paste__text:not(:placeholder-shown)) .paste__bar { display: flex; }
+.paste .drop__msg { margin: 0 20px 16px; }
 .drop__icon { width: 64px; height: 64px; border-radius: 18px; background: var(--paper); display: grid; place-items: center; box-shadow: var(--shadow-card); }
 .drop__icon .i { font-size: 30px; color: var(--ink-2); }
 .drop__title { font-family: var(--font-serif); font-size: 22px; font-weight: 700; }
@@ -409,6 +422,12 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .xhours small { display: block; font-family: var(--font-sans); font-size: 11.5px; color: var(--ink-3); }
 .xact { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
 .xstate { font-size: 12.5px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.xquote { display: block; max-width: 220px; margin-top: 4px; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.xnotes { list-style: none; margin: 0 20px 12px; padding: 0; display: grid; gap: 6px; }
+.xnotes li { display: flex; gap: 6px; font-size: 13px; color: #8f2a18; line-height: 1.55; }
+.xnotes .i { margin-top: 3px; flex: none; }
+.own-doc__ai { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.own-doc__ai .muted { font-size: 13px; }
 
 /* =========================================================
    時間（不可用時段）

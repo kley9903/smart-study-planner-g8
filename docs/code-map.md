@@ -18,7 +18,8 @@
 | 示範課程、功課、時段 | `dist/js/demo-data.js` |
 | AI 助手的預先寫好回覆 | `dist/js/scenarios.js`（目前不是 AI API） |
 | 中英文切換 | `dist/js/i18n.js`，以及各頁面的 `L('中文', 'English')` |
-| 真正的後端、登入、資料庫、AI API | **尚未建立**；接駁方向見下方說明 |
+| 大綱交給 AI 整理（Dify 工作流程） | 前端 `dist/js/syllabus-ai.js`，伺服器端轉接 `functions/api/syllabus.js` |
+| 真正的後端、登入、資料庫、AI 對話 | **尚未建立**；接駁方向見下方說明 |
 
 ## 網站入口與外觀
 
@@ -44,15 +45,16 @@
 | `dist/js/views/month.js` | 共用任務與忙碌資料的月曆、跨月切換及日期選擇 |
 | `dist/js/views/task-editor.js` | 新增／編輯任務表單、子任務與附件入口；新增頁右邊的「建議拆法」（`suggestSteps`，示範用固定範本，未接 AI；接 AI 時改這裡） |
 | `dist/js/views/tasks.js` | 任務列表、任務細節、步驟和進度 |
-| `dist/js/views/import.js` | 課程資料匯入及核對畫面；示範模式用預寫的抽取結果，自己的計劃只把 PDF 存在瀏覽器（`ownPanel`）；真正的 PDF／Canvas 抽取尚未接通 |
-| `dist/js/views/availability.js` | 「改沒空的時間」的說明行和右欄（睡眠、上課時間、你自己加的）；拖拉新增、右鍵移除、手機按空白處新增的處理在 `app.js`；不再是獨立頁面，由本週按「改沒空的時間」打開（`ui.editBusy`），舊網址 `#/time` 會轉到這裡 |
+| `dist/js/views/import.js` | 課程資料匯入及核對畫面。示範模式用預寫的抽取結果；自己的計劃有可打字的輸入框（`pasteBox`：貼上文字或上傳 PDF／Word），按「用 AI 找出項目」後結果放進同一張核對表 |
+| `dist/js/views/availability.js` | 「改沒空的時間」的說明行和右欄（睡眠、上課時間、你自己加的）；拖拉新增、右鍵移除、手機按空白處新增的處理在 `busy-paint.js`；不再是獨立頁面，由本週按「改沒空的時間」打開（`ui.editBusy`），舊網址 `#/time` 會轉到這裡 |
 | `dist/js/views/margin.js` | AI 助手的對話內容、建議及選擇方案的畫面（放在右下角角色展開的面板裡） |
 | `dist/js/views/dock.js` | 每頁右下角的角色入口：名牌狀態、有事時的泡泡（可直接回答）、展開／縮小；名字在 `assistantName` 改 |
+| `dist/js/views/popovers.js` | 時間表上的彈出框內容：按讀書時段（`blockPopover`）、按灰色沒空時段（`hatchPopover`）、用表格新增沒空時間（`busyForm`）；只由資料算出 HTML，`app.js` 負責打開 |
 | `dist/img/mascot*.webp` | 角色動畫，全部是橫向 sprite，由 CSS（`pages.css` 的 `.dock__*`）播放。「減少動態效果」時停在第 1 格。各組頭髮顏色統一成站著的顏色，切換點頭尾對齊；產生腳本放在專案的 `src/mascot-tools/build_all.py`（讀 `0_inbox` 的原片，不在本倉庫） |
 | `dist/img/mascot.webp` | 站著的循環：33 格 122×189，一次完整擺動，2.75 秒 |
 | `dist/img/mascot-drop.webp` | 「雙手抓住底邊」：8 格 122×189，每格雙手底部對齊 y=154；站著的圖先直直掉下去，再播一次這段 |
 | `dist/img/mascot-rest.webp` | 趴著的循環：33 格 122×88（只有露出來的頭和雙手）；捲動、打字、閒置 30 秒時，以及趴在打開的面板右上角 |
-| `dist/img/mascot-yawn.webp` | 打哈欠：17 格 122×88，1.5 秒（張嘴 0.15 秒、張著 1.2 秒、閉嘴 0.15 秒，各格時間寫在 `@keyframes mascot-yawn`）；趴著 20 秒後第一次，之後每次隨機隔 20–60 秒（`app.js` 的 `syncYawn`） |
+| `dist/img/mascot-yawn.webp` | 打哈欠：17 格 122×88，1.5 秒（張嘴 0.15 秒、張著 1.2 秒、閉嘴 0.15 秒，各格時間寫在 `@keyframes mascot-yawn`）；趴著 20 秒後第一次，之後每次隨機隔 20–60 秒（`mascot.js`） |
 | `dist/img/mascot-rise.webp` | 「撐起來站好」：25 格 122×197（每格就是角色框，底邊＝畫面底邊）：前 2 格從趴著補幀、原片 19 格、後 4 格補幀到站著第 1 格；叫醒時播 1.07 秒 |
 | `dist/js/views/about.js` | 原型說明與使用說明頁 |
 
@@ -61,8 +63,11 @@
 | 檔案 | 用途 |
 |---|---|
 | `dist/js/app.js` | JavaScript 入口（含獨立 `#/monthly` 月曆及 `#/add-task` 新增頁）；按網址切頁、更新畫面、接收點擊與表單等操作 |
+| `dist/js/mascot.js` | 右下角角色的姿勢：何時掉下去趴著、何時撐起來、閒置 30 秒、打哈欠的計時；姿勢寫成角色容器的 class，CSS 播動畫。`app.js` 每次重畫角色後呼叫 `shown()`，其餘由它自己監聽；時間設定在 `TIMING` |
+| `dist/js/busy-paint.js` | 「改沒空的時間」模式在時間表上拖拉新增、手機按一下用表格新增、右鍵移除；整個手勢都在這裡，`app.js` 只呼叫 `attachBusyPainting()` |
 | `dist/js/store.js` | 管理目前狀態與修改資料的動作；自己的計劃存在瀏覽器 localStorage，示範狀態主要存在記憶體 |
-| `dist/js/attachments.js` | 附件保存在本瀏覽器 IndexedDB；沒有伺服器上傳或 AI 文件分析 |
+| `dist/js/syllabus-ai.js` | 自己的大綱 → `/api/syllabus` → 待核對的項目：`readSyllabus(file)`（貼上的文字存成 .txt，以文字送出）、`toItems(Dify 結果)`、`rowText(項目)` 按目前語言產生顯示文字；確認後由 `store.js` 變成任務或每週沒空時間 |
+| `dist/js/attachments.js` | 附件保存在本瀏覽器 IndexedDB；只有按「用 AI 找出項目」時，那一份大綱才會送到 `/api/syllabus`。存檔一律用 `keepFile(file, 上限 MB)`，大小上限在 `LIMIT_MB`（任務附件 10 MB、課程大綱 20 MB） |
 | `dist/js/model.js` | 從狀態推算每日畫面、空檔、課程／任務資料和 AI 建議疊加結果 |
 | `dist/js/scheduler.js` | 固定規則排程：按截止時間找空檔、避開沒空時段、限制每日讀書量等；不是 AI 模型 |
 | `dist/js/planner.js` | 多頁共用的時間表繪製元件、時段和變動箭嘴 |
@@ -81,6 +86,7 @@
 | `package.json` | 定義 `npm start`、`npm run check` 等命令；目前沒有第三方套件依賴 |
 | `scripts/check.mjs` | 檢查 JS 語法、檔案引用、網站回應及 MIME；加新功能時可視需要擴充 |
 | `scripts/check-planner.mjs` | 檢查月曆邊界、排程確認、編輯後失效處理及本機資料保存 |
+| `scripts/check-modules.mjs` | 不用瀏覽器就能測的 module：角色姿勢（假時鐘、假事件）、彈出框內容、拖拉範圍、附件大小規則 |
 | `scripts/start-preview.mjs` | 舊雲端流程的預覽助手；下載後本機開發用 `npm start` 就好 |
 | `CONTRIBUTING.md` | 下載、執行、修改及交件步驟 |
 | `CONTRIBUTORS.md` | 小組角色、實際貢獻及 GitHub 自動署名的說明 |
@@ -101,11 +107,11 @@ GitHub 倉庫還保留以下管理設定，普通組員不用處理；下載 ZIP
 
 ## 後端目前在哪裡？
 
-**目前沒有真正的後端程式、登入 API、共用資料庫或 AI API。** Cloudflare Pages 只是提供這份靜態網站；自己的資料儲存在自己的瀏覽器。組員下載原始碼，不會下載到其他人的 localStorage 計劃。
+**目前唯一的伺服器端程式是 `functions/api/syllabus.js`**（Cloudflare Pages Functions，隨網站一起發布）：把大綱轉交給 Dify「課程資料整理｜Study Planner」工作流程，金鑰放在 Cloudflare 的環境變數 `DIFY_API_KEY`，設定方法見 [部署設定](deployment.md)。本機 `node serve.mjs` 跑同一份檔案。沒有登入 API 或共用資料庫；自己的資料儲存在自己的瀏覽器。組員下載原始碼，不會下載到其他人的 localStorage 計劃。
 
 日後有人負責後端時，先約定 API 路徑、請求與回傳格式，再新增獨立的 `backend/` 目錄（這是建議位置，現在尚不存在）。前端接駁點主要在 `store.js`：把直接修改狀態或產生示範結果的相關動作接到後端 API，再按需要調整 `model.js` 與頁面。
 
 - 登入、跨裝置保存：需要後端驗證、資料庫，以及前端的登入／載入／儲存動作。
 - AI 對話：需要真正的後端 AI 呼叫；`scenarios.js` 目前只供示範。
-- PDF／Canvas 匯入：需要實際解析或外部資料接駁；`views/import.js` 目前主要是展示與核對介面。
+- Canvas 匯入：尚未接通。PDF／Word／文字大綱已經可以交給 Dify 工作流程整理（見上）。
 - API 金鑰只放後端安全設定，不放在 `dist/`。前端檔案會被瀏覽器下載。

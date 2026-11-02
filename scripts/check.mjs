@@ -18,7 +18,7 @@ async function walk(directory) {
 }
 const files = await walk(dist);
 const jsFiles = files.filter((path) => path.endsWith('.js'));
-for (const file of [...jsFiles, resolve(root, 'serve.mjs'), ...await walk(resolve(root, 'scripts'))]) {
+for (const file of [...jsFiles, resolve(root, 'serve.mjs'), ...await walk(resolve(root, 'scripts')), ...await walk(resolve(root, 'functions'))]) {
   if (!/\.m?js$/.test(file)) continue;
   const parsed = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
   assert.equal(parsed.status, 0, parsed.stderr || `Cannot check ${file}`);
