@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, setTaskGroup, partsOf,
+  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, renameCourse, setTaskGroup, partsOf,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
 
@@ -458,10 +458,19 @@ const actions = {
       toast(readProblem(err), 'alert');
     }
   },
-  'course-toggle': (el) => { ui.openCourse = ui.openCourse === el.dataset.course ? null : el.dataset.course; render(); },
+  'course-toggle': (el) => {
+    const id = el.dataset.course;
+    // 同一張卡 400ms 內點兩下＝雙擊改名（點一下就重畫卡頭，瀏覽器不會發 dblclick）；兩下開合剛好回到原狀
+    const twice = lastHead.id === id && Date.now() - lastHead.at < 400;
+    lastHead = twice ? {} : { id, at: Date.now() };
+    ui.openCourse = ui.openCourse === id ? null : id;
+    if (twice) startRename(id); else render();
+  },
   'course-add': () => { ui.addCourse = null; ui.docId = null; location.hash = '#/import/add'; },
   'course-more': (el) => { ui.addCourse = el.dataset.course; ui.docId = null; location.hash = '#/import/add'; },
   'course-continue': (el) => { ui.addCourse = null; ui.docId = el.dataset.doc; },
+  'course-rename': (el) => startRename(el.dataset.course),
+  'course-rename-cancel': () => { ui.renameCourse = null; render(); },
   'task-group': (el) => { closePopover(); setTaskGroup(el.dataset.task, el.dataset.group); },
   'course-delete': (el) => {
     const c = getState().courses[el.dataset.course];
@@ -560,6 +569,16 @@ document.addEventListener('click', (e) => {
 }, true);
 
 document.getElementById('scrim').addEventListener('click', () => closePopover());
+
+/* 科目卡改名：雙擊卡頭（見 course-toggle），或按卡底「改名」；卡頭換成輸入格，代號先選好方便直接打。 */
+let lastHead = {};
+function startRename(id) {
+  ui.renameCourse = id;
+  render();
+  const input = document.querySelector('.course__rename input[name="name"]');
+  input?.focus();
+  input?.select();
+}
 
 /* 科目卡：把一項移到另一組（改它的類型）。電腦上拖放；手機長按「拿起來」再拖；電腦右鍵開「移到…」選單。 */
 const groupName = (g) => (g === 'exam' ? L('測驗和考試', 'quizzes and exams') : L('功課', 'assignments'));
@@ -706,6 +725,7 @@ document.addEventListener('keydown', (e) => {
     if (!document.getElementById('popover').hidden) closePopover();
     else if (ui.aiModal) actions['ai-modal-close']();
     else if (ui.dockOpen) toggleDock(false);
+    else if (ui.renameCourse) actions['course-rename-cancel']();
   }
   const t = e.target;
   if ((e.key === 'Enter' || e.key === ' ') && t.matches?.('li[data-action]')) { e.preventDefault(); t.click(); }
@@ -757,6 +777,12 @@ document.addEventListener('submit', (e) => {
     const date = String(f.get('date')), type = String(f.get('repeat'));
     closePopover();
     addRule({ label, type, start, end, ...(type === 'weekly' ? { days: [weekday(date)] } : { date }) });
+    return;
+  }
+  if (e.target.matches('[data-form="course-rename"]')) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    renameCourse(e.target.dataset.course, String(f.get('name')), String(f.get('title')));
     return;
   }
   if (e.target.matches('[data-form="say"]')) {

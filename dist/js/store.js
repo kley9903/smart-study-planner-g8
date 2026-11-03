@@ -79,7 +79,7 @@ function freshUi() {
   return {
     hlTask: null, showGaps: false, day: DEMO_TODAY, docId: 'stat', taskId: 'ps4',
     editBusy: false, dockOpen: false, dockDismissed: [], hlRule: null, justInked: [], arrowFor: null,
-    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
+    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, renameCourse: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
   };
 }
@@ -661,6 +661,32 @@ export function removeOwnDoc(id) {
 }
 
 /**
+ * 改一科的代號和全名（雙擊卡頭或按「改名」）。代號不能空，也不能跟另一科一樣；全名可以留空。
+ * 寫著舊代號、還沒確認的資料一起跟著改，之後確認的項目仍然放進這一科。回傳是否改成功。
+ */
+export function renameCourse(id, name, title = '') {
+  const c = state.courses[id];
+  const label = String(name || '').trim();
+  const full = String(title || '').trim();
+  if (!c) return false;
+  if (!label) { emit({ toast: L('科目代號不能留空', 'Enter a course code'), toastIcon: 'alert', keepScroll: true }); return false; }
+  if (Object.values(state.courses).some((o) => o.id !== id && o.name === label)) {
+    emit({ toast: L(`已經有一科叫「${label}」`, `There is already a course called ${label}`), toastIcon: 'alert', keepScroll: true });
+    return false;
+  }
+  const old = c.name;
+  c.name = label;
+  if (full) c.title = full; else delete c.title;
+  state.docs.filter((d) => d.own && (d.course === id || (!d.course && (d.courseName || '').trim() === old))).forEach((d) => {
+    d.courseName = label;
+    markMatches(d);
+  });
+  ui.renameCourse = null;
+  emit({ toast: L(`已改名為「${label}」`, `Renamed to ${label}`), keepScroll: true });
+  return true;
+}
+
+/**
  * 刪除一科：科目卡、它的任務和讀書時段，以及屬於它的資料（包括寫著這一科、還沒確認的）；其他科目不動。
  * 回傳要從瀏覽器刪掉的檔案 id（資料原檔和任務附件），由呼叫的地方刪。
  */
@@ -677,6 +703,7 @@ export function deleteCourse(id) {
   state.docs = state.docs.filter((d) => !docs.includes(d));
   delete state.courses[id];
   if (ui.openCourse === id) ui.openCourse = null;
+  if (ui.renameCourse === id) ui.renameCourse = null;
   if (ui.addCourse === id) ui.addCourse = null;
   if (docs.some((d) => d.id === ui.docId)) ui.docId = null;
   if (gone.has(ui.taskId)) ui.taskId = null;

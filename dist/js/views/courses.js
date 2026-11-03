@@ -68,14 +68,14 @@ function courseCard(s, c) {
   return `
     <section class="course ${open ? 'is-open' : ''}" data-ink="${c.ink}">
       <span class="course__tape" aria-hidden="true"></span>
-      <button class="course__head ${c.title ? 'has-name' : ''}" type="button" data-action="course-toggle" data-course="${c.id}" aria-expanded="${open}" aria-controls="${id}">
+      ${ui.renameCourse === c.id ? renameForm(c) : `<button class="course__head ${c.title ? 'has-name' : ''}" type="button" data-action="course-toggle" data-course="${c.id}" aria-expanded="${open}" aria-controls="${id}">
         <span class="course__title">
           <span class="course__code">${esc(c.name)}</span>
           ${c.title ? `<span class="course__name">${esc(c.title)}</span>` : ''}
         </span>
         <span class="course__mark ${/^[0-9A-Z]+$/.test(wm) ? 'is-latin' : ''}" aria-hidden="true">${esc(wm)}</span>
         <span class="course__chev" aria-hidden="true">${icon('chevron')}</span>
-      </button>
+      </button>`}
       ${open ? `
       <div class="course__body" id="${id}">
         ${group(s, c, 'exam', L('測驗和考試', 'Quizzes and exams'), exams, tasks.length)}
@@ -96,11 +96,25 @@ function courseCard(s, c) {
           <p class="course__tip">${L('漏了甚麼？貼上公告、大綱，或自己打字補充這一科。', 'Something missing? Paste an announcement or syllabus, or type it in.')}</p>
           <div class="course__actions">
             <button class="course__more" type="button" data-action="course-more" data-course="${c.id}">${icon('plus')} ${L('補充資訊', 'Add information')}</button>
+            <button class="course__del is-rename" type="button" data-action="course-rename" data-course="${c.id}">${icon('pencil')} ${L('改名', 'Rename')}</button>
             <button class="course__del" type="button" data-action="course-delete" data-course="${c.id}">${icon('x')} ${L('刪除這一科', 'Delete course')}</button>
           </div>
         </footer>
       </div>` : ''}
     </section>`;
+}
+
+/** 改名時卡頭換成兩格：代號和全名。Enter 保存，Esc 取消。 */
+function renameForm(c) {
+  return `
+      <form class="course__rename" data-form="course-rename" data-course="${c.id}">
+        <label><span>${L('代號', 'Code')}</span><input class="input input--sm" name="name" value="${esc(c.name)}" maxlength="40" required></label>
+        <label><span>${L('全名', 'Full name')}</span><input class="input input--sm" name="title" value="${esc(c.title || '')}" maxlength="80" placeholder="${L('可以留空', 'Optional')}"></label>
+        <div class="course__rename-actions">
+          <button class="btn btn--ink btn--sm" type="submit">${L('保存', 'Save')}</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-action="course-rename-cancel">${L('取消', 'Cancel')}</button>
+        </div>
+      </form>`;
 }
 
 /**

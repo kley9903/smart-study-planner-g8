@@ -10,7 +10,7 @@ const { createMascot, TIMING } = await import('../dist/js/mascot.js');
 const { blockPopover, hatchPopover, busyForm } = await import('../dist/js/views/popovers.js');
 const { snap, paintRange } = await import('../dist/js/busy-paint.js');
 const { keepFile, fits, LIMIT_MB } = await import('../dist/js/attachments.js');
-const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, setTaskGroup, partsOf, ui } = await import('../dist/js/store.js');
+const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, renameCourse, setTaskGroup, partsOf, ui } = await import('../dist/js/store.js');
 const { toItems, mergeFound, rowText, report, checklist, parseDays, parseWhen, readSyllabus } = await import('../dist/js/syllabus-ai.js');
 const { setLang } = await import('../dist/js/i18n.js');
 const { onRequestPost } = await import('../functions/api/syllabus.js');
@@ -345,6 +345,21 @@ assert.deepEqual([mathTasks().length, finalTask2.due.min], [1, 840], 'the real t
 // Deleting a course removes its card, tasks, sessions and sources (also a source for it not confirmed yet); nothing else.
 addOwnDoc({ id: 'doc-9', name: 'math-quiz.txt and 1 more', size: 2, parts: [{ id: 'f-a', name: 'math-quiz.txt', size: 1 }, { id: 'f-b', name: 'slides.pptx', size: 1 }] });
 setOwnItems('doc-9', { course: 'MATH1001', items: [{ ...lab, id: 'm-quiz', plan: { ...lab.plan, title: 'Quiz 1' } }], notes: [] });
+// Renaming a course keeps its id, tasks and colour; a source still waiting under the old code follows it.
+{
+  const ink = math.ink;
+  const taskCount = mathTasks().length;
+  assert.equal(renameCourse(math.id, 'PHYS1001'), false, 'cannot take another course\'s code');
+  assert.equal(renameCourse(math.id, '   '), false, 'the code cannot be empty');
+  assert.equal(math.name, 'MATH1001');
+  assert.equal(renameCourse(math.id, ' MATH1010 ', ' Calculus I '), true);
+  assert.deepEqual([math.name, math.title, math.ink, mathTasks().length], ['MATH1010', 'Calculus I', ink, taskCount]);
+  assert.equal(mine.docs.find((d) => d.id === 'doc-9').courseName, 'MATH1010', 'an unconfirmed source written for the old code follows');
+  assert.equal(mine.docs.find((d) => d.id === 'doc-7').courseName, 'MATH1010');
+  renameCourse(math.id, 'MATH1010', '');
+  assert.equal('title' in math, false, 'an empty full name removes it');
+  assert.equal(renameCourse('missing', 'X'), false);
+}
 mine.blocks.push({ id: 'b-math', task: finalTask2.id, step: finalTask2.steps[0].id, date: '2099-01-02', start: 600, end: 660 });
 finalTask2.attachments = [{ id: 'att-1', name: 'notes.pdf', size: 1 }];
 const otherTasks = mine.tasks.filter((t) => t.course !== math.id).length;

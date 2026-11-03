@@ -1113,6 +1113,17 @@ a.crow.is-dragged { opacity: 0.35; }
 .course__del:hover { color: var(--seal); background: var(--seal-wash); }
 .course__del:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 2px; }
 .course__del .i { font-size: 15px; }
+.course__del.is-rename:hover { color: var(--c-deep, var(--ink)); background: var(--c-wash, var(--paper-2)); }
+
+/* 改名（雙擊卡頭或按「改名」）：卡頭換成代號和全名兩格，保存／取消 */
+.course__rename {
+  position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; align-items: end; gap: 12px;
+  padding: 24px 24px 20px 30px; font-family: var(--font-serif);
+}
+.course__rename label { display: grid; gap: 4px; min-width: 0; }
+.course__rename label span { font-size: 13px; color: var(--sepia-2); }
+.course__rename .input { width: 100%; }
+.course__rename-actions { display: flex; gap: 6px; }
 
 /* 增加科目：一張空白的虛線索引卡 */
 .course-add {
@@ -1168,6 +1179,7 @@ a.crow.is-dragged { opacity: 0.35; }
   .crow__weight { grid-area: weight; min-width: 36px; font-size: 16px; }
   .course__foot { flex-direction: column; align-items: stretch; }
   .course__actions { flex-direction: column; align-items: stretch; gap: 4px; }
+  .course__rename { grid-template-columns: 1fr; padding: 22px 14px 16px 20px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .course__body { animation: none; }
