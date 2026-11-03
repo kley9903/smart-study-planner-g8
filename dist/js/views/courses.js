@@ -1,7 +1,8 @@
 // 課程資料（自己的計劃）：每科一張長方形的卡，寫著代號和全名；點一下展開，看這科已確認的功課、測驗和考試。
 // 收集資料、AI 核對、逐項確認都在另一頁（#/import/add）；可以分幾次加，確認的才放進科目，未確認的不會出現在這裡。
 // 上課時間不收：這個網站只幫你安排溫習和做功課的時間。
-// 版面：紙卡左上角貼一段科目色紙膠帶，卡頭右邊淡淡印著浮水印（見 mark）；科目色也用在代號和箭咀圓鈕。
+// 版面照使用者給的參考圖：暖色紙卡，左上角斜貼科目色紙膠帶，卡頭大號代號、右邊淡淡的浮水印（見 mark）；
+// 卡裡全用襯線字，科目色用在代號、小標題、箭咀和「補充資訊」按鈕。
 // 展開後以小標題（測驗和考試、功課、日期未公布）分組，類型只寫在小標題；每項一行：名稱｜日期時間｜比重，
 // 7 天內到期用朱紅標出，已過的變淡。
 import { esc, icon } from '../ui.js';
@@ -37,9 +38,7 @@ export function coursesPage(s) {
       <div>
         <p class="eyebrow">${L('課程資料', 'Courses')}</p>
         <h1 class="page-head__title">${L('課程資料', 'Courses')}</h1>
-        <p class="page-head__lede">${courses.length
-          ? L('點一下科目，看它的測驗、考試和功課。發現有漏的，打開那一科按「補充資訊」。', 'Tap a course to see its quizzes, exams and assignments. If something is missing, open the course and choose "Add information".')
-          : L('還沒有科目。放入第一份課程大綱、公告，或自己打字，AI 會幫你找出測驗、考試和功課。', 'No courses yet. Add a syllabus, an announcement or your own notes; AI finds the quizzes, exams and assignments.')}</p>
+        ${courses.length ? '' : `<p class="page-head__lede">${L('還沒有科目。放入第一份課程大綱、公告，或自己打字，AI 會幫你找出測驗、考試和功課。', 'No courses yet. Add a syllabus, an announcement or your own notes; AI finds the quizzes, exams and assignments.')}</p>`}
       </div>
     </div>
     ${waiting ? `<a class="course-pending" href="#/import/add" data-action="course-continue" data-doc="${firstWaiting.id}">${icon('pencil')} ${L(`還有 ${waiting} 項等你確認`, `${waiting} item${waiting === 1 ? '' : 's'} waiting for you to confirm`)} ${icon('arrow')}</a>` : ''}
@@ -61,15 +60,16 @@ function courseCard(s, c) {
   const undated = s.docs.filter((d) => d.own && d.course === c.id).flatMap((d) => d.items)
     .filter((i) => i.state === 'ink' && i.applied !== 'dup' && !i.filled && i.plan?.kind === 'task' && !i.plan.date);
   const id = `course-${c.id}`;
+  const wm = mark(c.name);
   return `
     <section class="course ${open ? 'is-open' : ''}" data-ink="${c.ink}">
       <span class="course__tape" aria-hidden="true"></span>
-      <button class="course__head" type="button" data-action="course-toggle" data-course="${c.id}" aria-expanded="${open}" aria-controls="${id}">
+      <button class="course__head ${c.title ? 'has-name' : ''}" type="button" data-action="course-toggle" data-course="${c.id}" aria-expanded="${open}" aria-controls="${id}">
         <span class="course__title">
           <span class="course__code">${esc(c.name)}</span>
           ${c.title ? `<span class="course__name">${esc(c.title)}</span>` : ''}
         </span>
-        <span class="course__mark" aria-hidden="true">${esc(mark(c.name))}</span>
+        <span class="course__mark ${/^[0-9A-Z]+$/.test(wm) ? 'is-latin' : ''}" aria-hidden="true">${esc(wm)}</span>
         <span class="course__chev" aria-hidden="true">${icon('chevron')}</span>
       </button>
       ${open ? `
@@ -80,7 +80,7 @@ function courseCard(s, c) {
         <div class="course__group">
           <h3>${L('日期未公布', 'Date not announced')} <span>${undated.length}</span></h3>
           <p class="course__hint">${L('公布後按下面的「補充資訊」加上日期。', 'Once a date is announced, add it with "Add information" below.')}</p>
-          <ul class="crows">${undated.map((i) => `
+          <ul class="crows ${undated.some((i) => i.weight) ? 'crows--weights' : ''}">${undated.map((i) => `
             <li><div class="crow is-undated">
               <span class="crow__title">${esc(i.what)}</span>
               <span class="crow__due">${L('待公布', 'TBA')}</span>
@@ -89,8 +89,11 @@ function courseCard(s, c) {
         </div>` : ''}
         ${!tasks.length && !undated.length ? `<p class="course__empty">${L('這科還沒有已確認的測驗、考試或功課。', 'Nothing confirmed for this course yet.')}</p>` : ''}
         <footer class="course__foot">
-          <span>${L('漏了甚麼？貼上公告、大綱，或自己打字補充這一科。', 'Something missing? Paste an announcement or syllabus, or type it in.')}</span>
-          <button class="btn btn--sm" type="button" data-action="course-more" data-course="${c.id}">${icon('plus')} ${L('補充資訊', 'Add information')}</button>
+          <p class="course__tip">${L('漏了甚麼？貼上公告、大綱，或自己打字補充這一科。', 'Something missing? Paste an announcement or syllabus, or type it in.')}</p>
+          <div class="course__actions">
+            <button class="course__more" type="button" data-action="course-more" data-course="${c.id}">${icon('plus')} ${L('補充資訊', 'Add information')}</button>
+            <button class="course__del" type="button" data-action="course-delete" data-course="${c.id}">${icon('x')} ${L('刪除這一科', 'Delete course')}</button>
+          </div>
         </footer>
       </div>` : ''}
     </section>`;
@@ -101,7 +104,7 @@ function group(s, title, tasks) {
   return `
         <div class="course__group">
           <h3>${title} <span>${tasks.length}</span></h3>
-          <ul class="crows">${tasks.map((t) => row(s, t)).join('')}</ul>
+          <ul class="crows ${tasks.some((t) => t.weight) ? 'crows--weights' : ''}">${tasks.map((t) => row(s, t)).join('')}</ul>
         </div>`;
 }
 

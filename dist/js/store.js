@@ -538,7 +538,10 @@ function courseFor(name, title = '') {
     return found.id;
   }
   const id = nid('c');
-  state.courses[id] = { id, name: label, ...(title ? { title } : {}), ink: INKS[Object.keys(state.courses).length % INKS.length] };
+  // 先用還沒有科目用的顏色（刪過科目後不會跟現有的科目撞色）
+  const used = Object.values(state.courses).map((c) => c.ink);
+  const ink = INKS.find((k) => !used.includes(k)) || INKS[used.length % INKS.length];
+  state.courses[id] = { id, name: label, ...(title ? { title } : {}), ink };
   return id;
 }
 
@@ -637,6 +640,30 @@ export function removeOwnDoc(id) {
   state.docs = state.docs.filter((d) => d.id !== id);
   if (ui.docId === id) ui.docId = state.docs[0]?.id || null;
   emit({ toast: L('已移除這份大綱', 'Syllabus removed'), toastIcon: 'x', keepScroll: true });
+}
+
+/**
+ * 刪除一科：科目卡、它的任務和讀書時段，以及屬於它的資料（包括寫著這一科、還沒確認的）；其他科目不動。
+ * 回傳要從瀏覽器刪掉的檔案 id（資料原檔和任務附件），由呼叫的地方刪。
+ */
+export function deleteCourse(id) {
+  const c = state.courses[id];
+  if (!c) return [];
+  const tasks = state.tasks.filter((t) => t.course === id);
+  const gone = new Set(tasks.map((t) => t.id));
+  const docs = state.docs.filter((d) => d.own && courseIdOf(d) === id);
+  const p = pendingProposal(state);
+  if (p && p.changes.some((ch) => gone.has(ch.block?.task))) { p.status = 'erased'; state.proposal = null; }
+  state.tasks = state.tasks.filter((t) => !gone.has(t.id));
+  state.blocks = state.blocks.filter((b) => !gone.has(b.task));
+  state.docs = state.docs.filter((d) => !docs.includes(d));
+  delete state.courses[id];
+  if (ui.openCourse === id) ui.openCourse = null;
+  if (ui.addCourse === id) ui.addCourse = null;
+  if (docs.some((d) => d.id === ui.docId)) ui.docId = null;
+  if (gone.has(ui.taskId)) ui.taskId = null;
+  emit({ toast: L(`已刪除「${c.name}」`, `Deleted ${c.name}`), toastIcon: 'x', keepScroll: true });
+  return [...docs.map((d) => d.id), ...tasks.flatMap((t) => (t.attachments || []).map((a) => a.id))];
 }
 
 export function addTaskAttachment(taskId, metadata) {

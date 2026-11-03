@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse,
+  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse,
 } from './store.js';
 import { readSyllabus, toItems, checklist, AI_MAX_MB } from './syllabus-ai.js';
 
@@ -431,6 +431,12 @@ const actions = {
   'course-add': () => { ui.addCourse = null; ui.docId = null; location.hash = '#/import/add'; },
   'course-more': (el) => { ui.addCourse = el.dataset.course; ui.docId = null; location.hash = '#/import/add'; },
   'course-continue': (el) => { ui.addCourse = null; ui.docId = el.dataset.doc; },
+  'course-delete': (el) => {
+    const c = getState().courses[el.dataset.course];
+    if (!c || !window.confirm(L(`刪除「${c.name}」？這一科的功課、測驗、考試，連同已排的讀書時段和你放過的資料，都會一起刪除，不能復原。`,
+      `Delete ${c.name}? Its assignments, quizzes and exams, their scheduled sessions and the sources you added are deleted too. This cannot be undone.`))) return;
+    deleteCourse(c.id).forEach((file) => removeAttachment(file).catch(() => {}));
+  },
   'ai-modal-close': () => {
     const done = ui.aiModal?.phase === 'done';
     ui.aiModal = null;

@@ -945,80 +945,114 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 
 /* =========================================================
    課程資料（自己的計劃）：科目卡列表、增加科目、收集資料頁
-   科目卡是紙卡：左上角貼一段科目色紙膠帶，卡頭右邊淡淡印著浮水印（科目編號），卡頭只放代號和全名；
-   展開後小標題（測驗和考試、功課、日期未公布）用科目色襯線字，是第一眼的焦點；類型只寫在小標題，
-   每項一行：名稱｜日期時間｜比重，項與項之間一條細線；7 天內到期用朱紅，已過的變淡。
+   科目卡照使用者給的參考圖做成紙本樣式：暖色紙加淡紙紋，左上角斜貼科目色紙膠帶，
+   卡頭是大號代號、右邊斜體浮水印、科目色箭咀（不加圓圈）；卡裡全用襯線字。
+   展開後小標題（測驗和考試、功課、日期未公布）連數量用科目色大字，是第一眼的焦點；類型只寫在小標題。
+   每項一行：名稱｜日期時間｜比重（這一組有比重才顯示），每項下面一條細線；7 天內到期用朱紅，已過的變淡。
+   卡底一行點線，「補充資訊」是科目色外框按鈕。
    ========================================================= */
-.courses { display: grid; gap: 14px; max-width: 900px; }
+.courses { display: grid; gap: 18px; max-width: 900px; }
 
 .course {
-  position: relative; background: var(--paper); border-radius: var(--radius-lg);
+  position: relative; border-radius: var(--radius-lg); background: var(--grain), var(--paper-warm);
   box-shadow: var(--shadow-card); transition: box-shadow 0.25s var(--ease);
 }
-/* 紙膠帶：凸出卡頂，兩端撕開的鋸齒 */
-.course__tape {
-  position: absolute; left: 22px; top: -8px; z-index: 2; width: 56px; height: 17px; pointer-events: none;
-  background: var(--c, var(--graphite-2)); opacity: 0.3; transform: rotate(-6deg);
-  clip-path: polygon(0 0, 100% 0, 96% 25%, 100% 50%, 96% 75%, 100% 100%, 0 100%, 4% 75%, 0 50%, 4% 25%);
-}
-/* 浮水印：卡頭右邊、箭咀左邊，很淡的大號科目編號；在卡頭裡垂直置中，卡頭矮的時候只裁掉上下一點 */
-.course__mark {
-  position: absolute; right: 68px; top: 50%; transform: translateY(-50%); z-index: 0; pointer-events: none;
-  font-family: var(--font-serif); font-size: 62px; font-weight: 800; line-height: 1; letter-spacing: 0.02em; white-space: nowrap;
-  color: var(--c, var(--graphite-2)); opacity: 0.09;
-}
 .course:hover, .course.is-open { box-shadow: var(--shadow-sheet); }
+/* 紙膠帶：斜貼在卡的左上角、凸出卡外，兩端撕開的鋸齒 */
+.course__tape {
+  position: absolute; left: -12px; top: -10px; z-index: 2; width: 86px; height: 26px; pointer-events: none;
+  background: var(--grain), var(--c, var(--graphite-2)); opacity: 0.36; transform: rotate(-12deg);
+  clip-path: polygon(0 0, 100% 0, 96% 20%, 100% 40%, 96% 60%, 100% 80%, 97% 100%, 3% 100%, 0 80%, 4% 60%, 0 40%, 4% 20%);
+}
+/* 浮水印：卡頭右邊、箭咀左邊，很淡的大字，英文和數字用斜體；在卡頭裡垂直置中，再跟標題一樣往上移 3px */
+.course__mark {
+  position: absolute; right: 74px; top: 50%; transform: translateY(calc(-50% - 3px)); z-index: 0; pointer-events: none;
+  font-family: var(--font-serif); font-size: 80px; font-weight: 700; line-height: 1; letter-spacing: 0.01em; white-space: nowrap;
+  color: var(--c, var(--graphite-2)); opacity: 0.1;
+}
+.course__mark.is-latin { font-style: italic; }
 .course__head {
   position: relative; z-index: 1; overflow: hidden; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  padding: 20px 20px 20px 26px; border: 0; background: none; text-align: left; color: inherit; font: inherit; cursor: pointer;
+  padding: 26px 24px 22px 30px; border: 0; background: none; text-align: left; color: inherit; font: inherit; cursor: pointer;
 }
+/* 有全名時，全名的字小，下面看起來空，所以下方少留一點白 */
+.course__head.has-name { padding-bottom: 16px; }
 .course__head:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -4px; border-radius: var(--radius-lg); }
-.course__title { position: relative; z-index: 1; display: grid; gap: 4px; min-width: 0; }
-.course__code { font-family: var(--font-serif); font-size: 24px; font-weight: 800; line-height: 1.15; letter-spacing: 0.02em; color: var(--c-deep, var(--ink)); }
-.course__name { font-size: 14px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.course__chev {
-  position: relative; z-index: 1; flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--c-wash, var(--paper-2)); color: var(--c-deep, var(--ink-2));
-  transform: rotate(90deg); transition: transform 0.3s var(--ease);
+/* 大寫字母和數字看起來偏低，整組標題往上移一點（約卡頭高度的 3%），跟箭咀看起來對齊 */
+.course__title { position: relative; top: -3px; z-index: 1; display: grid; gap: 6px; min-width: 0; }
+/* 大號代號，像印上去的字：上面一道亮邊、下面一點陰影 */
+.course__code {
+  font-family: var(--font-serif); font-size: 36px; font-weight: 700; line-height: 1.05; letter-spacing: 0.02em; color: var(--c-deep, var(--ink));
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8), 0 2px 5px rgba(70, 45, 15, 0.14);
 }
-.course__chev .i { font-size: 18px; }
+.course__name { font-family: var(--font-serif); font-size: 15px; line-height: 1.4; color: var(--sepia-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 箭咀：只有箭咀，不加圓圈 */
+.course__chev {
+  position: relative; z-index: 1; flex: none; width: 42px; height: 42px; display: grid; place-items: center;
+  color: var(--c-deep, var(--ink-2)); transform: rotate(90deg); transition: transform 0.3s var(--ease);
+}
+.course__chev .i { font-size: 30px; stroke-width: 2; }
 .course.is-open .course__chev { transform: rotate(-90deg); }
 
 .course__body {
-  display: grid; gap: 26px; margin: 0 22px 0 26px; padding: 20px 0 18px;
-  border-top: 1px dashed var(--rule); animation: ai-line-in 0.3s ease-out both;
+  display: grid; gap: 30px; margin: 0 24px 0 30px; padding: 24px 0 22px; font-family: var(--font-serif);
+  border-top: 1px solid var(--rule-warm); animation: ai-line-in 0.3s ease-out both;
 }
-/* 小標題：科目色襯線粗字，數量用淡色小字跟在後面 */
+/* 小標題連數量都用科目色大字 */
 .course__group h3 {
-  display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px;
-  font-family: var(--font-serif); font-size: 17px; font-weight: 700; letter-spacing: 0.04em; color: var(--c-deep, var(--ink));
+  display: flex; align-items: baseline; gap: 14px; margin: 0 0 6px;
+  font-family: var(--font-serif); font-size: 22px; font-weight: 700; letter-spacing: 0.06em; color: var(--c-deep, var(--ink));
 }
-.course__group h3 span { font-family: var(--font-sans); font-size: 12.5px; font-weight: 500; letter-spacing: 0; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-.course__hint { margin: 0 0 4px; font-size: 12.5px; color: var(--ink-3); }
-.course__empty { font-size: 13.5px; color: var(--ink-3); margin: 0; }
+.course__group h3 span { letter-spacing: 0; font-variant-numeric: lining-nums; }
+.course__hint { margin: 0 0 6px; font-size: 15px; color: var(--sepia-2); }
+.course__empty { margin: 0; font-size: 15px; color: var(--sepia-3); }
 
-/* 一項一行：名稱｜（還有幾天）日期時間｜比重；項與項之間一條細線 */
-.crows { list-style: none; margin: 0; padding: 0; }
-.crows li + li { border-top: 1px solid var(--rule); }
+/* 一項一行：名稱｜（還有幾天）日期時間｜比重；每項下面一條細線，文字比小標題縮進一點。
+   上下留白照使用者調過：上一條細線到字頂約 16px（手機 14.4px），基線到下一條細線約 14.3px（手機 12.8px） */
+/* --indent：每項文字比這一組的左邊縮進多少；下面的細線從文字左邊 13px 開始（使用者指定） */
+.crows { --indent: 20px; list-style: none; margin: 0 -8px; padding: 0; }
+.crows li { position: relative; padding-bottom: 1px; }
+.crows li::after { content: ""; position: absolute; left: calc(var(--indent) - 13px); right: 0; bottom: 0; height: 1px; background: var(--rule-warm); }
 .crow {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(48px, max-content); align-items: baseline; gap: 18px;
-  padding: 11px 12px; margin: 0 -12px; border-radius: 10px; color: inherit; text-decoration: none; transition: background 0.15s;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 20px;
+  padding: 9px 8px 7.7px var(--indent); color: inherit; text-decoration: none; transition: background 0.15s;
 }
-a.crow:hover { background: var(--paper-2); }
+.crows--weights .crow { grid-template-columns: minmax(0, 1fr) auto minmax(52px, max-content); }
+a.crow:hover { background: rgba(120, 84, 40, 0.05); }
 a.crow:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; }
-.crow__title { min-width: 0; font-size: 15px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
-.crow__due { font-size: 13.5px; color: var(--ink-2); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.crow__when { margin-right: 10px; font-size: 12.5px; color: var(--ink-3); }
-.crow__weight { text-align: right; font-family: var(--font-serif); font-size: 16px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.crow__title { min-width: 0; font-size: 17px; font-weight: 500; color: var(--sepia); overflow-wrap: anywhere; }
+.crow__due { font-size: 16px; color: var(--sepia-2); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums lining-nums; }
+.crow__when { margin-right: 14px; color: var(--sepia-3); }
+.crow__weight { display: none; text-align: right; font-size: 17px; font-weight: 700; color: var(--c-deep, var(--sepia)); font-variant-numeric: tabular-nums lining-nums; }
+.crows--weights .crow__weight { display: block; }
 .crow.is-soon .crow__when { color: var(--seal); font-weight: 700; }
-.crow.is-past { opacity: 0.5; }
-.crow.is-past:hover { opacity: 0.8; }
-.crow.is-undated .crow__title { color: var(--ink-2); }
-.crow.is-undated .crow__due { color: var(--ink-3); }
+.crow.is-past { opacity: 0.55; }
+.crow.is-past:hover { opacity: 0.85; }
+.crow.is-undated .crow__due { color: var(--sepia-3); }
 
-.course__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; padding-top: 14px; border-top: 1px dashed var(--rule); }
-.course__foot span { font-size: 13px; color: var(--ink-3); }
+/* 卡底：一行點線，左邊說明，右邊科目色外框按鈕；「刪除這一科」是淡色文字按鈕，滑過才變朱紅 */
+.course__foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px 18px; flex-wrap: wrap; padding-top: 20px;
+  background: radial-gradient(circle, var(--graphite-2) 1px, transparent 1.5px) 0 0 / 10px 3px repeat-x;
+}
+.course__tip { margin: 0; font-size: 15px; color: var(--sepia-2); }
+.course__actions { display: flex; flex-direction: row-reverse; align-items: center; gap: 10px; }
+.course__more {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 0 20px; border-radius: 10px;
+  border: 1.5px solid var(--c-deep, var(--ink-2)); background: transparent; color: var(--c-deep, var(--ink-2));
+  font-family: var(--font-serif); font-size: 15.5px; font-weight: 700; letter-spacing: 0.04em; cursor: pointer; transition: background 0.15s;
+}
+.course__more:hover { background: var(--c-wash, var(--paper-2)); }
+.course__more:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 2px; }
+.course__more .i { font-size: 17px; }
+.course__del {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 42px; padding: 0 12px; border: 0; border-radius: 10px;
+  background: none; color: var(--sepia-3); font-family: var(--font-serif); font-size: 14.5px; cursor: pointer; transition: color 0.15s, background 0.15s;
+}
+.course__del:hover { color: var(--seal); background: var(--seal-wash); }
+.course__del:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 2px; }
+.course__del .i { font-size: 15px; }
 
 /* 增加科目：一張空白的虛線索引卡 */
 .course-add {
@@ -1052,21 +1086,28 @@ a.crow:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; }
 .imp-done .muted { font-size: 13px; }
 
 @media (max-width: 600px) {
-  .course__head { padding: 16px 14px 16px 18px; }
-  .course__tape { left: 16px; width: 46px; }
-  .course__mark { right: 56px; font-size: 44px; opacity: 0.07; }
-  .course__code { font-size: 21px; }
-  .course__body { margin: 0 14px 0 18px; }
+  .course__head { padding: 22px 14px 18px 20px; }
+  .course__head.has-name { padding-bottom: 12px; }
+  .course__tape { left: -6px; top: -9px; width: 68px; height: 22px; }
+  .course__mark { right: 58px; font-size: 44px; opacity: 0.08; transform: translateY(calc(-50% - 2px)); }
+  .course__code { font-size: 27px; }
+  .course__title { top: -2px; }
+  .course__name { font-size: 14px; }
+  .course__chev { width: 38px; height: 38px; }
+  .course__chev .i { font-size: 26px; }
+  .course__body { gap: 26px; margin: 0 14px 0 20px; }
+  .course__group h3 { gap: 10px; font-size: 19px; }
   /* 手機：日期放到名稱下面，比重在右邊置中 */
-  .crow {
+  .crows { --indent: 12px; margin: 0 -6px; }
+  .crow, .crows--weights .crow {
     grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title weight" "due weight";
-    align-items: center; gap: 3px 12px; padding: 10px 8px; margin: 0 -8px;
+    align-items: center; gap: 4px 12px; padding: 8.4px 6px 7.6px var(--indent);
   }
-  .crow__title { grid-area: title; }
-  .crow__due { grid-area: due; justify-self: start; text-align: left; font-size: 12.5px; }
-  .crow__weight { grid-area: weight; min-width: 36px; font-size: 15px; }
+  .crow__title { grid-area: title; font-size: 16px; }
+  .crow__due { grid-area: due; justify-self: start; text-align: left; font-size: 14.5px; }
+  .crow__weight { grid-area: weight; min-width: 36px; font-size: 16px; }
   .course__foot { flex-direction: column; align-items: stretch; }
-  .course__foot .btn { justify-content: center; }
+  .course__actions { flex-direction: column; align-items: stretch; gap: 4px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .course__body { animation: none; }

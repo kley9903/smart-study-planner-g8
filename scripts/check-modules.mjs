@@ -10,7 +10,7 @@ const { createMascot, TIMING } = await import('../dist/js/mascot.js');
 const { blockPopover, hatchPopover, busyForm } = await import('../dist/js/views/popovers.js');
 const { snap, paintRange } = await import('../dist/js/busy-paint.js');
 const { keepFile, fits, LIMIT_MB } = await import('../dist/js/attachments.js');
-const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse } = await import('../dist/js/store.js');
+const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, ui } = await import('../dist/js/store.js');
 const { toItems, rowText, report, checklist, parseDays, parseWhen, readSyllabus } = await import('../dist/js/syllabus-ai.js');
 const { setLang } = await import('../dist/js/i18n.js');
 const { onRequestPost } = await import('../functions/api/syllabus.js');
@@ -311,6 +311,28 @@ const doc8 = mine.docs.find((d) => d.id === 'doc-8');
 assert.deepEqual(doc8.items.map((i) => i.match?.kind), ['same', 'same'], 'same date without a time, or no date at all, adds nothing new');
 inkAllItems('doc-8');
 assert.deepEqual([mathTasks().length, finalTask2.due.min], [1, 840], 'the real time is not replaced by a placeholder');
+
+// Deleting a course removes its card, tasks, sessions and sources (also a source for it not confirmed yet); nothing else.
+addOwnDoc({ id: 'doc-9', name: 'math-quiz.txt', size: 1 });
+setOwnItems('doc-9', { course: 'MATH1001', items: [{ ...lab, id: 'm-quiz', plan: { ...lab.plan, title: 'Quiz 1' } }], notes: [] });
+mine.blocks.push({ id: 'b-math', task: finalTask2.id, step: finalTask2.steps[0].id, date: '2099-01-02', start: 600, end: 660 });
+finalTask2.attachments = [{ id: 'att-1', name: 'notes.pdf', size: 1 }];
+const otherTasks = mine.tasks.filter((t) => t.course !== math.id).length;
+ui.openCourse = math.id;
+const files = deleteCourse(math.id);
+assert.equal(mine.courses[math.id], undefined, 'the course card is gone');
+assert.deepEqual([mathTasks().length, mine.tasks.length], [0, otherTasks], 'its tasks are deleted; other courses keep theirs');
+assert.equal(mine.blocks.some((b) => b.id === 'b-math'), false, 'its sessions are deleted');
+assert.deepEqual(mine.docs.filter((d) => ['doc-5', 'doc-6', 'doc-7', 'doc-8', 'doc-9'].includes(d.id)), [], 'its sources are removed, including one not confirmed yet');
+assert.deepEqual(files.sort(), ['att-1', 'doc-5', 'doc-6', 'doc-7', 'doc-8', 'doc-9'], 'stored files for the page to remove from the browser');
+assert.equal(ui.openCourse, null);
+assert.ok(mine.docs.some((d) => d.id === 'doc-4') && physFinal.state === 'ink', 'another course is untouched');
+assert.deepEqual(deleteCourse('missing'), []);
+assert.ok(!Object.values(mine.courses).some((c) => c.ink === math.ink), 'its colour is free again');
+addOwnDoc({ id: 'doc-10', name: 'chem.pdf', size: 1 });
+setOwnItems('doc-10', { course: 'CHEM1001', items: [{ ...lab, id: 'c-lab' }], notes: [] });
+inkAllItems('doc-10');
+assert.equal(Object.values(mine.courses).find((c) => c.name === 'CHEM1001').ink, math.ink, 'a new course takes the freed colour instead of repeating one in use');
 
 // Server relay with a fake Dify: uploads the file, runs the workflow in streaming mode, unwraps the output.
 const sse = (events) => new Response(events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('event: ping\n\n'));

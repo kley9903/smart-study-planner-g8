@@ -9,6 +9,13 @@
   --rule: #e3dccf;
   --rule-2: #eee8dd;
   --margin-line: #e9b2a6;
+  /* 課程資料的科目卡：暖一點的紙、淡淡的紙紋、深褐色的字 */
+  --paper-warm: #fbf6ed;
+  --rule-warm: #e2d5c0;
+  --sepia: #3b332a;
+  --sepia-2: #5f5447;
+  --sepia-3: #8c8072;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E");
 
   /* 墨水（已確認）與鉛筆（AI 建議） */
   --ink: #1b2232;
