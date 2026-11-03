@@ -79,7 +79,7 @@ function freshUi() {
   return {
     hlTask: null, showGaps: false, day: DEMO_TODAY, docId: 'stat', taskId: 'ps4',
     editBusy: false, dockOpen: false, dockDismissed: [], hlRule: null, justInked: [], arrowFor: null,
-    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, addCourse: null, syllabusDraft: '', sleepEdit: false, dropMsg: '', guideOpen: false,
+    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
   };
 }
@@ -624,10 +624,16 @@ export function updateTask(id, fields, steps) {
   emit({ toast: changed ? L('已保存。尚未開始的安排已清除，請到本週重新排程並確認。', 'Saved. Unstarted sessions cleared; schedule again on Week and confirm.') : L('任務已保存', 'Task saved'), keepScroll: true });
 }
 
-/** 放入一份資料（大綱、公告或自己打的字），檔案本身存在瀏覽器。course：從某科的「補充資訊」進來時，這份資料固定屬於那一科。 */
-export function addOwnDoc({ id, name, size }, course = null) {
+/** 一份資料裡的檔案（存在瀏覽器）。一次放入幾個檔案加文字時有好幾份；以前的資料只有一份，id 就是資料本身的 id。 */
+export const partsOf = (doc) => doc.parts || [{ id: doc.id, name: doc.name, size: doc.size }];
+
+/**
+ * 放入一份資料。parts：一次放入的幾個檔案（加上打的字，存成 .txt），AI 會逐份讀，結果合成一份核對表。
+ * course：從某科的「補充資訊」進來時，這份資料固定屬於那一科。
+ */
+export function addOwnDoc({ id, name, size, parts }, course = null) {
   const c = course && state.courses[course];
-  state.docs.push({ id, name, size, own: true, pages: null, items: [], course: c ? c.id : null, courseName: c ? c.name : '' });
+  state.docs.push({ id, name, size, ...(parts ? { parts } : {}), own: true, pages: null, items: [], course: c ? c.id : null, courseName: c ? c.name : '' });
   ui.docId = id;
   emit({ toast: L(`已保存「${name}」`, `Saved "${name}"`), keepScroll: true });
 }
@@ -675,7 +681,7 @@ export function deleteCourse(id) {
   if (docs.some((d) => d.id === ui.docId)) ui.docId = null;
   if (gone.has(ui.taskId)) ui.taskId = null;
   emit({ toast: L(`已刪除「${c.name}」`, `Deleted ${c.name}`), toastIcon: 'x', keepScroll: true });
-  return [...docs.map((d) => d.id), ...tasks.flatMap((t) => (t.attachments || []).map((a) => a.id))];
+  return [...docs.flatMap((d) => partsOf(d).map((x) => x.id)), ...tasks.flatMap((t) => (t.attachments || []).map((a) => a.id))];
 }
 
 export function addTaskAttachment(taskId, metadata) {

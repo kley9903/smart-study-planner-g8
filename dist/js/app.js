@@ -3,9 +3,9 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, setTaskGroup,
+  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, setTaskGroup, partsOf,
 } from './store.js';
-import { readSyllabus, toItems, checklist, AI_MAX_MB } from './syllabus-ai.js';
+import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
 
 const REVEAL_STEP_MS = 450; // 檢查視窗逐行揭曉的間隔
 import { editor } from './views/task-editor.js';
@@ -371,12 +371,15 @@ const actions = {
   'open-doc': (el) => { ui.docId = el.dataset.doc; },
   'doc-remove': (el) => {
     if (!confirm(L('從這個瀏覽器移除這份大綱？', 'Remove this syllabus from this browser?'))) return;
-    removeAttachment(el.dataset.doc).catch(() => {});
+    const doc = getState().docs.find((d) => d.id === el.dataset.doc);
+    if (doc) partsOf(doc).forEach((x) => removeAttachment(x.id).catch(() => {}));
     removeOwnDoc(el.dataset.doc);
   },
   'syllabus-paste': async () => {
     const box = document.querySelector('[data-syllabus-text]');
     try {
+      const shots = await clipboardImages();
+      if (shots.length) { await takeFiles(shots); return; }
       const text = await navigator.clipboard.readText();
       if (!text.trim()) throw new Error('empty');
       ui.syllabusDraft = text;
@@ -391,16 +394,28 @@ const actions = {
   'syllabus-read': async () => {
     const text = ui.syllabusDraft.trim();
     if (ui.docReading) return;
-    if (text.length < 30) { toast(L('文字太短了，請貼上整份或整段大綱（至少 30 個字）。', 'That is too short. Paste the whole syllabus or a full section (30 characters or more).'), 'alert'); return; }
-    const line = text.split('\n')[0].replace(/[\\/:*?"<>|]/g, ' ').trim();
-    const first = (line.length > 40 ? line.slice(0, 40).replace(/\s+\S*$/, '') : line).replace(/[\s.,;:，。；：]+$/, '') || L('貼上的大綱', 'Pasted syllabus');
-    let saved;
-    try {
-      saved = await keepFile(new File([text], `${first}.txt`, { type: 'text/plain' }), LIMIT_MB.syllabus);
-    } catch (err) { toast(fileProblem(err, { name: first }), 'alert'); return; }
+    if (!text && !ui.basket.length) { toast(L('先打幾個字、貼上文字，或放入檔案。', 'Type or paste something, or add a file, first.'), 'alert'); return; }
+    // 收集箱裡的檔案加上打的字（存成 .txt）合成一份資料，AI 逐份讀，結果合成一份核對表
+    const parts = [...ui.basket];
+    if (text) {
+      const line = text.split('\n')[0].replace(/[\\/:*?"<>|]/g, ' ').trim();
+      const first = (line.length > 40 ? line.slice(0, 40).replace(/\s+\S*$/, '') : line).replace(/[\s.,;:，。；：]+$/, '') || L('貼上的大綱', 'Pasted syllabus');
+      try {
+        parts.push(await keepFile(new File([text], `${first}.txt`, { type: 'text/plain' }), LIMIT_MB.syllabus));
+      } catch (err) { toast(fileProblem(err, { name: first }), 'alert'); return; }
+    }
+    const one = parts.length === 1;
+    const doc = { id: one ? parts[0].id : crypto.randomUUID(), size: parts.reduce((n, x) => n + (x.size || 0), 0),
+      name: one ? parts[0].name : L(`${parts[0].name} 等 ${parts.length} 份`, `${parts[0].name} and ${parts.length - 1} more`), ...(one ? {} : { parts }) };
     ui.syllabusDraft = '';
-    addOwnDoc(saved, ui.addCourse);
-    actions['doc-read']({ dataset: { doc: saved.id } });
+    ui.basket = [];
+    addOwnDoc(doc, ui.addCourse);
+    actions['doc-read']({ dataset: { doc: doc.id } });
+  },
+  'basket-remove': (el) => {
+    ui.basket = ui.basket.filter((f) => f.id !== el.dataset.fileId);
+    removeAttachment(el.dataset.fileId).catch(() => {});
+    render();
   },
   'doc-read': async (el) => {
     const id = el.dataset.doc;
@@ -410,18 +425,34 @@ const actions = {
     ui.aiModal = { doc: id, phase: 'run', fresh: true };
     render();
     try {
-      const file = await getAttachment(id);
-      if (!file) throw Object.assign(new Error('missing'), { reason: 'missing' });
       const doc = getState().docs.find((d) => d.id === id);
       const course = doc?.course && getState().courses[doc.course];
       // 補充某一科時，告訴 AI 這份資料屬於哪一科（短短一段公告也認得出）
       const context = course ? `這份資料屬於 ${course.name}${course.title ? `（${course.title}）` : ''}。` : '';
-      const found = toItems(await readSyllabus(file, { context, onStage: (stage) => { ui.readStage = stage; render(); } }));
+      const parts = partsOf(doc);
+      const found = [];
+      let failed = null;
+      for (const [n, part] of parts.entries()) {
+        ui.readPart = parts.length > 1 ? { n: n + 1, of: parts.length, name: part.name } : null;
+        ui.readStage = 'read';
+        render();
+        try {
+          const file = await getAttachment(part.id);
+          if (!file) throw Object.assign(new Error('missing'), { reason: 'missing' });
+          found.push(toItems(await readSyllabus(file, { context, onStage: (stage) => { ui.readStage = stage; render(); } })));
+        } catch (err) {
+          failed = err;
+          found.push({ course: '', items: [], weightTotal: null, notes: [{ kind: 'other', text: L(`「${part.name}」讀不到：${readProblem(err)}`, `Could not read "${part.name}": ${readProblem(err)}`) }] });
+        }
+      }
+      ui.readPart = null;
+      if (failed && found.every((f) => !f.items.length && f.notes.length === 1)) throw failed; // 全部都讀不到
       ui.docReading = null;
-      setOwnItems(id, found);
+      setOwnItems(id, mergeFound(found));
       revealChecks(id);
     } catch (err) {
       ui.docReading = null;
+      ui.readPart = null;
       ui.aiModal = null;
       render();
       toast(readProblem(err), 'alert');
@@ -741,7 +772,8 @@ document.addEventListener('input', (e) => {
   if (e.target.matches('[data-syllabus-text]')) {
     ui.syllabusDraft = e.target.value;
     const count = document.querySelector('[data-syllabus-count]');
-    if (count) count.textContent = L(`${e.target.value.length} 字`, `${e.target.value.length} characters`);
+    const n = ui.basket.length;
+    if (count) count.textContent = L(`${e.target.value.length} 字`, `${e.target.value.length} characters`) + (n ? L(` · ${n} 個檔案`, ` · ${n} file${n === 1 ? '' : 's'}`) : '');
   }
 });
 
@@ -769,12 +801,14 @@ function revealChecks(id) {
 }
 
 const readProblem = (err) => ({
-  'too-big': L(`AI 只能讀 ${AI_MAX_MB} MB 以內的檔案，請先壓縮或只放有日期的那幾頁。`, `The AI can only read files up to ${AI_MAX_MB} MB. Compress it or keep only the pages with dates.`),
+  'too-big': err.image
+    ? L(`AI 只能讀 ${AI_IMAGE_MAX_MB} MB 以內的圖片，請截小一點或壓縮後再放。`, `The AI can only read images up to ${AI_IMAGE_MAX_MB} MB. Crop or compress it first.`)
+    : L(`AI 只能讀 ${AI_MAX_MB} MB 以內的檔案，請先壓縮或只放有日期的那幾頁。`, `The AI can only read files up to ${AI_MAX_MB} MB. Compress it or keep only the pages with dates.`),
   missing: L('讀不到這份檔案，請重新放入原檔。', 'Cannot read this file. Add the original again.'),
   offline: L('連不上 AI，請檢查網絡後再試。', 'Cannot reach the AI. Check your connection and try again.'),
   'no-key': L('AI 還沒在伺服器設定好（缺少 DIFY_API_KEY）。', 'The AI is not set up on the server yet (DIFY_API_KEY is missing).'),
   'no-server': L('這個網址沒有 AI 轉接服務。請用 node serve.mjs 預覽，或在已發布的網站使用。', 'No AI relay at this address. Preview with node serve.mjs or use the published site.'),
-  invalid: L('AI 讀不出課程資料。如果是掃描圖片，請換成可以選取文字的 PDF 或 Word。', 'The AI found no course data. If it is a scanned image, use a PDF or Word file with selectable text.'),
+  invalid: L('AI 讀不出課程資料。如果是圖片，請確認字夠清楚；掃描的 PDF 可以改成截圖放入。', 'The AI found no course data. If it is an image, make sure the text is sharp; for a scanned PDF, add screenshots instead.'),
 }[err.reason] || L('AI 讀取失敗，請稍後再試。', 'The AI could not read it. Try again later.'));
 
 async function saveGuides(taskId, files) {
@@ -785,18 +819,44 @@ async function saveGuides(taskId, files) {
   }
 }
 
+/** 剪貼簿裡的圖片（例如剛截的圖），變成有檔名的 File；讀不到（瀏覽器不准）就回傳空陣列。 */
+async function clipboardImages() {
+  if (!navigator.clipboard?.read) return [];
+  try {
+    const out = [];
+    for (const item of await navigator.clipboard.read()) {
+      const type = item.types.find((t) => t.startsWith('image/'));
+      if (type) out.push(namedShot(await item.getType(type)));
+    }
+    return out;
+  } catch { return []; }
+}
+const namedShot = (blob, i = 0) => new File([blob], `${L('截圖', 'Screenshot')} ${new Date().toTimeString().slice(0, 8).replaceAll(':', '')}${i ? `-${i + 1}` : ''}.${(blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg')}`, { type: blob.type || 'image/png' });
+
+// 在收集頁按 Ctrl+V／⌘V 貼上截圖：圖片放進收集箱；貼的是文字就照舊進文字框
+document.addEventListener('paste', (e) => {
+  if (getMode() !== 'mine' || current.name !== 'import' || current.params?.[0] !== 'add') return;
+  const shots = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
+  if (!shots.length) return;
+  e.preventDefault();
+  takeFiles(shots.map((f, i) => (f.name && f.name !== 'image.png' ? f : namedShot(f, i))));
+});
+
 async function takeFiles(files) {
   const names = [...files].map((f) => f.name).join('、');
   if (!names) return;
   if (getMode() === 'mine' && current.name === 'import') {
     for (const file of files) {
+      if (!/[.](pdf|docx|pptx|txt|md|jpe?g|png|gif|webp)$/i.test(file.name)) { toast(L(`「${file.name}」不是 PDF、Word、PPT、文字檔或圖片（JPG、PNG、WEBP），沒有放入。`, `"${file.name}" is not a PDF, Word, PowerPoint, text file or image (JPG, PNG, WEBP), so it was skipped.`), 'alert'); continue; }
       try {
-        addOwnDoc(await keepFile(file, LIMIT_MB.syllabus), ui.addCourse);
+        ui.basket.push(await keepFile(file, LIMIT_MB.syllabus));
       } catch (err) {
         toast(fileProblem(err, file), 'alert');
-        if (err.reason !== 'too-big') return; // 太大的跳過，存不進去就停
+        if (err.reason !== 'too-big') break; // 太大的跳過，存不進去就停
       }
     }
+    if (current.params?.[0] !== 'add') location.hash = '#/import/add';
+    render();
     return;
   }
   ui.dropMsg = `收到檔名「${names}」。原型不會上傳或讀取內容，會改用示範大綱。`;

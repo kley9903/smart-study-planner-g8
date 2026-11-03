@@ -3,12 +3,16 @@
 // 自己的計劃：#/import 是科目列表（views/courses.js）；#/import/add 是收集資料的頁面——貼上文字或放入 PDF／Word，
 // 經 syllabus-ai.js 交給 Dify 工作流程，核對確認後才放進科目、變成任務。可以分幾次加。
 import { esc, icon } from '../ui.js';
-import { ui, getMode } from '../store.js';
+import { ui, getMode, partsOf } from '../store.js';
 import { L } from '../i18n.js';
-import { AI_MAX_MB, rowText, report, checklist, STAGES, stageLabel } from '../syllabus-ai.js';
+import { AI_MAX_MB, AI_IMAGE_MAX_MB, rowText, report, checklist, STAGES, stageLabel } from '../syllabus-ai.js';
 import { coursesPage } from './courses.js';
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const PPTX = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+const ACCEPT = `.pdf,.docx,.pptx,.txt,.md,.jpg,.jpeg,.png,.webp,.gif,application/pdf,${DOCX},${PPTX},text/plain,image/jpeg,image/png,image/webp,image/gif`;
+/** AI 正在讀第幾份（一次放入幾個檔案時） */
+const partNote = () => (ui.readPart ? L(`第 ${ui.readPart.n}／${ui.readPart.of} 份：${ui.readPart.name}`, `File ${ui.readPart.n} of ${ui.readPart.of}: ${ui.readPart.name}`) : '');
 
 export function render(s, params = []) {
   const mine = getMode() === 'mine';
@@ -41,7 +45,7 @@ export function render(s, params = []) {
         <section class="sheet imp-how" aria-label="${L('流程', 'How it works')}">
           <h2>${L('大綱怎樣變成計劃', 'From syllabus to plan')}</h2>
           ${mine ? `<ol class="how-list">
-            <li><span class="how-list__n">1</span><span><b>${L('放入資料', 'Add information')}</b><br>${L('大綱、公告或自己打字，PDF、Word、文字都可以；不用一次齊全。', 'A syllabus, an announcement or your notes, as PDF, Word or text; it does not have to be complete.')}</span></li>
+            <li><span class="how-list__n">1</span><span><b>${L('放入資料', 'Add information')}</b><br>${L('大綱、公告、簡報、截圖或自己打字，PDF、Word、PPT、圖片、文字都可以，可以一次放幾個；不用一次齊全。', 'A syllabus, an announcement, slides, a screenshot or your notes, as PDF, Word, PowerPoint, image or text, several at once; it does not have to be complete.')}</span></li>
             <li><span class="how-list__n">2</span><span><b>${L('AI 找出項目（未確認）', 'AI finds items (not confirmed)')}</b><br>${L('功課、測驗、考試的日期和比重，附原文出處；沒寫清楚的會講明。', 'Dates and weights of assignments, quizzes and exams, with the original wording; it says what is unclear.')}</span></li>
             <li><span class="how-list__n">3</span><span><b>${L('你確認', 'You confirm')}</b><br>${L('確認的才放進科目、變成任務；科目裡已有的不會重複加入。', 'Only confirmed items go into the course and become tasks; anything already there is not added twice.')}</span></li>
             <li><span class="how-list__n">4</span><span><b>${L('排溫習時間', 'Plan revision time')}</b><br>${L('到「本週」產生建議，確認了才會生效。', 'Generate suggestions on This week; they apply only after you confirm.')}</span></li>
@@ -93,7 +97,7 @@ function aiModal(s) {
           <div>
             <p class="ai-modal__eyebrow">${L('AI 核對', 'AI check')} · ${settled} / ${rows.length}</p>
             <h2 class="ai-modal__title" id="ai-modal-title">${done ? L('核對完成', 'Check complete') : L('正在逐項核對大綱', 'Checking the syllabus')}</h2>
-            <p class="ai-modal__file">${icon('file')}<span>${esc(doc.name)}</span></p>
+            <p class="ai-modal__file">${icon('file')}<span>${esc(m.phase === 'run' && ui.readPart ? partNote() : doc.name)}</span></p>
           </div>
           <button class="ai-modal__close" type="button" data-action="ai-modal-close" aria-label="${L('關閉', 'Close')}">${icon('x')}</button>
         </header>
@@ -146,22 +150,30 @@ function findings(doc, animate) {
         </div>`;
 }
 
-/** 自己的計劃：可以直接打字／貼上大綱文字，也可以放入檔案。框是空的時候中間顯示「貼上」「上傳檔案」。 */
+/**
+ * 自己的計劃：收集箱。可以打字／貼上文字，也可以一次放入幾個檔案（PDF、Word、PPT），短短一句也可以。
+ * 放入的檔案列在框下方，按「用 AI 找出項目」時 AI 逐份讀，合成一份給你核對。框是空的時候中間顯示「貼上」「上傳檔案」。
+ */
 function pasteBox() {
+  const files = ui.basket;
   return `
-        <div class="drop paste" data-drop>
+        <div class="drop paste ${files.length ? 'has-files' : ''}" data-drop>
           <label class="sr-only" for="syllabus-text">${L('課程大綱文字', 'Syllabus text')}</label>
           <textarea class="paste__text" id="syllabus-text" data-syllabus-text maxlength="80000"
-            placeholder="${L('在這裡貼上或輸入課程大綱的文字，或把 PDF／Word 檔拖進來', 'Paste or type your syllabus text here, or drop a PDF or Word file')}">${esc(ui.syllabusDraft)}</textarea>
+            placeholder="${L('打字或貼上文字，一句也可以；或把幾個 PDF、Word、PPT、公告截圖一起拖進來', 'Type or paste text, even one line, or drop several PDF, Word or PowerPoint files or screenshots')}">${esc(ui.syllabusDraft)}</textarea>
           <div class="paste__start">
             <div class="drop__actions">
               <button class="btn" type="button" data-action="syllabus-paste">${icon('clip')} ${L('貼上', 'Paste here')}</button>
-              <label class="btn">${icon('upload')} ${L('上傳檔案', 'Upload file')}<input type="file" accept=".pdf,.docx,application/pdf,${DOCX}" multiple hidden data-file></label>
+              <label class="btn">${icon('upload')} ${L('上傳檔案', 'Upload files')}<input type="file" accept="${ACCEPT}" multiple hidden data-file></label>
             </div>
-            <p class="drop__sub">${L(`檔案保存在這個瀏覽器（每份最多 20 MB）。按「用 AI 找出項目」時才會交給 AI 讀（檔案最多 ${AI_MAX_MB} MB）。`, `Files are kept in this browser (up to 20 MB each). Nothing goes to the AI until you press "Find items with AI" (files up to ${AI_MAX_MB} MB).`)}</p>
+            <p class="drop__sub">${L(`可以一次放幾個檔案（PDF、Word、PPT、公告截圖或相片），再加上自己打的字；截圖可以直接按 Ctrl+V 貼上。AI 會逐份讀，合成一份給你核對。檔案保存在這個瀏覽器（每份最多 20 MB；交給 AI 的檔案最多 ${AI_MAX_MB} MB，圖片最多 ${AI_IMAGE_MAX_MB} MB）。`, `Add several files at once (PDF, Word, PowerPoint, screenshots or photos), plus your own text; paste a screenshot with Ctrl+V. The AI reads each one and puts the results together for you to check. Files stay in this browser (up to 20 MB each; for the AI, files up to ${AI_MAX_MB} MB and images up to ${AI_IMAGE_MAX_MB} MB).`)}</p>
           </div>
+          ${files.length ? `<ul class="paste__files" aria-label="${L('已放入的檔案', 'Files added')}">${files.map((f) => `
+            <li class="paste__file">${icon(/[.](jpe?g|png|gif|webp)$/i.test(f.name) ? 'eye' : 'file')}<span>${esc(f.name)}</span><button type="button" class="paste__x" data-action="basket-remove" data-file-id="${f.id}" aria-label="${L(`移除 ${esc(f.name)}`, `Remove ${esc(f.name)}`)}">${icon('x')}</button></li>`).join('')}
+          </ul>` : ''}
           <div class="paste__bar">
-            <span class="paste__count" data-syllabus-count>${L(`${ui.syllabusDraft.length} 字`, `${ui.syllabusDraft.length} characters`)}</span>
+            <span class="paste__count" data-syllabus-count>${L(`${ui.syllabusDraft.length} 字`, `${ui.syllabusDraft.length} characters`)}${files.length ? L(` · ${files.length} 個檔案`, ` · ${files.length} file${files.length === 1 ? '' : 's'}`) : ''}</span>
+            <label class="btn btn--ghost btn--sm">${icon('plus')} ${L('加檔案', 'Add files')}<input type="file" accept="${ACCEPT}" multiple hidden data-file></label>
             <button class="btn btn--ghost btn--sm" type="button" data-action="syllabus-clear">${icon('x')} ${L('清除', 'Clear')}</button>
             <button class="btn btn--ink" type="button" data-action="syllabus-read" ${ui.docReading ? 'disabled' : ''}>${icon('eye')} ${L('用 AI 找出項目', 'Find items with AI')}</button>
           </div>
@@ -178,7 +190,7 @@ function readingSteps() {
               ${STAGES.map((st, i) => `<li class="ai-step ${i < now ? 'is-done' : i === now ? 'is-now' : ''}">
                 <span class="ai-step__mark">${i < now ? icon('check') : ''}</span>${stageLabel(st)}${i === now ? '…' : ''}</li>`).join('')}
             </ol>
-            <p class="muted">${L('通常要半分鐘到一分鐘，可以先做別的事。', 'This usually takes 30–60 seconds. You can do other things meanwhile.')}</p>
+            <p class="muted">${partNote() ? `${esc(partNote())}。` : ''}${L('每份通常要半分鐘到一分鐘，可以先做別的事。', 'Each file usually takes 30–60 seconds. You can do other things meanwhile.')}</p>
           </div>`;
 }
 
@@ -192,8 +204,10 @@ function reportCard(doc) {
 }
 
 function ownPanel(doc) {
-  const typed = /\.txt$/i.test(doc.name);
-  const what = typed ? L('你貼上或打的文字', 'Text you pasted or typed') : doc.size ? `${Math.max(0.1, doc.size / 1048576).toFixed(1)} MB` : '';
+  const parts = partsOf(doc);
+  const typed = parts.length === 1 && /[.]txt$/i.test(doc.name);
+  const size = doc.size ? `${Math.max(0.1, doc.size / 1048576).toFixed(1)} MB` : '';
+  const what = typed ? L('你貼上或打的文字', 'Text you pasted or typed') : parts.length > 1 ? L(`${parts.length} 份資料`, `${parts.length} files`) + (size ? ` · ${size}` : '') : size;
   return `
     <section class="sheet review own-doc" id="review" aria-label="${esc(doc.name)}">
       <header class="review__head">
@@ -202,11 +216,14 @@ function ownPanel(doc) {
           <p>${what} · ${L('保存在這個瀏覽器', 'Saved in this browser')}</p>
         </div>
         <div class="own-doc__acts">
-          <button class="btn" type="button" data-action="file-download" data-file-id="${doc.id}">${icon('file')} ${L('打開檔案', 'Open file')}</button>
+          ${parts.length > 1 ? '' : `<button class="btn" type="button" data-action="file-download" data-file-id="${parts[0].id}">${icon('file')} ${L('打開檔案', 'Open file')}</button>`}
           <button class="btn btn--ghost" type="button" data-action="doc-remove" data-doc="${doc.id}">${icon('x')} ${L('移除', 'Remove')}</button>
         </div>
       </header>
       <div class="own-doc__body">
+        ${parts.length > 1 ? `<ul class="own-doc__parts">${parts.map((x) => `
+          <li><button class="own-doc__part" type="button" data-action="file-download" data-file-id="${x.id}">${icon('file')}<span>${esc(x.name)}</span></button></li>`).join('')}
+        </ul>` : ''}
         <div class="own-doc__ai">
           ${ui.docReading === doc.id
             ? readingSteps()

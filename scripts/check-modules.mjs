@@ -10,8 +10,8 @@ const { createMascot, TIMING } = await import('../dist/js/mascot.js');
 const { blockPopover, hatchPopover, busyForm } = await import('../dist/js/views/popovers.js');
 const { snap, paintRange } = await import('../dist/js/busy-paint.js');
 const { keepFile, fits, LIMIT_MB } = await import('../dist/js/attachments.js');
-const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, setTaskGroup, ui } = await import('../dist/js/store.js');
-const { toItems, rowText, report, checklist, parseDays, parseWhen, readSyllabus } = await import('../dist/js/syllabus-ai.js');
+const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, setTaskGroup, partsOf, ui } = await import('../dist/js/store.js');
+const { toItems, mergeFound, rowText, report, checklist, parseDays, parseWhen, readSyllabus } = await import('../dist/js/syllabus-ai.js');
 const { setLang } = await import('../dist/js/i18n.js');
 const { onRequestPost } = await import('../functions/api/syllabus.js');
 
@@ -216,6 +216,15 @@ assert.equal(found.weightTotal, 100);
   });
   assert.deepEqual(dify.notes.map((n) => n.kind), ['weight', 'other', 'check', 'weight', 'date', 'other']);
 
+  // Several files added at once are read one by one and put together into one list to check.
+  const fromSlides = { course: '', items: [{ ...final, id: 'x1' }, { ...a1, id: 'x2', weight: '' }], notes: [{ kind: 'other', text: 'Slides only' }], weightTotal: null };
+  const fromNote = { course: 'COMP1010', courseTitle: 'Intro', items: [{ ...final, id: 'y1', plan: { ...final.plan, date: '2026-12-15', min: 540 }, flag: null }, { ...a1, id: 'y2', weight: '20%' }], notes: [], weightTotal: 100 };
+  const merged = mergeFound([fromSlides, fromNote]);
+  assert.deepEqual(merged.items.map((i) => [i.plan.title, i.plan.date, i.weight]), [['Final exam', '2026-12-15', final.weight], ['Assignment 1', '2026-11-20', '20%']], 'one row per item: the dated final wins, the missing weight is filled in');
+  assert.deepEqual([merged.course, merged.courseTitle, merged.weightTotal, merged.notes.length], ['COMP1010', 'Intro', 100, 1]);
+  assert.equal(new Set(merged.items.map((i) => i.id)).size, 2);
+  assert.deepEqual(partsOf({ id: 'd', name: 'a.pdf', size: 3 }), [{ id: 'd', name: 'a.pdf', size: 3 }], 'older sources are one file with the source id');
+
   // The report lists only what needs checking, grouped; a repeated note is shown once with a count.
   const notes = [
     { kind: 'weight', text: 'No weight published' }, { kind: 'weight', text: 'No weight published' }, { kind: 'weight', text: 'No weight published' },
@@ -334,7 +343,7 @@ inkAllItems('doc-8');
 assert.deepEqual([mathTasks().length, finalTask2.due.min], [1, 840], 'the real time is not replaced by a placeholder');
 
 // Deleting a course removes its card, tasks, sessions and sources (also a source for it not confirmed yet); nothing else.
-addOwnDoc({ id: 'doc-9', name: 'math-quiz.txt', size: 1 });
+addOwnDoc({ id: 'doc-9', name: 'math-quiz.txt and 1 more', size: 2, parts: [{ id: 'f-a', name: 'math-quiz.txt', size: 1 }, { id: 'f-b', name: 'slides.pptx', size: 1 }] });
 setOwnItems('doc-9', { course: 'MATH1001', items: [{ ...lab, id: 'm-quiz', plan: { ...lab.plan, title: 'Quiz 1' } }], notes: [] });
 mine.blocks.push({ id: 'b-math', task: finalTask2.id, step: finalTask2.steps[0].id, date: '2099-01-02', start: 600, end: 660 });
 finalTask2.attachments = [{ id: 'att-1', name: 'notes.pdf', size: 1 }];
@@ -345,7 +354,7 @@ assert.equal(mine.courses[math.id], undefined, 'the course card is gone');
 assert.deepEqual([mathTasks().length, mine.tasks.length], [0, otherTasks], 'its tasks are deleted; other courses keep theirs');
 assert.equal(mine.blocks.some((b) => b.id === 'b-math'), false, 'its sessions are deleted');
 assert.deepEqual(mine.docs.filter((d) => ['doc-5', 'doc-6', 'doc-7', 'doc-8', 'doc-9'].includes(d.id)), [], 'its sources are removed, including one not confirmed yet');
-assert.deepEqual(files.sort(), ['att-1', 'doc-5', 'doc-6', 'doc-7', 'doc-8', 'doc-9'], 'stored files for the page to remove from the browser');
+assert.deepEqual(files.sort(), ['att-1', 'doc-5', 'doc-6', 'doc-7', 'doc-8', 'f-a', 'f-b'], 'stored files for the page to remove from the browser');
 assert.equal(ui.openCourse, null);
 assert.ok(mine.docs.some((d) => d.id === 'doc-4') && physFinal.state === 'ink', 'another course is untouched');
 assert.deepEqual(deleteCourse('missing'), []);
@@ -391,6 +400,22 @@ assert.equal(calls[0].url, 'https://api.dify.ai/v1/files/upload');
 assert.equal(calls[0].init.headers.Authorization, 'Bearer k');
 assert.deepEqual(JSON.parse(calls[1].init.body).inputs.document, { type: 'document', transfer_method: 'local_file', upload_file_id: 'file-9' });
 assert.equal(JSON.parse(calls[1].init.body).response_mode, 'streaming');
+// An image (screenshot or photo of a notice) goes to the workflow's image input; the OCR step still counts as reading.
+calls.length = 0;
+const ocrDify = async (url, init) => {
+  calls.push({ url, init });
+  if (url.endsWith('/files/upload')) return Response.json({ id: 'img-1' });
+  return sse([{ event: 'workflow_started' }, node('start'), node('if-else'), { event: 'node_started', data: { node_type: 'llm', title: '圖片文字辨識' } }, node('llm'), node('code'), node('end'),
+    { event: 'workflow_finished', data: { status: 'succeeded', outputs: { result: JSON.stringify({ valid: true, data: sample, errors: [] }) } } }]);
+};
+const withImage = (size = 4) => { const f = new FormData(); f.append('file', new File([new Uint8Array(size)], 'notice.png', { type: 'image/png' })); return f; };
+res = await onRequestPost({ request: post(withImage()), env: { DIFY_API_KEY: 'k' }, fetcher: ocrDify });
+all = await lines(res);
+const imgInputs = JSON.parse(calls[1].init.body).inputs;
+assert.deepEqual([imgInputs.image, imgInputs.document], [{ type: 'image', transfer_method: 'local_file', upload_file_id: 'img-1' }, undefined], 'an image goes to the image input, not document');
+assert.deepEqual(all.slice(0, -1).map((l) => l.stage), ['read', 'extract', 'check', 'tidy'], 'reading the image is part of "read", not "extract"');
+res = await onRequestPost({ request: post(withImage(11 * 1024 * 1024)), env: { DIFY_API_KEY: 'k' }, fetcher: ocrDify });
+assert.equal(res.status, 413, 'images over 10 MB are refused');
 res = await onRequestPost({ request: post(withFile()), env: {}, fetcher: fakeDify });
 assert.deepEqual([res.status, (await res.json()).reason], [503, 'no-key']);
 res = await onRequestPost({ request: post(withFile(), { Origin: 'https://evil.test' }), env: { DIFY_API_KEY: 'k' }, fetcher: fakeDify });

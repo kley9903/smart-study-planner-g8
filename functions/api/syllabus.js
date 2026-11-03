@@ -1,5 +1,5 @@
 // Cloudflare Pages Function: POST /api/syllabus
-// 把使用者的大綱（PDF／Word 檔，或文字）交給 Dify「課程資料整理｜Study Planner」工作流程，回傳它整理好的 JSON。
+// 把使用者的大綱（PDF／Word 檔、公告圖片，或文字）交給 Dify「課程資料整理｜Study Planner」工作流程，回傳它整理好的 JSON。
 // API 金鑰只在伺服器端：Cloudflare Pages 的環境變數 DIFY_API_KEY（本機預覽用同名環境變數）。
 //
 // 輸入有問題時直接回 JSON：{ ok: false, reason: 'no-key' | 'bad-input' | 'too-big', message }。
@@ -8,8 +8,11 @@
 //   { ok: true, result: { course, tasks, course_events, facts, missing_information, warnings, ... } }   最後一行
 //   或 { ok: false, reason: 'dify' | 'invalid', message }
 const MAX_MB = 15; // Dify 雲端的單檔上限
+const IMAGE_MAX_MB = 10; // Dify 雲端的圖片上限
+/** 圖片送到工作流程的 image 欄位（先經「圖片文字辨識」抄出文字），其他檔案送到 document。 */
+const isImage = (file) => /^image[/]/.test(file.type || '') || /[.](jpe?g|png|gif|webp)$/i.test(file.name || '');
 const USER = 'study-planner-web';
-/** Dify 節點類型 → 網頁上的步驟 */
+/** Dify 節點類型 → 網頁上的步驟（圖片文字辨識雖然是 llm，但仍算「讀取」） */
 const STAGE = {
   start: 'read', 'if-else': 'read', 'variable-aggregator': 'read', 'document-extractor': 'read',
   llm: 'extract', code: 'check', 'template-transform': 'tidy', end: 'tidy',
@@ -35,7 +38,8 @@ export async function onRequestPost({ request, env, waitUntil, fetcher = fetch }
   const context = String(form.get('context') || '').slice(0, 20000);
   const hasFile = file && typeof file === 'object' && file.size > 0;
   if (!hasFile && !text.trim()) return fail(400, 'bad-input', 'Send a file or some text');
-  if (hasFile && file.size > MAX_MB * 1024 * 1024) return fail(413, 'too-big', `Files over ${MAX_MB} MB are not accepted`);
+  const limit = hasFile && isImage(file) ? IMAGE_MAX_MB : MAX_MB;
+  if (hasFile && file.size > limit * 1024 * 1024) return fail(413, 'too-big', `Files over ${limit} MB are not accepted`);
 
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
@@ -60,7 +64,8 @@ async function run({ base, key, file, inputs, fetcher, send }) {
     const res = await fetcher(`${base}/files/upload`, { method: 'POST', headers: auth, body: upload });
     if (!res.ok) return { ok: false, reason: 'dify', message: `File upload failed (${res.status}): ${(await res.text()).slice(0, 300)}` };
     const { id } = await res.json();
-    inputs.document = { type: 'document', transfer_method: 'local_file', upload_file_id: id };
+    const kind = isImage(file) ? 'image' : 'document';
+    inputs[kind] = { type: kind, transfer_method: 'local_file', upload_file_id: id };
   }
   // 用 streaming 讀到 workflow_finished：長的大綱可能超過 blocking 模式的等待上限，也能一路回報步驟。
   const res = await fetcher(`${base}/workflows/run`, {
@@ -71,7 +76,8 @@ async function run({ base, key, file, inputs, fetcher, send }) {
   if (!res.ok) return { ok: false, reason: 'dify', message: `Workflow failed to start (${res.status}): ${(await res.text()).slice(0, 300)}` };
   let stage = 'read';
   const finished = await readEvents(res.body, async (msg) => {
-    const next = msg.event === 'node_started' && STAGE[msg.data?.node_type];
+    const ocr = msg.data?.node_type === 'llm' && /圖片|image|ocr/i.test(msg.data?.title || '');
+    const next = msg.event === 'node_started' && (ocr ? 'read' : STAGE[msg.data?.node_type]);
     if (next && next !== stage) { stage = next; await send({ stage }); }
   });
   if (!finished) return { ok: false, reason: 'dify', message: 'The workflow ended without a result' };

@@ -4,6 +4,7 @@ import { L } from './i18n.js';
 
 /** 伺服器（Dify 雲端）接受的單檔上限 */
 export const AI_MAX_MB = 15;
+export const AI_IMAGE_MAX_MB = 10; // 圖片（公告截圖、相片）：Dify 先逐字抄出文字再整理
 
 /** AI 讀大綱的步驟，順序同伺服器送來的 stage */
 export const STAGES = ['read', 'extract', 'check', 'tidy'];
@@ -15,13 +16,14 @@ export const stageLabel = (stage) => ({
 }[stage]);
 
 /**
- * 把大綱檔案交給 AI 整理（貼上的文字存成 .txt，以文字送出）。onStage(stage) 在 AI 走到下一步時呼叫。
+ * 把大綱檔案交給 AI 整理（貼上的文字存成 .txt，以文字送出；圖片由伺服器交給工作流程的圖片欄位）。onStage(stage) 在 AI 走到下一步時呼叫。
  * 成功回傳 Dify 的課程 JSON；失敗丟出帶 reason 的錯誤：'too-big'、'no-key'（伺服器未設定金鑰）、'offline'、'dify'、'invalid'。
  */
 export async function readSyllabus(file, { fetcher = fetch, onStage = () => {}, context = '' } = {}) {
-  if (file.size > AI_MAX_MB * 1024 * 1024) throw Object.assign(new Error('too big'), { reason: 'too-big' });
+  const image = (file.type || '').startsWith('image/');
+  if (file.size > (image ? AI_IMAGE_MAX_MB : AI_MAX_MB) * 1024 * 1024) throw Object.assign(new Error('too big'), { reason: 'too-big', image });
   const body = new FormData();
-  if (file.type.startsWith('text/')) body.append('text', await file.text());
+  if ((file.type || '').startsWith('text/')) body.append('text', await file.text());
   else body.append('file', file, file.name);
   if (context) body.append('context', context);
   let res;
@@ -170,6 +172,33 @@ export function toItems(result) {
   ].filter((n) => n.text);
   const weights = (r.assessment_components || []).map((c) => c.weight_percent).filter((w) => typeof w === 'number');
   return { course, courseTitle: r.course?.code && r.course?.name ? r.course.name : '', items, notes, weightTotal: weights.length ? weights.reduce((a, b) => a + b, 0) : null };
+}
+
+/**
+ * 一次放入的幾份資料（幾個檔案加打的字）各自讀完，合成一份給你核對：
+ * 同名的功課、測驗、考試只留一項——有日期的勝過沒日期的，有時間的勝過沒時間的，缺的比重用另一份補上；
+ * 提醒全部保留（報告會把重複的合起來）。科目代號、全名和比重合計用第一份有寫的。
+ */
+export function mergeFound(list) {
+  const out = { course: '', courseTitle: '', items: [], notes: [], weightTotal: null };
+  const key = (it) => (it.plan?.kind === 'task' ? String(it.plan.title || '').toLowerCase().split(' ').join('') : null);
+  const score = (it) => (it.plan?.date ? 2 : 0) + (it.plan?.date && it.flag !== 'no-time' ? 1 : 0);
+  list.forEach((found, n) => {
+    out.course ||= found.course || '';
+    out.courseTitle ||= found.courseTitle || '';
+    if (out.weightTotal == null) out.weightTotal = found.weightTotal ?? null;
+    out.notes.push(...(found.notes || []));
+    for (const it of found.items || []) {
+      const item = { ...it, id: `p${n}-${it.id}` };
+      const at = key(item) ? out.items.findIndex((x) => key(x) === key(item)) : -1;
+      if (at < 0) { out.items.push(item); continue; }
+      const kept = out.items[at];
+      const [best, other] = score(item) > score(kept) ? [item, kept] : [kept, item];
+      if (!best.weight && other.weight) best.weight = other.weight;
+      out.items[at] = best;
+    }
+  });
+  return out;
 }
 
 const EXAMS = new Set(['exam', 'quiz', 'test']);

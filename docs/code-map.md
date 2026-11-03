@@ -67,7 +67,7 @@
 | `dist/js/mascot.js` | 右下角角色的姿勢：何時掉下去趴著、何時撐起來、閒置 30 秒、打哈欠的計時；姿勢寫成角色容器的 class，CSS 播動畫。`app.js` 每次重畫角色後呼叫 `shown()`，其餘由它自己監聽；時間設定在 `TIMING` |
 | `dist/js/busy-paint.js` | 「改沒空的時間」模式在時間表上拖拉新增、手機按一下用表格新增、右鍵移除；整個手勢都在這裡，`app.js` 只呼叫 `attachBusyPainting()` |
 | `dist/js/store.js` | 管理目前狀態與修改資料的動作；自己的計劃存在瀏覽器 localStorage，示範狀態主要存在記憶體 |
-| `dist/js/syllabus-ai.js` | 自己的大綱 → `/api/syllabus` → 待核對的項目：`readSyllabus(file)`（貼上的文字存成 .txt，以文字送出）、`toItems(Dify 結果)`、`rowText(項目)` 按目前語言產生顯示文字、`report(大綱)` 把要你核對的事按類別分組（日期未定、比重、要確認、其他；同一句只列一次並標出次數）；`readSyllabus` 的 `onStage` 收到 Dify 每一步的進度（伺服器以 NDJSON 逐行送出），畫面據此在檢查視窗（`views/import.js` 的 `aiModal`，後面模糊）逐項轉圈；結果到了由 `checklist(大綱)` 逐行揭曉找到／找不到，最後出報告；確認後由 `store.js` 變成任務或每週沒空時間 |
+| `dist/js/syllabus-ai.js` | 自己的大綱 → `/api/syllabus` → 待核對的項目：一次放入的幾個檔案加文字由 `app.js` 逐份交給 `readSyllabus(file)`，`mergeFound` 合成一份（同名只留一項，有日期的優先）；`readSyllabus(file)`（貼上的文字存成 .txt，以文字送出；圖片由伺服器送到工作流程的 image 欄位，先逐字辨識再整理）、`toItems(Dify 結果)`、`rowText(項目)` 按目前語言產生顯示文字、`report(大綱)` 把要你核對的事按類別分組（日期未定、比重、要確認、其他；同一句只列一次並標出次數）；`readSyllabus` 的 `onStage` 收到 Dify 每一步的進度（伺服器以 NDJSON 逐行送出），畫面據此在檢查視窗（`views/import.js` 的 `aiModal`，後面模糊）逐項轉圈；結果到了由 `checklist(大綱)` 逐行揭曉找到／找不到，最後出報告；確認後由 `store.js` 變成任務或每週沒空時間 |
 | `dist/js/attachments.js` | 附件保存在本瀏覽器 IndexedDB；只有按「用 AI 找出項目」時，那一份大綱才會送到 `/api/syllabus`。存檔一律用 `keepFile(file, 上限 MB)`，大小上限在 `LIMIT_MB`（任務附件 10 MB、課程大綱 20 MB） |
 | `dist/js/model.js` | 從狀態推算每日畫面、空檔、課程／任務資料和 AI 建議疊加結果 |
 | `dist/js/scheduler.js` | 固定規則排程：按截止時間找空檔、避開沒空時段、限制每日讀書量等；不是 AI 模型 |
