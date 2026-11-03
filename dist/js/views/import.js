@@ -1,23 +1,27 @@
 // 課程資料：放入大綱 → AI 抽出項目（未確認） → 你核對確認。
-// 示範模式用預寫的結果；自己的計劃經 syllabus-ai.js 交給 Dify 工作流程，確認的項目才變成任務或沒空時間。
+// 示範模式：一頁看完，用預寫的結果。
+// 自己的計劃：#/import 是科目列表（views/courses.js）；#/import/add 是收集資料的頁面——貼上文字或放入 PDF／Word，
+// 經 syllabus-ai.js 交給 Dify 工作流程，核對確認後才放進科目、變成任務。可以分幾次加。
 import { esc, icon } from '../ui.js';
 import { ui, getMode } from '../store.js';
 import { L } from '../i18n.js';
 import { AI_MAX_MB, rowText, report, checklist, STAGES, stageLabel } from '../syllabus-ai.js';
+import { coursesPage } from './courses.js';
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-export function render(s) {
+export function render(s, params = []) {
   const mine = getMode() === 'mine';
-  const doc = s.docs.find((d) => d.id === ui.docId) || s.docs[0];
+  if (mine && params[0] !== 'add') return coursesPage(s);
+  const doc = mine ? s.docs.find((d) => d.id === ui.docId) : s.docs.find((d) => d.id === ui.docId) || s.docs[0];
   const pendingAll = s.docs.flatMap((d) => d.items).filter((i) => i.state === 'pencil').length;
   return `
     <div class="page-head">
       <div>
-        <p class="eyebrow">${L('課程資料', 'Syllabus')}</p>
-        <h1 class="page-head__title">${L('課程資料', 'Syllabus')}</h1>
+        ${mine ? `<a class="page-back" href="#/import">${icon('back')} ${L('課程資料', 'Courses')}</a>` : `<p class="eyebrow">${L('課程資料', 'Syllabus')}</p>`}
+        <h1 class="page-head__title">${!mine ? L('課程資料', 'Syllabus') : s.courses[ui.addCourse] ? L(`補充 ${esc(s.courses[ui.addCourse].name)} 的資訊`, `Add information to ${esc(s.courses[ui.addCourse].name)}`) : L('增加科目', 'Add a course')}</h1>
         <p class="page-head__lede">${mine
-          ? L('把課程大綱放在這裡。AI 會找出 deadline、考試和上課時間，你逐項核對；確認了才會加入任務和沒空的時間。', 'Add your syllabi here. AI finds deadlines, exams and class times for you to check; only what you confirm becomes tasks and busy times.')
+          ? L('大綱、公告、或自己打的字都可以，不用一次齊全；AI 找出功課、測驗和考試，你確認了才會放進科目。可以分幾次加。', 'A syllabus, an announcement or your own notes all work, and nothing has to be complete at once. AI finds assignments, quizzes and exams; only what you confirm goes into the course. Add more any time.')
           : L('AI 會從大綱找出 deadline、考試、上課時間和功課要求，每一項都附出處頁碼。你核對、確認之後，才會用來排計劃。', 'The AI finds deadlines, exams, class times and requirements in your syllabus, each with its page number. Only what you check and confirm is used for planning.')}</p>
       </div>
       ${mine ? '' : pendingAll ?`<span class="chip chip--pencil">${icon('pencil')} ${L(`還有 ${pendingAll} 項待核對`, `${pendingAll} to check`)}</span>` : `<span class="chip chip--ok">${icon('check')} ${L('全部已核對', 'All checked')}</span>`}
@@ -37,10 +41,10 @@ export function render(s) {
         <section class="sheet imp-how" aria-label="${L('流程', 'How it works')}">
           <h2>${L('大綱怎樣變成計劃', 'From syllabus to plan')}</h2>
           ${mine ? `<ol class="how-list">
-            <li><span class="how-list__n">1</span><span><b>${L('放入大綱', 'Add the syllabus')}</b><br>${L('貼上文字，或放入 PDF／Word 檔；都保存在這個瀏覽器。', 'Paste the text or add a PDF or Word file; both stay in this browser.')}</span></li>
-            <li><span class="how-list__n">2</span><span><b>${L('AI 找出項目（未確認）', 'AI finds items (not confirmed)')}</b><br>${L('deadline、考試、上課時間，附原文出處；沒寫清楚的會講明。', 'Deadlines, exams and class times with the original wording; it says what is unclear.')}</span></li>
-            <li><span class="how-list__n">3</span><span><b>${L('你核對', 'You check')}</b><br>${L('確認的功課和考試變成任務，上課時間變成每週沒空的時間。', 'Confirmed assignments and exams become tasks; class times become weekly busy times.')}</span></li>
-            <li><span class="how-list__n">4</span><span><b>${L('到本週排程', 'Schedule on This week')}</b><br>${L('產生建議後，確認了才會生效。', 'Suggestions apply only after you confirm.')}</span></li>
+            <li><span class="how-list__n">1</span><span><b>${L('放入資料', 'Add information')}</b><br>${L('大綱、公告或自己打字，PDF、Word、文字都可以；不用一次齊全。', 'A syllabus, an announcement or your notes, as PDF, Word or text; it does not have to be complete.')}</span></li>
+            <li><span class="how-list__n">2</span><span><b>${L('AI 找出項目（未確認）', 'AI finds items (not confirmed)')}</b><br>${L('功課、測驗、考試的日期和比重，附原文出處；沒寫清楚的會講明。', 'Dates and weights of assignments, quizzes and exams, with the original wording; it says what is unclear.')}</span></li>
+            <li><span class="how-list__n">3</span><span><b>${L('你確認', 'You confirm')}</b><br>${L('確認的才放進科目、變成任務；科目裡已有的不會重複加入。', 'Only confirmed items go into the course and become tasks; anything already there is not added twice.')}</span></li>
+            <li><span class="how-list__n">4</span><span><b>${L('排溫習時間', 'Plan revision time')}</b><br>${L('到「本週」產生建議，確認了才會生效。', 'Generate suggestions on This week; they apply only after you confirm.')}</span></li>
           </ol>` : `<ol class="how-list">
             <li><span class="how-list__n">1</span><span><b>${L('放入大綱', 'Add the syllabus')}</b><br>${L('第一版先做 PDF；之後可以接 Canvas。', 'PDF first; Canvas later.')}</span></li>
             <li><span class="how-list__n">2</span><span><b>${L('AI 抽出（未確認）', 'AI extracts (not confirmed)')}</b><br>${L('deadline、考試、上課時間、要求，每項附頁碼；不肯定的會講明。', 'Deadlines, exams, class times and requirements, each with a page number; it says when it is unsure.')}</span></li>
@@ -50,11 +54,11 @@ export function render(s) {
         </section>
       </div>
 
-      ${doc ? `<div class="docs" role="group" aria-label="${L('已放入的大綱', 'Syllabi added')}">
+      ${mine ? '' : doc ? `<div class="docs" role="group" aria-label="${L('已放入的大綱', 'Syllabi added')}">
         ${s.docs.map((d) => docCard(s, d, d.id === doc.id)).join('')}
       </div>` : `<p class="docs-empty muted">${L('還沒有放入大綱。', 'No syllabus added yet.')}</p>`}
 
-      ${!doc ? '' : doc.own ? `${ownPanel(doc)}${doc.items.length && ui.docReading !== doc.id ? `${reportCard(doc)}${review(s, doc)}${confirmed(doc)}` : ''}` : `${review(s, doc)}${confirmed(doc)}`}
+      ${!doc ? '' : doc.own ? `${ownPanel(doc)}${doc.items.length && ui.docReading !== doc.id ? `${reportCard(doc)}${review(s, doc)}${doneBar(doc)}` : ''}` : `${review(s, doc)}${confirmed(doc)}`}
     </div>
     ${ui.aiModal ? aiModal(s) : ''}`;
 }
@@ -185,13 +189,14 @@ function reportCard(doc) {
 }
 
 function ownPanel(doc) {
-  const mb = doc.size ? `${Math.max(0.1, doc.size / 1048576).toFixed(1)} MB` : '';
+  const typed = /\.txt$/i.test(doc.name);
+  const what = typed ? L('你貼上或打的文字', 'Text you pasted or typed') : doc.size ? `${Math.max(0.1, doc.size / 1048576).toFixed(1)} MB` : '';
   return `
     <section class="sheet review own-doc" id="review" aria-label="${esc(doc.name)}">
       <header class="review__head">
         <div>
           <h2>${esc(doc.name)}</h2>
-          <p>${mb} · ${L('保存在這個瀏覽器', 'Saved in this browser')}</p>
+          <p>${what} · ${L('保存在這個瀏覽器', 'Saved in this browser')}</p>
         </div>
         <div class="own-doc__acts">
           <button class="btn" type="button" data-action="file-download" data-file-id="${doc.id}">${icon('file')} ${L('打開檔案', 'Open file')}</button>
@@ -207,11 +212,7 @@ function ownPanel(doc) {
                 ? L('再讀一次會換掉未確認的項目，已確認的保留。', 'Reading again replaces unconfirmed items; confirmed ones stay.')
                 : L('AI 讀完後，項目會出現在下面等你核對，不會自動加入。', 'Items appear below for you to check; nothing is added automatically.')}</span>`}
         </div>
-        <p>${L('也可以對照大綱自己加入：', 'You can also add these yourself from the syllabus:')}</p>
-        <div class="own-doc__next">
-          <a class="btn btn--ink" href="#/add-task">${icon('plus')} ${L('功課和考試 → 新增任務', 'Assignments and exams → Add task')}</a>
-          <a class="btn" href="#/time">${icon('hatch')} ${L('上課時間 → 改沒空的時間', 'Class times → Edit busy times')}</a>
-        </div>
+        <p class="own-doc__manual">${L('AI 沒找到的，也可以', 'Anything the AI missed, you can also')} <a href="#/add-task">${L('自己加一項功課或考試', 'add yourself as a task')} ${icon('arrow')}</a></p>
       </div>
     </section>`;
 }
@@ -244,11 +245,29 @@ function docCard(s, d, current) {
     </button>`;
 }
 
+/** 這份資料屬於哪一科：確認第一項之後就固定；之前可以改（AI 找到的代號、或選已有的科目）。 */
+function courseField(s, doc) {
+  if (doc.course) return `<span class="xcourse">${L('科目', 'Course')} <b>${esc(s.courses[doc.course]?.name || doc.courseName)}</b></span>`;
+  return `<label class="xcourse">${L('放進科目', 'Course')}
+      <input class="input input--sm" list="course-names" value="${esc(doc.courseName || '')}" data-doc-course="${doc.id}" placeholder="${L('例如 COMP1023', 'e.g. COMP1023')}">
+    </label>
+    <datalist id="course-names">${Object.values(s.courses).map((c) => `<option value="${esc(c.name)}">${esc(c.title || '')}</option>`).join('')}</datalist>`;
+}
+
+function doneBar(doc) {
+  const pending = doc.items.filter((i) => i.state === 'pencil').length;
+  return `
+    <div class="imp-done">
+      <span class="muted">${pending ? L(`還有 ${pending} 項未確認，可以之後再回來。`, `${pending} still to confirm; you can come back later.`) : L('這份資料都核對好了。', 'Everything here is checked.')}</span>
+      <a class="btn btn--ink" href="#/import">${L('完成，回到課程資料', 'Done, back to courses')} ${icon('arrow')}</a>
+    </div>`;
+}
+
 function review(s, doc) {
   const ink = s.courses[doc.course]?.ink || '';
   const pending = doc.items.filter((i) => i.state === 'pencil').length;
   const meta = doc.own
-    ? `${esc(doc.courseName || '')} · ${L(`找到 ${doc.items.length} 項`, `${doc.items.length} items found`)} · <span class="demo-note">${icon('info')} ${L('AI 抽取，可能有錯，請逐項核對', 'Found by AI and may be wrong; check each item')}</span>`
+    ? `${courseField(s, doc)} · ${L(`找到 ${doc.items.length} 項`, `${doc.items.length} items found`)} · <span class="demo-note">${icon('info')} ${L('AI 抽取，可能有錯，請逐項核對', 'Found by AI and may be wrong; check each item')}</span>`
     : `${L(`${doc.pages} 頁 · 找到 ${doc.items.length} 項`, `${doc.pages} pages · ${doc.items.length} items found`)} · <span class="demo-note">${icon('info')} ${L('示範：預先寫好的抽取結果，並非 AI 分析', 'Demo: pre-written results, not AI analysis')}</span>`;
   return `
     <section class="sheet review" id="review" data-ink="${ink}" aria-label="${esc(doc.name)}">
@@ -274,7 +293,7 @@ function itemRow(doc, it) {
        <button class="btn btn--sm" type="button" data-action="edit-item" data-item="${it.id}">${icon('pencil')} ${L('改', 'Edit')}</button>
        <button class="btn btn--sm btn--ghost" type="button" data-action="item" data-doc="${doc.id}" data-item="${it.id}" data-to="erased">${icon('eraser')} ${L('不是', 'Remove')}</button>`
     : it.state === 'ink'
-      ? `<span class="xstate">${icon('check')} ${it.applied === 'task' ? L('已加入任務', 'Added to Tasks') : it.applied === 'busy' ? L('已加入沒空時間', 'Added as busy time') : L('已確認', 'Confirmed')}${it.edited ? L('（你改過）', ' (edited)') : ''}</span>
+      ? `<span class="xstate">${icon('check')} ${it.applied === 'task' ? L('已加入任務', 'Added to Tasks') : it.applied === 'dup' ? L('科目裡已有，沒有重複加入', 'Already in the course') : it.applied === 'moved' ? L('已更新任務的日期', 'Task date updated') : it.applied === 'busy' ? L('已加入沒空時間', 'Added as busy time') : L('已確認', 'Confirmed')}${it.edited ? L('（你改過）', ' (edited)') : ''}</span>
          ${it.applied ? '' : `<button class="btn btn--sm btn--ghost" type="button" data-action="edit-item" data-item="${it.id}" aria-label="${L('修改', 'Edit')}">${icon('pencil')}</button>`}`
       : `<span class="xstate">${icon('x')} ${L('已刪除', 'Removed')}</span>
          <button class="btn btn--sm btn--ghost" type="button" data-action="item" data-doc="${doc.id}" data-item="${it.id}" data-to="pencil">${L('復原', 'Undo')}</button>`;

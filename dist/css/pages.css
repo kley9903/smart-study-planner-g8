@@ -942,3 +942,137 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .task-files summary { cursor: pointer; font-weight: 700; font-size: 14px; min-height: 28px; }
 .task-files__body { display: grid; gap: 12px; margin-top: 14px; }
 .month__day { min-height: 96px; }
+
+/* =========================================================
+   課程資料（自己的計劃）：科目卡列表、增加科目、收集資料頁
+   科目卡是紙卡：左上角貼一段科目色紙膠帶，卡頭右邊淡淡印著浮水印（科目編號），卡頭只放代號和全名；
+   展開後小標題（測驗和考試、功課、日期未公布）用科目色襯線字，是第一眼的焦點；類型只寫在小標題，
+   每項一行：名稱｜日期時間｜比重，項與項之間一條細線；7 天內到期用朱紅，已過的變淡。
+   ========================================================= */
+.courses { display: grid; gap: 14px; max-width: 900px; }
+
+.course {
+  position: relative; background: var(--paper); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card); transition: box-shadow 0.25s var(--ease);
+}
+/* 紙膠帶：凸出卡頂，兩端撕開的鋸齒 */
+.course__tape {
+  position: absolute; left: 22px; top: -8px; z-index: 2; width: 56px; height: 17px; pointer-events: none;
+  background: var(--c, var(--graphite-2)); opacity: 0.3; transform: rotate(-6deg);
+  clip-path: polygon(0 0, 100% 0, 96% 25%, 100% 50%, 96% 75%, 100% 100%, 0 100%, 4% 75%, 0 50%, 4% 25%);
+}
+/* 浮水印：卡頭右邊、箭咀左邊，很淡的大號科目編號；在卡頭裡垂直置中，卡頭矮的時候只裁掉上下一點 */
+.course__mark {
+  position: absolute; right: 68px; top: 50%; transform: translateY(-50%); z-index: 0; pointer-events: none;
+  font-family: var(--font-serif); font-size: 62px; font-weight: 800; line-height: 1; letter-spacing: 0.02em; white-space: nowrap;
+  color: var(--c, var(--graphite-2)); opacity: 0.09;
+}
+.course:hover, .course.is-open { box-shadow: var(--shadow-sheet); }
+.course__head {
+  position: relative; z-index: 1; overflow: hidden; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 20px 20px 20px 26px; border: 0; background: none; text-align: left; color: inherit; font: inherit; cursor: pointer;
+}
+.course__head:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -4px; border-radius: var(--radius-lg); }
+.course__title { position: relative; z-index: 1; display: grid; gap: 4px; min-width: 0; }
+.course__code { font-family: var(--font-serif); font-size: 24px; font-weight: 800; line-height: 1.15; letter-spacing: 0.02em; color: var(--c-deep, var(--ink)); }
+.course__name { font-size: 14px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.course__chev {
+  position: relative; z-index: 1; flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--c-wash, var(--paper-2)); color: var(--c-deep, var(--ink-2));
+  transform: rotate(90deg); transition: transform 0.3s var(--ease);
+}
+.course__chev .i { font-size: 18px; }
+.course.is-open .course__chev { transform: rotate(-90deg); }
+
+.course__body {
+  display: grid; gap: 26px; margin: 0 22px 0 26px; padding: 20px 0 18px;
+  border-top: 1px dashed var(--rule); animation: ai-line-in 0.3s ease-out both;
+}
+/* 小標題：科目色襯線粗字，數量用淡色小字跟在後面 */
+.course__group h3 {
+  display: flex; align-items: baseline; gap: 8px; margin: 0 0 4px;
+  font-family: var(--font-serif); font-size: 17px; font-weight: 700; letter-spacing: 0.04em; color: var(--c-deep, var(--ink));
+}
+.course__group h3 span { font-family: var(--font-sans); font-size: 12.5px; font-weight: 500; letter-spacing: 0; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.course__hint { margin: 0 0 4px; font-size: 12.5px; color: var(--ink-3); }
+.course__empty { font-size: 13.5px; color: var(--ink-3); margin: 0; }
+
+/* 一項一行：名稱｜（還有幾天）日期時間｜比重；項與項之間一條細線 */
+.crows { list-style: none; margin: 0; padding: 0; }
+.crows li + li { border-top: 1px solid var(--rule); }
+.crow {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(48px, max-content); align-items: baseline; gap: 18px;
+  padding: 11px 12px; margin: 0 -12px; border-radius: 10px; color: inherit; text-decoration: none; transition: background 0.15s;
+}
+a.crow:hover { background: var(--paper-2); }
+a.crow:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; }
+.crow__title { min-width: 0; font-size: 15px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.crow__due { font-size: 13.5px; color: var(--ink-2); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.crow__when { margin-right: 10px; font-size: 12.5px; color: var(--ink-3); }
+.crow__weight { text-align: right; font-family: var(--font-serif); font-size: 16px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.crow.is-soon .crow__when { color: var(--seal); font-weight: 700; }
+.crow.is-past { opacity: 0.5; }
+.crow.is-past:hover { opacity: 0.8; }
+.crow.is-undated .crow__title { color: var(--ink-2); }
+.crow.is-undated .crow__due { color: var(--ink-3); }
+
+.course__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; padding-top: 14px; border-top: 1px dashed var(--rule); }
+.course__foot span { font-size: 13px; color: var(--ink-3); }
+
+/* 增加科目：一張空白的虛線索引卡 */
+.course-add {
+  display: grid; justify-items: center; gap: 4px; width: 100%; padding: 22px 20px; text-align: center; font: inherit; color: var(--ink-2);
+  border: 2px dashed var(--graphite-3); border-radius: var(--radius-lg); background: transparent; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+.course-add:hover { border-color: var(--ink-3); background: rgba(251, 249, 244, 0.7); color: var(--ink); }
+.course-add:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 3px; }
+.course-add__plus {
+  width: 44px; height: 44px; margin-bottom: 6px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--paper); box-shadow: var(--shadow-card); color: var(--ink-2); transition: transform 0.3s var(--ease);
+}
+.course-add:hover .course-add__plus { transform: rotate(90deg); }
+.course-add__plus .i { font-size: 22px; }
+.course-add b { font-size: 15.5px; color: var(--ink); }
+.course-add small { font-size: 12.5px; color: var(--ink-3); }
+.course-add.is-first { padding: 56px 24px; }
+
+.course-pending {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 6px 14px; border-radius: 999px;
+  border: 1.5px dashed var(--graphite-2); color: var(--ink-2); font-size: 13.5px; text-decoration: none;
+}
+.course-pending:hover { border-color: var(--ink-3); color: var(--ink); }
+
+.page-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-3); text-decoration: none; margin-bottom: 6px; }
+.page-back:hover { color: var(--ink); }
+.xcourse { display: inline-flex; align-items: center; gap: 6px; }
+.xcourse .input { min-height: 30px; width: 140px; padding: 0 8px; font-size: 13px; }
+.imp-done { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
+.imp-done .muted { font-size: 13px; }
+
+@media (max-width: 600px) {
+  .course__head { padding: 16px 14px 16px 18px; }
+  .course__tape { left: 16px; width: 46px; }
+  .course__mark { right: 56px; font-size: 44px; opacity: 0.07; }
+  .course__code { font-size: 21px; }
+  .course__body { margin: 0 14px 0 18px; }
+  /* 手機：日期放到名稱下面，比重在右邊置中 */
+  .crow {
+    grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title weight" "due weight";
+    align-items: center; gap: 3px 12px; padding: 10px 8px; margin: 0 -8px;
+  }
+  .crow__title { grid-area: title; }
+  .crow__due { grid-area: due; justify-self: start; text-align: left; font-size: 12.5px; }
+  .crow__weight { grid-area: weight; min-width: 36px; font-size: 15px; }
+  .course__foot { flex-direction: column; align-items: stretch; }
+  .course__foot .btn { justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .course__body { animation: none; }
+  .course__chev, .course-add__plus { transition: none; }
+}
+.own-doc__manual { font-size: 13px; color: var(--ink-3); }
+.own-doc__manual a { color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--graphite-3); text-underline-offset: 3px; display: inline-flex; align-items: center; gap: 4px; }
+.own-doc__manual a:hover { color: var(--ink); }
+.own-doc__manual .i { font-size: 13px; }

@@ -9,7 +9,7 @@ export const AI_MAX_MB = 15;
 export const STAGES = ['read', 'extract', 'check', 'tidy'];
 export const stageLabel = (stage) => ({
   read: L('讀取大綱', 'Reading the syllabus'),
-  extract: L('AI 找出功課、考試和上課時間', 'AI finds assignments, exams and class times'),
+  extract: L('AI 找出功課、測驗和考試', 'AI finds assignments, quizzes and exams'),
   check: L('逐項核對比重和日期', 'Checking weights and dates one by one'),
   tidy: L('整理結果', 'Putting the results together'),
 }[stage]);
@@ -18,11 +18,12 @@ export const stageLabel = (stage) => ({
  * 把大綱檔案交給 AI 整理（貼上的文字存成 .txt，以文字送出）。onStage(stage) 在 AI 走到下一步時呼叫。
  * 成功回傳 Dify 的課程 JSON；失敗丟出帶 reason 的錯誤：'too-big'、'no-key'（伺服器未設定金鑰）、'offline'、'dify'、'invalid'。
  */
-export async function readSyllabus(file, { fetcher = fetch, onStage = () => {} } = {}) {
+export async function readSyllabus(file, { fetcher = fetch, onStage = () => {}, context = '' } = {}) {
   if (file.size > AI_MAX_MB * 1024 * 1024) throw Object.assign(new Error('too big'), { reason: 'too-big' });
   const body = new FormData();
   if (file.type.startsWith('text/')) body.append('text', await file.text());
   else body.append('file', file, file.name);
+  if (context) body.append('context', context);
   let res;
   try {
     res = await fetcher('/api/syllabus', { method: 'POST', body });
@@ -133,20 +134,7 @@ export function toItems(result) {
   (r.tasks || []).forEach((t) => { perComponent[t.component_id] = (perComponent[t.component_id] || 0) + 1; });
   const items = [];
 
-  (r.course_events || []).forEach((ev, i) => {
-    const prefix = `/course_events/${i}/`;
-    const start = toMin(ev.start_time), end = toMin(ev.end_time);
-    const days = parseDays(ev.recurrence_raw || ev.date_raw || '');
-    const label = [course, ev.title].filter(Boolean).join(' ');
-    let plan = null;
-    if (start != null && end > start && ev.date) plan = { kind: 'busy', type: 'single', date: ev.date, start, end, label };
-    else if (start != null && end > start && days.length) plan = { kind: 'busy', type: 'weekly', days, start, end, label };
-    items.push({
-      id: `ev-${i}`, key: 'class', what: [ev.title, ev.location].filter(Boolean).join(' · '), raw: ev.recurrence_raw || ev.date_raw || '',
-      ...sourceOf(prefix), reasons: reasonsFor(prefix), flag: plan ? null : 'no-day', plan, state: 'pencil',
-    });
-  });
-
+  // 上課時間不收：這個網站只幫你排溫習和做功課的時間，不管上課。
   (r.tasks || []).forEach((t, i) => {
     const prefix = `/tasks/${i}/`;
     const key = keyOf(t.type);
@@ -169,9 +157,9 @@ export function toItems(result) {
   });
 
   const describe = (x) => (typeof x === 'string' ? x : x?.reason || x?.message || x?.description || x?.question || JSON.stringify(x));
-  const notes = [...missing.filter((m) => !used.has(m)), ...(r.conflicts || []), ...(r.warnings || [])].map(describe).filter(Boolean);
+  const notes = [...missing.filter((m) => !used.has(m) && !m.path?.startsWith('/course_events/')), ...(r.conflicts || []), ...(r.warnings || [])].map(describe).filter(Boolean);
   const weights = (r.assessment_components || []).map((c) => c.weight_percent).filter((w) => typeof w === 'number');
-  return { course, items, notes, weightTotal: weights.length ? weights.reduce((a, b) => a + b, 0) : null };
+  return { course, courseTitle: r.course?.code && r.course?.name ? r.course.name : '', items, notes, weightTotal: weights.length ? weights.reduce((a, b) => a + b, 0) : null };
 }
 
 const EXAMS = new Set(['exam', 'quiz', 'test']);
@@ -186,7 +174,6 @@ export function checklist(doc) {
   const found = (n, unit) => (n ? { state: 'ok', text: L(`找到 ${n} ${unit[0]}`, `${n} found`) } : { state: 'none', text: L('沒找到', 'None found') });
   const work = count((i) => i.plan?.kind === 'task' && !EXAMS.has(i.key));
   const exams = count((i) => EXAMS.has(i.key));
-  const classes = count((i) => i.key === 'class');
   const undated = count((i) => i.plan?.kind === 'task' && !i.plan.date);
   const total = doc.weightTotal;
   const gaps = (doc.notes || []).length;
@@ -194,7 +181,6 @@ export function checklist(doc) {
     { stage: 'read', label: L('讀取大綱', 'Read the syllabus'), state: 'ok', text: L('完成', 'Done') },
     { stage: 'extract', label: L('功課', 'Assignments'), ...found(work, ['項']) },
     { stage: 'extract', label: L('考試／測驗', 'Exams and quizzes'), ...found(exams, ['項']) },
-    { stage: 'extract', label: L('上課時間', 'Class times'), ...found(classes, ['段']) },
     { stage: 'check', label: L('比重', 'Weights'), ...(total == null ? { state: 'none', text: L('大綱沒寫比重', 'No weights given') }
       : Math.abs(total - 100) <= 0.5 ? { state: 'ok', text: L(`合計 ${total}%`, `${total}% in total`) }
         : { state: 'warn', text: L(`合計 ${total}%，不是 100%`, `${total}% in total, not 100%`) }) },
@@ -210,15 +196,12 @@ export function report(doc) {
   const items = doc.items.filter((i) => i.state !== 'erased');
   const exams = items.filter((i) => EXAMS.has(i.key));
   const work = items.filter((i) => i.plan?.kind === 'task' && !EXAMS.has(i.key));
-  const classes = items.filter((i) => i.key === 'class');
   const have = [
     L(`功課 ${work.length} 項`, `${work.length} assignment${work.length === 1 ? '' : 's'}`),
     L(`考試／測驗 ${exams.length} 項`, `${exams.length} exam${exams.length === 1 ? '' : 's'} or quiz${exams.length === 1 ? '' : 'zes'}`),
-    L(`上課時間 ${classes.length} 段`, `${classes.length} class time${classes.length === 1 ? '' : 's'}`),
   ];
   if (doc.weightTotal != null) have.push(L(`比重合計 ${doc.weightTotal}%`, `Weights add up to ${doc.weightTotal}%`));
   const missing = [];
-  if (!classes.length) missing.push(L('沒找到上課時間', 'No class times found'));
   if (!exams.length) missing.push(L('沒找到考試或測驗', 'No exams or quizzes found'));
   if (doc.weightTotal != null && Math.abs(doc.weightTotal - 100) > 0.5) {
     missing.push(L(`比重合計 ${doc.weightTotal}%，不是 100%：可能漏了評核項目`, `Weights add up to ${doc.weightTotal}%, not 100%: an assessment may be missing`));
@@ -229,6 +212,19 @@ export function report(doc) {
     else if (it.flag === 'no-day') missing.push(L(`${it.what}：看不出星期幾或時間`, `${it.what}: day or time unclear`));
   }
   return { have, missing: [...missing, ...(doc.notes || [])] };
+}
+
+/** 科目裡已有同名項目時的說明（match 由 store.js 判斷：不重複／改日期／補日期）。已確認的不再提示。 */
+function matchText(it) {
+  const m = it.state === 'pencil' && it.match;
+  if (!m) return '';
+  if (m.kind === 'moved') {
+    const when = (d) => `${d.date} ${hm(d.min)}`;
+    return L(`科目裡這一項是 ${when(m.from)}，這份資料寫 ${when(m.to)}；確認後會改成新的日期。`,
+      `The course has this on ${when(m.from)}; this source says ${when(m.to)}. Confirming moves it to the new date.`);
+  }
+  if (m.kind === 'dated') return L('科目裡這一項原本日期未公布；確認後會補上這個日期，加入任務。', 'This was in the course without a date; confirming adds this date and makes it a task.');
+  return L('科目裡已有同名的項目，確認後不會重複加入。', 'This course already has an item with this name; it will not be added twice.');
 }
 
 /** 一個 AI 項目在核對表上顯示的文字（目前的介面語言）。 */
@@ -248,7 +244,7 @@ export function rowText(it) {
     src: it.src || (it.quote ? L('原文', 'Quote') : '—'),
     hours: task ? L(`${p.hours} 小時`, `${p.hours} hours`) : '—',
     hoursNote: task && it.hoursDefault ? L('預設值，請按需要修改', 'default, change as needed') : '',
-    warn: [...(it.reasons || []), flag].filter(Boolean).join(' ') || undefined,
+    warn: [matchText(it), ...(it.reasons || []), flag].filter(Boolean).join(' ') || undefined,
   };
 }
 

@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems,
+  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse,
 } from './store.js';
 import { readSyllabus, toItems, checklist, AI_MAX_MB } from './syllabus-ai.js';
 
@@ -399,7 +399,7 @@ const actions = {
       saved = await keepFile(new File([text], `${first}.txt`, { type: 'text/plain' }), LIMIT_MB.syllabus);
     } catch (err) { toast(fileProblem(err, { name: first }), 'alert'); return; }
     ui.syllabusDraft = '';
-    addOwnDoc(saved);
+    addOwnDoc(saved, ui.addCourse);
     actions['doc-read']({ dataset: { doc: saved.id } });
   },
   'doc-read': async (el) => {
@@ -412,7 +412,11 @@ const actions = {
     try {
       const file = await getAttachment(id);
       if (!file) throw Object.assign(new Error('missing'), { reason: 'missing' });
-      const found = toItems(await readSyllabus(file, { onStage: (stage) => { ui.readStage = stage; render(); } }));
+      const doc = getState().docs.find((d) => d.id === id);
+      const course = doc?.course && getState().courses[doc.course];
+      // 補充某一科時，告訴 AI 這份資料屬於哪一科（短短一段公告也認得出）
+      const context = course ? `這份資料屬於 ${course.name}${course.title ? `（${course.title}）` : ''}。` : '';
+      const found = toItems(await readSyllabus(file, { context, onStage: (stage) => { ui.readStage = stage; render(); } }));
       ui.docReading = null;
       setOwnItems(id, found);
       revealChecks(id);
@@ -423,6 +427,10 @@ const actions = {
       toast(readProblem(err), 'alert');
     }
   },
+  'course-toggle': (el) => { ui.openCourse = ui.openCourse === el.dataset.course ? null : el.dataset.course; render(); },
+  'course-add': () => { ui.addCourse = null; ui.docId = null; location.hash = '#/import/add'; },
+  'course-more': (el) => { ui.addCourse = el.dataset.course; ui.docId = null; location.hash = '#/import/add'; },
+  'course-continue': (el) => { ui.addCourse = null; ui.docId = el.dataset.doc; },
   'ai-modal-close': () => {
     const done = ui.aiModal?.phase === 'done';
     ui.aiModal = null;
@@ -642,7 +650,7 @@ async function takeFiles(files) {
   if (getMode() === 'mine' && current.name === 'import') {
     for (const file of files) {
       try {
-        addOwnDoc(await keepFile(file, LIMIT_MB.syllabus));
+        addOwnDoc(await keepFile(file, LIMIT_MB.syllabus), ui.addCourse);
       } catch (err) {
         toast(fileProblem(err, file), 'alert');
         if (err.reason !== 'too-big') return; // 太大的跳過，存不進去就停
@@ -662,6 +670,7 @@ async function takeFiles(files) {
 
 document.addEventListener('change', async (e) => {
   const t = e.target;
+  if (t.matches('[data-doc-course]')) { setDocCourse(t.dataset.docCourse, t.value); return; }
   if (t.matches('[data-task-file]')) {
     const file = t.files[0];
     if (!file) return;

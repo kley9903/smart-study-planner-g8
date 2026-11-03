@@ -79,7 +79,7 @@ function freshUi() {
   return {
     hlTask: null, showGaps: false, day: DEMO_TODAY, docId: 'stat', taskId: 'ps4',
     editBusy: false, dockOpen: false, dockDismissed: [], hlRule: null, justInked: [], arrowFor: null,
-    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, syllabusDraft: '', sleepEdit: false, dropMsg: '', guideOpen: false,
+    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, addCourse: null, syllabusDraft: '', sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
   };
 }
@@ -360,13 +360,89 @@ export function confirmEstimate(taskId) {
 function itemOf(docId, itemId) {
   return state.docs.find((d) => d.id === docId)?.items.find((i) => i.id === itemId);
 }
-/** 自己的大綱：確認一項時，把它的 plan 變成任務或沒空時段（每項只做一次）。回傳加了什麼。 */
+const norm = (t) => String(t || '').toLowerCase().replace(/\s+/g, '');
+const courseIdOf = (doc) => doc.course || Object.values(state.courses).find((c) => c.name === (doc.courseName || '').trim())?.id;
+
+/**
+ * 這一項在科目裡是否已經有（同名）：
+ *   'same'  —— 已有，這次沒有新的日期或時間 → 不重複加入
+ *   'moved' —— 已有任務，但這次寫的日期或時間不同 → 確認後改任務的日期（from 是原本的）
+ *   'dated' —— 已確認過但當時日期未公布，這次有日期 → 確認後補上日期、變成任務
+ * 沒有同名的回傳 null。
+ */
+function matchOf(doc, it) {
+  const p = it.plan;
+  const course = courseIdOf(doc);
+  if (p?.kind !== 'task' || !course) return null;
+  const key = norm(p.title);
+  const task = state.tasks.find((t) => t.course === course && norm(t.title) === key);
+  if (task) {
+    if (!p.date) return { kind: 'same', task: task.id };
+    // 這次沒寫時間（暫定的）就不拿暫定時間蓋掉原本的時間
+    const min = it.flag === 'no-time' ? task.due.min : p.min;
+    if (task.due.date === p.date && task.due.min === min) return { kind: 'same', task: task.id };
+    return { kind: 'moved', task: task.id, from: { ...task.due }, to: { date: p.date, min } };
+  }
+  const undated = state.docs.filter((d) => d.own && (d === doc || d.course === course)).flatMap((d) => d.items)
+    .some((i) => i !== it && i.state === 'ink' && !i.filled && i.applied !== 'dup' && i.plan?.kind === 'task' && !i.plan.date && norm(i.plan.title) === key);
+  if (undated) return p.date ? { kind: 'dated' } : { kind: 'same' };
+  return null;
+}
+/** 重新判斷這份資料裡未確認的項目（讀完、或改了科目之後）。 */
+function markMatches(doc) {
+  doc.items.forEach((it) => { if (it.state === 'pencil') it.match = matchOf(doc, it); });
+}
+
+/** 改這份資料屬於哪一科（只限還沒確認任何項目、也不是從某科的「補充資訊」進來的）。 */
+export function setDocCourse(docId, name) {
+  const doc = state.docs.find((d) => d.id === docId);
+  if (!doc || doc.course) return;
+  doc.courseName = name.trim();
+  markMatches(doc);
+  emit({ keepScroll: true });
+}
+
+/** 任務的截止改了：跟編輯任務一樣，清掉還沒開始的讀書時段和待確認的建議，請你重新排程。 */
+function moveDue(task, due) {
+  state.blocks = state.blocks.filter((b) => b.task !== task.id || b.date < state.today || (b.date === state.today && b.start <= state.now));
+  const pending = pendingProposal(state);
+  if (pending) { pending.status = 'erased'; state.proposal = null; }
+  task.due = { ...due };
+}
+
+/**
+ * 自己的資料：確認一項時，把它放進科目（第一次確認時才建立科目），再變成任務（每項只做一次）。
+ * 科目裡已有同名的：補日期、改日期，或不重複加入（見 matchOf）。回傳做了什麼：'task'、'moved'、'busy' 或 null。
+ */
 function applyItem(doc, it) {
   const p = it.plan;
   if (!doc.own || it.applied || !p) return null;
+  if (!doc.course) doc.course = courseFor(doc.courseName || L('未命名科目', 'Untitled course'), doc.courseTitle || '');
+  doc.courseName = state.courses[doc.course].name;
+  const m = matchOf(doc, it);
+  it.match = m;
+  if (m?.kind === 'same') {
+    const task = m.task && taskOf(state, m.task);
+    if (task && !task.weight && it.weight) task.weight = it.weight; // 原本沒有比重的順便補上
+    it.applied = 'dup';
+    return null;
+  }
+  if (m?.kind === 'moved') {
+    moveDue(taskOf(state, m.task), m.to);
+    if (it.weight) taskOf(state, m.task).weight = it.weight;
+    it.taskId = m.task;
+    it.applied = 'moved';
+    return 'moved';
+  }
   if (p.kind === 'task' && p.date) {
-    createTask({ title: p.title, course: doc.courseName || '', kind: typeLabel(p.key), date: p.date, min: p.min, hours: p.hours });
+    it.taskId = createTask({ title: p.title, course: doc.courseName || '', kind: typeLabel(p.key), date: p.date, min: p.min, hours: p.hours, weight: it.weight || '' }).id;
     it.applied = 'task';
+    if (m?.kind === 'dated') {
+      // 之前確認過、日期未公布的同一項，現在有日期了：不再列在「日期未公布」
+      state.docs.filter((d) => d.course === doc.course).flatMap((d) => d.items).forEach((i) => {
+        if (i !== it && i.state === 'ink' && !i.filled && i.plan?.kind === 'task' && !i.plan.date && norm(i.plan.title) === norm(p.title)) i.filled = it.taskId;
+      });
+    }
   } else if (p.kind === 'busy') {
     pushRule({ type: p.type, ...(p.type === 'weekly' ? { days: p.days } : { date: p.date }), start: p.start, end: p.end, label: p.label });
     it.applied = 'busy';
@@ -374,10 +450,10 @@ function applyItem(doc, it) {
   return it.applied || null;
 }
 function appliedText(kinds) {
-  const t = kinds.filter((k) => k === 'task').length, b = kinds.filter((k) => k === 'busy').length;
-  if (!t && !b) return '';
-  return L(`；加入 ${[t && `${t} 項任務`, b && `${b} 段沒空時間`].filter(Boolean).join('、')}`,
-    `; added ${[t && `${t} task${t === 1 ? '' : 's'}`, b && `${b} busy time${b === 1 ? '' : 's'}`].filter(Boolean).join(' and ')}`);
+  const t = kinds.filter((k) => k === 'task').length, b = kinds.filter((k) => k === 'busy').length, m = kinds.filter((k) => k === 'moved').length;
+  if (!t && !b && !m) return '';
+  return L(`；${[t && `加入 ${t} 項任務`, m && `更新 ${m} 項任務的日期（尚未開始的安排已清除，請重新排程）`, b && `加入 ${b} 段沒空時間`].filter(Boolean).join('、')}`,
+    `; ${[t && `added ${t} task${t === 1 ? '' : 's'}`, m && `moved the date of ${m} task${m === 1 ? '' : 's'} (unstarted sessions cleared; schedule again)`, b && `added ${b} busy time${b === 1 ? '' : 's'}`].filter(Boolean).join(', ')}`);
 }
 
 export function setItemState(docId, itemId, value) {
@@ -453,12 +529,16 @@ export function setSleep(start, end) {
 }
 
 /* ---------------- 我的計劃：功課與自動排程 ---------------- */
-function courseFor(name) {
+/** 用科目名稱（通常是代號）找科目，沒有就新增；title 是全名，有的話順便記下。 */
+function courseFor(name, title = '') {
   const label = name.trim() || L('其他', 'Other');
   const found = Object.values(state.courses).find((c) => c.name === label);
-  if (found) return found.id;
+  if (found) {
+    if (title && !found.title) found.title = title;
+    return found.id;
+  }
   const id = nid('c');
-  state.courses[id] = { id, name: label, ink: INKS[Object.keys(state.courses).length % INKS.length] };
+  state.courses[id] = { id, name: label, ...(title ? { title } : {}), ink: INKS[Object.keys(state.courses).length % INKS.length] };
   return id;
 }
 
@@ -472,14 +552,14 @@ function splitMinutes(total) {
   return out;
 }
 
-function createTask({ title, course, kind, date, min, hours, requirements = '' }, ownSteps = []) {
+function createTask({ title, course, kind, date, min, hours, requirements = '', weight = '' }, ownSteps = []) {
   const id = nid('t');
   const total = ownSteps.length ? ownSteps.reduce((n, st) => n + st.min, 0) : Math.max(30, Math.round(hours * 2) * 30);
   const parts = ownSteps.length ? ownSteps : splitMinutes(total).map((m, i, all) => ({ title: all.length > 1 ? L(`第 ${i + 1} 部分`, `Part ${i + 1}`) : L('全部', 'All'), min: m }));
   const steps = parts.map((st, i) => ({ id: `${id}-${i + 1}`, title: st.title, min: st.min, progress: 'todo' }));
   state.tasks.push({
     id, course: courseFor(course), title, short: title.length > 14 ? `${title.slice(0, 13)}…` : title, kind,
-    due: { date, min }, requirements, attachments: [], weight: '', source: null, estimateBy: 'me', estimateConfirmed: true, steps, aiNote: '',
+    due: { date, min }, requirements, attachments: [], weight, source: null, estimateBy: 'me', estimateConfirmed: true, steps, aiNote: '',
   });
   return { id, total };
 }
@@ -529,20 +609,24 @@ export function updateTask(id, fields, steps) {
   emit({ toast: changed ? L('已保存。尚未開始的安排已清除，請到本週重新排程並確認。', 'Saved. Unstarted sessions cleared; schedule again on Week and confirm.') : L('任務已保存', 'Task saved'), keepScroll: true });
 }
 
-/** 自己的計劃：大綱檔案存在瀏覽器，這裡只記檔名；自動抽取未接通，所以沒有項目。 */
-export function addOwnDoc({ id, name, size }) {
-  state.docs.push({ id, name, size, own: true, pages: null, course: null, items: [] });
+/** 放入一份資料（大綱、公告或自己打的字），檔案本身存在瀏覽器。course：從某科的「補充資訊」進來時，這份資料固定屬於那一科。 */
+export function addOwnDoc({ id, name, size }, course = null) {
+  const c = course && state.courses[course];
+  state.docs.push({ id, name, size, own: true, pages: null, items: [], course: c ? c.id : null, courseName: c ? c.name : '' });
   ui.docId = id;
   emit({ toast: L(`已保存「${name}」`, `Saved "${name}"`), keepScroll: true });
 }
 
 /** AI 讀完一份自己的大綱：放入待核對的項目（已確認的保留，未確認的換成這次的結果）。 */
-export function setOwnItems(docId, { course, items, notes, weightTotal = null }) {
+export function setOwnItems(docId, { course, courseTitle = '', items, notes, weightTotal = null }) {
   const doc = state.docs.find((d) => d.id === docId);
   if (!doc) return;
   const kept = doc.items.filter((i) => i.state === 'ink');
   doc.items = [...kept, ...items.map((it) => ({ ...it, id: nid(`${it.id}-`) }))];
-  doc.courseName = course;
+  // 科目要等第一項確認時才建立（見 applyItem），資料裡甚麼都沒有就不會多出一張空的科目卡。
+  // 從某科的「補充資訊」進來的，維持那一科；否則用 AI 找到的科目代號，之後可以在核對表上改。
+  if (!doc.course) { doc.courseName = course || doc.courseName || ''; doc.courseTitle = courseTitle; }
+  markMatches(doc);
   doc.notes = notes;
   doc.weightTotal = weightTotal;
   ui.docId = docId;
