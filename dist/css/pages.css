@@ -463,7 +463,7 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .ai-modal.is-fresh { animation: fade-in 0.22s both; }
 .ai-modal__card {
   position: relative; width: min(580px, 100%); max-height: calc(100vh - 48px); overflow: auto;
-  display: grid; gap: 18px; padding: 26px 28px 22px 44px;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 26px 28px 22px 44px; /* 欄寬不被長檔名撐開 */
   background: var(--paper); border-radius: var(--radius-lg); box-shadow: var(--shadow-pop);
   overscroll-behavior: contain;
 }
@@ -476,6 +476,7 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 @keyframes ai-card-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
 
 .ai-modal__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.ai-modal__head > div { min-width: 0; } /* 檔名很長時用省略號 */
 .ai-modal__eyebrow { font-size: 11.5px; letter-spacing: 0.14em; color: var(--ink-3); font-weight: 600; font-variant-numeric: tabular-nums; }
 .ai-modal__title { font-family: var(--font-serif); font-size: 22px; font-weight: 700; line-height: 1.3; margin: 4px 0 6px; letter-spacing: 0.01em; }
 .ai-modal__file { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 12.5px; color: var(--ink-3); }
@@ -541,23 +542,34 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .ai-modal__hint .i { font-size: 14px; }
 .ai-modal__foot .btn--ink { margin-left: auto; }
 
-/* 報告的帳目：找到（墨水）｜找不到／要核對（鉛筆虛線框） */
-.ai-ledger { display: grid; grid-template-columns: 1fr 1.45fr; gap: 14px; align-items: start; }
-.ai-ledger h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-family: var(--font-serif); font-size: 15px; font-weight: 700; }
-.ai-ledger ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
-.ai-ledger__col { padding: 14px 16px; border-radius: var(--radius); background: var(--paper-2); }
-.ai-ledger__col--check { background: transparent; border: 1.5px dashed var(--graphite-3); }
-.ai-ledger__col--check.is-clear { border-color: var(--ok); border-style: solid; background: var(--ok-wash); }
-.ai-ledger__count {
-  min-width: 22px; height: 22px; padding: 0 7px; border-radius: 99px; display: inline-grid; place-items: center;
-  font-family: var(--font-sans); font-size: 12px; font-weight: 700; background: var(--amber-wash); color: var(--amber-deep);
+/* 報告：要你核對的事按類別分組。每組一個小色塊標記（日期琥珀、比重紫、要確認朱紅、其他灰），
+   同一句只寫一次，後面的 ×N 是出現幾次 */
+.ai-todo { display: grid; gap: 8px; }
+.ai-todo__title { margin: 4px 0 2px; font-family: var(--font-serif); font-size: 15.5px; font-weight: 700; color: var(--ink); }
+.ai-todo__group { --k: var(--ink-2); --k-wash: var(--paper-3); padding: 11px 14px 12px; border-radius: var(--radius); background: var(--paper-2); }
+.ai-todo__group.is-date { --k: var(--amber-deep); --k-wash: var(--amber-wash); }
+.ai-todo__group.is-weight { --k: var(--plum-deep); --k-wash: var(--plum-wash); }
+.ai-todo__group.is-check { --k: #8f2a18; --k-wash: var(--seal-wash); }
+.ai-todo__head { display: flex; align-items: center; gap: 9px; margin: 0; font-family: var(--font-serif); font-size: 14.5px; font-weight: 700; color: var(--ink); }
+.ai-todo__icon {
+  flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--k-wash); color: var(--k); font-family: var(--font-sans); font-size: 13px;
 }
-.ai-ledger__col--check.is-clear .ai-ledger__count { background: var(--paper); color: var(--green-deep); }
-.ai-line { display: flex; gap: 8px; font-size: 13.5px; line-height: 1.55; color: var(--ink-2); }
-.ai-line .i { flex: none; margin-top: 3px; font-size: 14px; }
-.ai-line.is-ok .i { color: var(--ok); }
-.ai-line.is-warn .i { color: var(--amber); }
-.ai-ledger.is-animated .ai-line { opacity: 0; animation: ai-line-in 0.35s ease-out forwards; animation-delay: calc(0.25s + var(--i) * 90ms); }
+.ai-todo__icon .i { font-size: 14px; }
+.ai-todo__n {
+  margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 99px; display: inline-grid; place-items: center;
+  font-family: var(--font-sans); font-size: 12px; font-weight: 700; color: var(--k); background: var(--k-wash);
+}
+.ai-todo ul { list-style: none; margin: 7px 0 0 33px; padding: 0; display: grid; gap: 5px; }
+.ai-todo li { font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+.ai-todo__what { color: var(--ink); }
+.ai-todo__hint { display: inline-block; margin-left: 4px; font-size: 12.5px; color: var(--ink-3); } /* 放不下時整段換到下一行，不在中間斷開 */
+.ai-todo__times { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 99px; font-size: 11.5px; font-weight: 700; color: var(--k); background: var(--k-wash); }
+.ai-todo.is-animated .ai-todo__group { opacity: 0; animation: ai-line-in 0.35s ease-out forwards; animation-delay: calc(0.25s + var(--i) * 120ms); }
+.ai-todo-clear {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 14px; border-radius: var(--radius);
+  background: var(--ok-wash); color: var(--green-deep); font-size: 14px; font-weight: 600;
+}
 
 /* 頁面上的報告卡 */
 .ai-report { padding: 18px 22px 20px; margin-top: 16px; display: grid; gap: 12px; }
@@ -571,12 +583,11 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
   .ai-check { grid-template-columns: 22px 1fr auto; gap: 10px; }
   .ai-check__n { display: none; }
   .ai-stamp { top: 16px; right: 54px; font-size: 14px; padding: 4px 9px; }
-  .ai-ledger { grid-template-columns: 1fr; }
+  .ai-todo ul { margin-left: 0; }
 }
-@media (max-width: 760px) { .ai-report .ai-ledger { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) {
   .ai-step.is-now .ai-step__mark, .ai-check.is-spin .ai-check__mark, .ai-check.is-spin .ai-check__text::after { animation: none; }
-  .ai-modal, .ai-modal__card, .ai-check, .ai-check__mark, .ai-check__text, .ai-stamp, .ai-ledger .ai-line { animation: none !important; opacity: 1; }
+  .ai-modal, .ai-modal__card, .ai-check, .ai-check__mark, .ai-check__text, .ai-stamp, .ai-todo__group { animation: none !important; opacity: 1; }
   .ai-stamp { opacity: 0.88; }
   .ai-meter span { transition: none; }
 }
@@ -1030,6 +1041,23 @@ a.crow:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; }
 .crow.is-past { opacity: 0.55; }
 .crow.is-past:hover { opacity: 0.85; }
 .crow.is-undated .crow__due { color: var(--sepia-3); }
+
+/* 移到另一組：拖動時原位變淡，可以放的那一組出現虛線框；空的那一組平時不顯示，拖動時才出現 */
+a.crow { -webkit-touch-callout: none; }
+a.crow[draggable="true"] { cursor: grab; }
+a.crow.is-dragged { opacity: 0.35; }
+/* 手機長按拿起來的那一項：像一張卡片浮起來，跟著手指走 */
+.crow-ghost {
+  position: fixed; z-index: 60; margin: 0; pointer-events: none; border-radius: 12px;
+  background: var(--paper-warm); box-shadow: 0 14px 30px -10px rgba(60, 40, 20, 0.45), 0 0 0 1.5px var(--c-deep, var(--ink-2));
+  transform: scale(1.04) rotate(-1.2deg); animation: crow-lift 0.18s ease-out;
+}
+@keyframes crow-lift { from { transform: scale(1) rotate(0); box-shadow: none; } }
+.course__group.is-empty { display: none; }
+.course.is-dragging .course__group.is-empty { display: block; }
+.course__drop { margin: 6px 0 0; padding: 14px; border-radius: 10px; text-align: center; font-size: 14px; color: var(--sepia-3); border: 1.5px dashed var(--rule-warm); }
+.course.is-dragging .course__group[data-group] { border-radius: 12px; outline: 1.5px dashed transparent; outline-offset: 6px; transition: outline-color 0.15s, background 0.15s; }
+.course__group.is-drop { outline-color: var(--c-deep, var(--ink-2)) !important; background: color-mix(in srgb, var(--c-wash, var(--paper-2)) 55%, transparent); }
 
 /* 卡底：一行點線，左邊說明，右邊科目色外框按鈕；「刪除這一科」是淡色文字按鈕，滑過才變朱紅 */
 .course__foot {

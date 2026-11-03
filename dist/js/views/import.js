@@ -113,7 +113,7 @@ function aiModal(s) {
           }).join('')}
         </ol>
         ${done ? `
-        ${ledger(doc, true)}
+        ${findings(doc, true)}
         <footer class="ai-modal__foot">
           <button class="btn btn--ink" type="button" data-action="ai-modal-close">${L('去逐項核對', 'Check the items')} ${icon('arrow')}</button>
         </footer>` : `
@@ -125,21 +125,24 @@ function aiModal(s) {
     </div>`;
 }
 
-/** 報告的帳目：左邊「找到」用墨水寫，右邊「找不到／要核對」放在鉛筆虛線框裡，等你處理。 */
-function ledger(doc, animate) {
-  const { have, missing } = report(doc);
-  let n = 0;
-  const line = (cls, sign, text) => `<li class="ai-line ${cls}" ${animate ? `style="--i:${n++}"` : ''}>${icon(sign)}<span>${esc(text)}</span></li>`;
+const GROUP_MARK = { date: () => icon('calendar'), weight: () => '<b>%</b>', check: () => icon('alert'), other: () => icon('info') };
+
+/**
+ * 報告：要你核對的事按類別分組（日期未定、比重、要確認、其他），每組一個色塊標記和數目；
+ * 同一句只寫一次，後面標出現幾次。找到的數目已經在上面的清單，這裡不再列。
+ */
+function findings(doc, animate) {
+  const groups = report(doc);
+  if (!groups.length) return `<p class="ai-todo-clear">${icon('check')} ${L('沒有發現缺漏，可以直接逐項確認。', 'Nothing missing. Go ahead and confirm the items.')}</p>`;
   return `
-        <div class="ai-ledger ${animate ? 'is-animated' : ''}">
-          <div class="ai-ledger__col">
-            <h3>${L('找到', 'Found')}</h3>
-            <ul>${have.map((t) => line('is-ok', 'check', t)).join('')}</ul>
-          </div>
-          <div class="ai-ledger__col ai-ledger__col--check ${missing.length ? '' : 'is-clear'}">
-            <h3>${L('找不到／要核對', 'Missing or to check')} <span class="ai-ledger__count">${missing.length}</span></h3>
-            <ul>${missing.length ? missing.map((t) => line('is-warn', 'alert', t)).join('') : line('is-ok', 'check', L('沒有發現缺漏', 'Nothing missing found'))}</ul>
-          </div>
+        <div class="ai-todo ${animate ? 'is-animated' : ''}">
+          <h3 class="ai-todo__title">${L('要你核對', 'Please check')}</h3>
+          ${groups.map((g, i) => `
+          <section class="ai-todo__group is-${g.kind}" ${animate ? `style="--i:${i}"` : ''}>
+            <h4 class="ai-todo__head"><span class="ai-todo__icon" aria-hidden="true">${GROUP_MARK[g.kind]()}</span>${g.label}<span class="ai-todo__n">${g.lines.length}</span></h4>
+            <ul>${g.lines.map((l) => `
+              <li><span class="ai-todo__what">${esc(l.text)}</span>${l.hint ? ` <span class="ai-todo__hint">${esc(l.hint)}</span>` : ''}${l.times > 1 ? ` <span class="ai-todo__times">×${l.times}</span>` : ''}</li>`).join('')}</ul>
+          </section>`).join('')}
         </div>`;
 }
 
@@ -184,7 +187,7 @@ function reportCard(doc) {
   return `
     <section class="sheet ai-report" aria-label="${L('AI 讀取報告', 'AI reading report')}">
       <p class="ai-report__eyebrow">${L('AI 讀取報告', 'AI reading report')}</p>
-      ${ledger(doc, false)}
+      ${findings(doc, false)}
     </section>`;
 }
 

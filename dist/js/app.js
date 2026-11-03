@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse,
+  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, setTaskGroup,
 } from './store.js';
 import { readSyllabus, toItems, checklist, AI_MAX_MB } from './syllabus-ai.js';
 
@@ -13,7 +13,7 @@ import { renderMonth, shiftMonth } from './views/month.js';
 import { stepFields, stepHelper, suggestSteps } from './views/task-editor.js';
 import { keepFile, fits, LIMIT_MB, getAttachment, removeAttachment } from './attachments.js';
 import { L, setLang, applyStatic } from './i18n.js';
-import { toast, openPopover, closePopover, place, remember, recall } from './ui.js';
+import { toast, openPopover, closePopover, place, remember, recall, esc } from './ui.js';
 import { drawArrows, forgetPencils } from './planner.js';
 import { startTour, endTour, tourStep, tourActive, placeTour } from './tour.js';
 import { taskOf, pendingProposal, pendingCount } from './model.js';
@@ -431,6 +431,7 @@ const actions = {
   'course-add': () => { ui.addCourse = null; ui.docId = null; location.hash = '#/import/add'; },
   'course-more': (el) => { ui.addCourse = el.dataset.course; ui.docId = null; location.hash = '#/import/add'; },
   'course-continue': (el) => { ui.addCourse = null; ui.docId = el.dataset.doc; },
+  'task-group': (el) => { closePopover(); setTaskGroup(el.dataset.task, el.dataset.group); },
   'course-delete': (el) => {
     const c = getState().courses[el.dataset.course];
     if (!c || !window.confirm(L(`刪除「${c.name}」？這一科的功課、測驗、考試，連同已排的讀書時段和你放過的資料，都會一起刪除，不能復原。`,
@@ -528,6 +529,140 @@ document.addEventListener('click', (e) => {
 }, true);
 
 document.getElementById('scrim').addEventListener('click', () => closePopover());
+
+/* 科目卡：把一項移到另一組（改它的類型）。電腦上拖放；手機長按「拿起來」再拖；電腦右鍵開「移到…」選單。 */
+const groupName = (g) => (g === 'exam' ? L('測驗和考試', 'quizzes and exams') : L('功課', 'assignments'));
+let dragRow = null;
+const endDrag = () => {
+  dragRow?.classList.remove('is-dragged');
+  document.querySelectorAll('.course.is-dragging').forEach((x) => x.classList.remove('is-dragging'));
+  document.querySelectorAll('.course__group.is-drop').forEach((x) => x.classList.remove('is-drop'));
+  dragRow = null;
+};
+// 只能放到同一科的另一組
+const dropTarget = (e) => groupAt(e.target);
+const groupAt = (el) => {
+  const g = el?.closest?.('.course__group[data-group]');
+  return dragRow && g && g.dataset.course === dragRow.dataset.course && g.dataset.group !== dragRow.dataset.group ? g : null;
+};
+const markDrop = (g) => document.querySelectorAll('.course__group[data-group]').forEach((x) => x.classList.toggle('is-drop', x === g));
+document.addEventListener('dragstart', (e) => {
+  const row = e.target.closest?.('.crow[data-task]');
+  if (!row) return;
+  dragRow = row;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', row.dataset.task);
+  row.closest('.course')?.classList.add('is-dragging'); // 空的那一組這時才出現
+  setTimeout(() => row.classList.add('is-dragged'), 0); // 拖著的影像先照原樣拍下，原位才變淡
+});
+document.addEventListener('dragover', (e) => {
+  const g = dropTarget(e);
+  document.querySelectorAll('.course__group.is-drop').forEach((x) => { if (x !== g) x.classList.remove('is-drop'); });
+  if (!g) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  g.classList.add('is-drop');
+});
+document.addEventListener('drop', (e) => {
+  const g = dropTarget(e);
+  if (!g) return;
+  e.preventDefault();
+  const id = dragRow.dataset.task;
+  endDrag();
+  setTaskGroup(id, g.dataset.group);
+});
+document.addEventListener('dragend', endDrag);
+
+const openMoveMenu = (row) => {
+  const t = taskOf(getState(), row.dataset.task);
+  if (!t) return;
+  const to = row.dataset.group === 'exam' ? 'work' : 'exam';
+  openPopover(row, `<p class="pop__title">${esc(t.title)}</p>
+    <div class="pop__actions">
+      <button class="btn btn--sm btn--ink" type="button" data-action="task-group" data-task="${t.id}" data-group="${to}">${L(`移到${groupName(to)}`, `Move to ${groupName(to)}`)}</button>
+      <a class="btn btn--sm btn--ghost" href="#/tasks/${t.id}" data-action="pop-close">${L('打開這一項', 'Open')}</a>
+    </div>`);
+};
+// 手機：按住 0.4 秒，那一項像方塊一樣浮起來跟著手指走，放到另一組就移過去。
+// 浮起來之前手指一移動就當作捲動；浮起來之後不捲動頁面，拖到螢幕上下邊緣才慢慢捲。
+let touch = null;
+const dropTouch = () => {
+  if (!touch) return;
+  clearTimeout(touch.timer);
+  cancelAnimationFrame(touch.raf);
+  touch.ghost?.remove();
+  if (touch.lifted) endDrag();
+  touch = null;
+};
+document.addEventListener('touchstart', (e) => {
+  const row = e.target.closest?.('.crow[data-task]');
+  if (!row || e.touches.length !== 1) return;
+  const t0 = e.touches[0];
+  touch = { row, x: t0.clientX, y: t0.clientY, lifted: false, used: false };
+  touch.timer = setTimeout(() => {
+    const r = row.getBoundingClientRect();
+    const ghost = row.cloneNode(true);
+    ghost.className = 'crow crow-ghost';
+    ghost.removeAttribute('href');
+    ghost.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px`;
+    row.closest('.course').append(ghost);
+    Object.assign(touch, { lifted: true, used: true, ghost, dx: touch.x - r.left, dy: touch.y - r.top });
+    dragRow = row;
+    row.closest('.course')?.classList.add('is-dragging');
+    row.classList.add('is-dragged');
+    navigator.vibrate?.(12);
+  }, 400);
+}, { passive: true });
+document.addEventListener('touchmove', (e) => {
+  if (!touch) return;
+  const t0 = e.touches[0];
+  if (!touch.lifted) {
+    if (Math.hypot(t0.clientX - touch.x, t0.clientY - touch.y) > 10) { clearTimeout(touch.timer); touch = null; } // 是捲動
+    return;
+  }
+  e.preventDefault();
+  touch.x = t0.clientX;
+  touch.y = t0.clientY;
+  touch.ghost.style.left = `${touch.x - touch.dx}px`;
+  touch.ghost.style.top = `${touch.y - touch.dy}px`;
+  markDrop(groupAt(document.elementFromPoint(touch.x, touch.y)));
+  // 拖到上下邊緣：慢慢捲動
+  cancelAnimationFrame(touch.raf);
+  const edge = touch.y < 90 ? -1 : touch.y > innerHeight - 70 ? 1 : 0;
+  if (edge) {
+    const step = () => {
+      if (!touch?.lifted) return;
+      window.scrollBy(0, edge * 8);
+      markDrop(groupAt(document.elementFromPoint(touch.x, touch.y)));
+      touch.raf = requestAnimationFrame(step);
+    };
+    touch.raf = requestAnimationFrame(step);
+  }
+}, { passive: false });
+document.addEventListener('touchend', () => {
+  if (!touch) return;
+  if (!touch.lifted) { clearTimeout(touch.timer); touch = null; return; }
+  const g = groupAt(document.elementFromPoint(touch.x, touch.y));
+  const id = dragRow?.dataset.task;
+  const keep = touch;
+  dropTouch();
+  touch = { used: keep.used }; // 擋住放手後的 click
+  setTimeout(() => { if (touch && !touch.row) touch = null; }, 400);
+  if (g && id) setTaskGroup(id, g.dataset.group);
+});
+document.addEventListener('touchcancel', dropTouch);
+
+// 電腦右鍵：「移到…」選單（手機長按也會觸發 contextmenu，但手機用上面的拖動，這裡只擋掉系統選單）
+document.addEventListener('contextmenu', (e) => {
+  const row = e.target.closest?.('.crow[data-task]');
+  if (!row) return;
+  e.preventDefault();
+  if (!touch) openMoveMenu(row);
+});
+// 長按拿起過，放手產生的 click 不要打開這一項
+document.addEventListener('click', (e) => {
+  if (touch?.used && e.target.closest?.('.crow[data-task]')) { e.preventDefault(); e.stopPropagation(); touch = null; }
+}, true);
 
 document.addEventListener('keydown', (e) => {
   if (tourActive()) {

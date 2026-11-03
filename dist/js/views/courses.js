@@ -10,8 +10,12 @@ import { ui } from '../store.js';
 import { L } from '../i18n.js';
 import { dayShort, hm } from '../time.js';
 
-// 先看類型（AI 給的，或你在任務裡填的）；類型說不準時才看名稱，而且只認明確的字（「final report」不是考試）
-const isExam = (t) => /考試|測驗|小測|exam|quiz|test/i.test(t.kind || '') || /\b(?:exam|quiz|test|midterm)\b|考試|測驗|小測/i.test(t.title);
+// 分組看類型（AI 給的、你拖動或在任務裡改的）；類型是空的或「其他」才看名稱（只認明確的字，「final report」不是考試）。
+const EXAM_KIND = /考試|測驗|小測|exam|quiz|test/i;
+const GENERIC_KIND = /^(其他|other)?$/i;
+const EXAM_TITLE = /\b(?:exam|quiz|test|midterm)\b|考試|測驗|小測/i;
+/** 這一項放在哪一組：'exam'（測驗和考試）或 'work'（功課）。 */
+export const groupOf = (t) => ((GENERIC_KIND.test((t.kind || '').trim()) ? EXAM_TITLE.test(t.title) : EXAM_KIND.test(t.kind)) ? 'exam' : 'work');
 const due = (t) => `${t.due.date} ${String(t.due.min).padStart(4, '0')}`;
 /**
  * 卡頭的浮水印：代號裡的數字（COMP1023 → 1023）；沒有數字時，短代號照用（MATH），
@@ -55,8 +59,8 @@ export function coursesPage(s) {
 function courseCard(s, c) {
   const open = ui.openCourse === c.id;
   const tasks = s.tasks.filter((t) => t.course === c.id).sort((a, b) => due(a).localeCompare(due(b)));
-  const exams = tasks.filter(isExam);
-  const work = tasks.filter((t) => !exams.includes(t));
+  const exams = tasks.filter((t) => groupOf(t) === 'exam');
+  const work = tasks.filter((t) => groupOf(t) === 'work');
   const undated = s.docs.filter((d) => d.own && d.course === c.id).flatMap((d) => d.items)
     .filter((i) => i.state === 'ink' && i.applied !== 'dup' && !i.filled && i.plan?.kind === 'task' && !i.plan.date);
   const id = `course-${c.id}`;
@@ -74,8 +78,8 @@ function courseCard(s, c) {
       </button>
       ${open ? `
       <div class="course__body" id="${id}">
-        ${group(s, L('測驗和考試', 'Quizzes and exams'), exams)}
-        ${group(s, L('功課', 'Assignments'), work)}
+        ${group(s, c, 'exam', L('測驗和考試', 'Quizzes and exams'), exams, tasks.length)}
+        ${group(s, c, 'work', L('功課', 'Assignments'), work, tasks.length)}
         ${undated.length ? `
         <div class="course__group">
           <h3>${L('日期未公布', 'Date not announced')} <span>${undated.length}</span></h3>
@@ -99,12 +103,17 @@ function courseCard(s, c) {
     </section>`;
 }
 
-function group(s, title, tasks) {
-  if (!tasks.length) return '';
+/**
+ * 一組（測驗和考試／功課）。電腦上可以把一項拖到另一組（改它的類型），手機上長按選「移到…」。
+ * 這科有任務但這一組是空的時候，先畫一個隱藏的空組，拖動時才出現，讓你放進去。
+ */
+function group(s, c, key, title, tasks, any) {
+  if (!tasks.length && !any) return '';
   return `
-        <div class="course__group">
+        <div class="course__group ${tasks.length ? '' : 'is-empty'}" data-group="${key}" data-course="${c.id}">
           <h3>${title} <span>${tasks.length}</span></h3>
-          <ul class="crows ${tasks.some((t) => t.weight) ? 'crows--weights' : ''}">${tasks.map((t) => row(s, t)).join('')}</ul>
+          ${tasks.length ? `<ul class="crows ${tasks.some((t) => t.weight) ? 'crows--weights' : ''}">${tasks.map((t) => row(s, t)).join('')}</ul>`
+            : `<p class="course__drop">${L('放到這裡', 'Drop here')}</p>`}
         </div>`;
 }
 
@@ -113,7 +122,7 @@ function row(s, t) {
   const d = daysFrom(s.today, t.due.date);
   const when = d < 0 ? L('已過', 'Past') : d === 0 ? L('今天', 'Today') : d === 1 ? L('明天', 'Tomorrow') : d <= 7 ? L(`還有 ${d} 天`, `In ${d} days`) : '';
   return `
-            <li><a class="crow ${d < 0 ? 'is-past' : d <= 7 ? 'is-soon' : ''}" href="#/tasks/${t.id}">
+            <li><a class="crow ${d < 0 ? 'is-past' : d <= 7 ? 'is-soon' : ''}" href="#/tasks/${t.id}" draggable="true" data-task="${t.id}" data-course="${t.course}" data-group="${groupOf(t)}">
               <span class="crow__title">${esc(t.title)}</span>
               <span class="crow__due">${when ? `<span class="crow__when">${when}</span>` : ''}${dayShort(t.due.date)} ${hm(t.due.min)}</span>
               <span class="crow__weight">${esc(t.weight || '')}</span>

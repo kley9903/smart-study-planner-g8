@@ -113,9 +113,15 @@ export function whenText(plan) {
   return `${plan.date} ${hm(plan.min)}`;
 }
 
+// 沒對到任何一項的提醒分成幾類（報告裡分組）：'date' 日期、'weight' 比重、'check' 要確認（衝突）、'other' 其他。
+// 硬性檢查的句子以「原文有「」開頭：有 % 的是比重，其他是日期。以前存成純文字的提醒也用這個分類。
+const kindOfText = (t) => (String(t).startsWith('原文有「') ? (/%/.test(t) ? 'weight' : 'date') : 'other');
+const kindOfPath = (path = '') => (/weight/i.test(path) ? 'weight' : /date|time|due/i.test(path) ? 'date' : 'other');
+const notesOf = (doc) => (doc.notes || []).map((n) => (typeof n === 'string' ? { kind: kindOfText(n), text: n } : n));
+
 /**
  * Dify 的課程 JSON → { course, items, notes }。items 都是 'pencil'（待核對），
- * 只存跟語言無關的資料；畫面用 rowText(item) 取得目前語言的文字。
+ * 只存跟語言無關的資料；畫面用 rowText(item) 取得目前語言的文字。notes 是 { kind, text }（見 kindOfText）。
  */
 export function toItems(result) {
   const r = result || {};
@@ -157,7 +163,11 @@ export function toItems(result) {
   });
 
   const describe = (x) => (typeof x === 'string' ? x : x?.reason || x?.message || x?.description || x?.question || JSON.stringify(x));
-  const notes = [...missing.filter((m) => !used.has(m) && !m.path?.startsWith('/course_events/')), ...(r.conflicts || []), ...(r.warnings || [])].map(describe).filter(Boolean);
+  const notes = [
+    ...missing.filter((m) => !used.has(m) && !m.path?.startsWith('/course_events/')).map((m) => ({ kind: kindOfPath(m.path), text: describe(m) })),
+    ...(r.conflicts || []).map((c) => ({ kind: 'check', text: describe(c) })),
+    ...(r.warnings || []).map((w) => ({ kind: kindOfText(describe(w)), text: describe(w) })),
+  ].filter((n) => n.text);
   const weights = (r.assessment_components || []).map((c) => c.weight_percent).filter((w) => typeof w === 'number');
   return { course, courseTitle: r.course?.code && r.course?.name ? r.course.name : '', items, notes, weightTotal: weights.length ? weights.reduce((a, b) => a + b, 0) : null };
 }
@@ -176,7 +186,7 @@ export function checklist(doc) {
   const exams = count((i) => EXAMS.has(i.key));
   const undated = count((i) => i.plan?.kind === 'task' && !i.plan.date);
   const total = doc.weightTotal;
-  const gaps = (doc.notes || []).length;
+  const gaps = new Set(notesOf(doc).map((n) => n.text)).size; // 同一句重複只算一處
   return [
     { stage: 'read', label: L('讀取大綱', 'Read the syllabus'), state: 'ok', text: L('完成', 'Done') },
     { stage: 'extract', label: L('功課', 'Assignments'), ...found(work, ['項']) },
@@ -188,30 +198,36 @@ export function checklist(doc) {
     { stage: 'check', label: L('原文對照', 'Against the syllabus'), ...(gaps ? { state: 'warn', text: L(`${gaps} 處要核對`, `${gaps} to check`) } : { state: 'ok', text: L('沒有發現對不上的地方', 'Nothing out of line') }) },
   ];
 }
+const GROUPS = [
+  ['date', () => L('日期未定', 'Dates to settle')],
+  ['weight', () => L('比重', 'Weights')],
+  ['check', () => L('要確認', 'To confirm')],
+  ['other', () => L('其他', 'Other')],
+];
 /**
- * AI 讀完一份大綱的報告：have（找到了甚麼）和 missing（沒有或要核對甚麼），都是目前語言的文字。
- * 已刪除的項目不算。missing 包括 Dify 的硬性檢查（原文有、結果沒有）和衝突。
+ * AI 讀完一份大綱的報告：要你核對的事，按類別分組（日期未定、比重、要確認、其他），都是目前語言的文字。
+ * 每組是 { kind, label, lines }，每行 { text, hint?, times? }：同一句只寫一次，times 是出現幾次。沒有要核對的回傳 []。
+ * 找到了甚麼不再列（檢查視窗上面的清單已經寫了數目）。已刪除的項目不算。
  */
 export function report(doc) {
   const items = doc.items.filter((i) => i.state !== 'erased');
-  const exams = items.filter((i) => EXAMS.has(i.key));
-  const work = items.filter((i) => i.plan?.kind === 'task' && !EXAMS.has(i.key));
-  const have = [
-    L(`功課 ${work.length} 項`, `${work.length} assignment${work.length === 1 ? '' : 's'}`),
-    L(`考試／測驗 ${exams.length} 項`, `${exams.length} exam${exams.length === 1 ? '' : 's'} or quiz${exams.length === 1 ? '' : 'zes'}`),
-  ];
-  if (doc.weightTotal != null) have.push(L(`比重合計 ${doc.weightTotal}%`, `Weights add up to ${doc.weightTotal}%`));
-  const missing = [];
-  if (!exams.length) missing.push(L('沒找到考試或測驗', 'No exams or quizzes found'));
-  if (doc.weightTotal != null && Math.abs(doc.weightTotal - 100) > 0.5) {
-    missing.push(L(`比重合計 ${doc.weightTotal}%，不是 100%：可能漏了評核項目`, `Weights add up to ${doc.weightTotal}%, not 100%: an assessment may be missing`));
-  }
+  const lines = { date: [], weight: [], check: [], other: [] };
   for (const it of items) {
-    if (it.plan?.kind === 'task' && !it.plan.date) missing.push(L(`${it.what}：沒有日期（${it.raw || '大綱沒寫'}）`, `${it.what}: no date (${it.raw || 'not in the syllabus'})`));
-    else if (it.flag === 'no-time') missing.push(L(`${it.what}：沒寫時間，暫定 ${hm(it.plan.min)}`, `${it.what}: no time, set to ${hm(it.plan.min)}`));
-    else if (it.flag === 'no-day') missing.push(L(`${it.what}：看不出星期幾或時間`, `${it.what}: day or time unclear`));
+    if (it.plan?.kind === 'task' && !it.plan.date) lines.date.push({ text: it.what, hint: it.raw ? L(`原文：${it.raw}`, `Syllabus: ${it.raw}`) : L('大綱沒寫日期', 'No date given') });
+    else if (it.flag === 'no-time') lines.date.push({ text: it.what, hint: L(`沒寫時間，暫定 ${hm(it.plan.min)}`, `No time; set to ${hm(it.plan.min)}`) });
+    else if (it.flag === 'no-day') lines.date.push({ text: it.what, hint: L('看不出星期幾或時間', 'Day or time unclear') });
   }
-  return { have, missing: [...missing, ...(doc.notes || [])] };
+  if (doc.weightTotal != null && Math.abs(doc.weightTotal - 100) > 0.5) {
+    lines.weight.push({ text: L(`比重合計 ${doc.weightTotal}%，不是 100%：可能漏了評核項目`, `Weights add up to ${doc.weightTotal}%, not 100%: an assessment may be missing`) });
+  }
+  if (!items.some((i) => EXAMS.has(i.key))) lines.check.push({ text: L('沒找到考試或測驗', 'No exams or quizzes found') });
+  for (const n of notesOf(doc)) {
+    const list = lines[n.kind] || lines.other;
+    const same = list.find((l) => l.text === n.text);
+    if (same) same.times = (same.times || 1) + 1;
+    else list.push({ text: n.text });
+  }
+  return GROUPS.filter(([kind]) => lines[kind].length).map(([kind, label]) => ({ kind, label: label(), lines: lines[kind] }));
 }
 
 /** 科目裡已有同名項目時的說明（match 由 store.js 判斷：不重複／改日期／補日期）。已確認的不再提示。 */

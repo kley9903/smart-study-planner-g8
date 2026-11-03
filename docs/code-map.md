@@ -45,7 +45,7 @@
 | `dist/js/views/month.js` | 共用任務與忙碌資料的月曆、跨月切換及日期選擇 |
 | `dist/js/views/task-editor.js` | 新增／編輯任務表單、子任務與附件入口；新增頁右邊的「建議拆法」（`suggestSteps`，示範用固定範本，未接 AI；接 AI 時改這裡） |
 | `dist/js/views/tasks.js` | 任務列表、任務細節、步驟和進度 |
-| `dist/js/views/courses.js` | 「自己的計劃」的課程資料首頁（`#/import`）：每科一張可展開的科目卡（代號、全名；展開看已確認的測驗和考試、功課、日期未公布的項目），卡底「補充資訊」和「刪除這一科」（確認後由 `store.js` 的 `deleteCourse` 刪掉科目、它的任務、讀書時段和資料，回傳要從瀏覽器刪掉的檔案），最下面虛線「增加科目」。不收上課時間 |
+| `dist/js/views/courses.js` | 「自己的計劃」的課程資料首頁（`#/import`）：每科一張可展開的科目卡（代號、全名；展開看已確認的測驗和考試、功課、日期未公布的項目），分組看類型（`groupOf`，類型空的或「其他」才看名稱）；電腦上可把一項拖到另一組，手機長按把那一項拿起來拖，電腦右鍵選「移到…」，由 `store.js` 的 `setTaskGroup` 只改類型；卡底「補充資訊」和「刪除這一科」（確認後由 `store.js` 的 `deleteCourse` 刪掉科目、它的任務、讀書時段和資料，回傳要從瀏覽器刪掉的檔案），最下面虛線「增加科目」。不收上課時間 |
 | `dist/js/views/import.js` | 收集資料與核對的頁面。示範模式一頁看完（預寫的抽取結果）；自己的計劃在 `#/import/add`：可打字的輸入框（`pasteBox`，貼上文字或上傳 PDF／Word），「用 AI 找出項目」→ 檢查視窗 → 核對表；「放進科目」可改，確認了才建立科目、變成任務，科目裡已有的不重複加入 |
 | `dist/js/views/availability.js` | 「改沒空的時間」的說明行和右欄（睡眠、上課時間、你自己加的）；拖拉新增、右鍵移除、手機按空白處新增的處理在 `busy-paint.js`；不再是獨立頁面，由本週按「改沒空的時間」打開（`ui.editBusy`），舊網址 `#/time` 會轉到這裡 |
 | `dist/js/views/margin.js` | AI 助手的對話內容、建議及選擇方案的畫面（放在右下角角色展開的面板裡） |
@@ -67,7 +67,7 @@
 | `dist/js/mascot.js` | 右下角角色的姿勢：何時掉下去趴著、何時撐起來、閒置 30 秒、打哈欠的計時；姿勢寫成角色容器的 class，CSS 播動畫。`app.js` 每次重畫角色後呼叫 `shown()`，其餘由它自己監聽；時間設定在 `TIMING` |
 | `dist/js/busy-paint.js` | 「改沒空的時間」模式在時間表上拖拉新增、手機按一下用表格新增、右鍵移除；整個手勢都在這裡，`app.js` 只呼叫 `attachBusyPainting()` |
 | `dist/js/store.js` | 管理目前狀態與修改資料的動作；自己的計劃存在瀏覽器 localStorage，示範狀態主要存在記憶體 |
-| `dist/js/syllabus-ai.js` | 自己的大綱 → `/api/syllabus` → 待核對的項目：`readSyllabus(file)`（貼上的文字存成 .txt，以文字送出）、`toItems(Dify 結果)`、`rowText(項目)` 按目前語言產生顯示文字、`report(大綱)` 產生讀完後的「有／沒有」報告；`readSyllabus` 的 `onStage` 收到 Dify 每一步的進度（伺服器以 NDJSON 逐行送出），畫面據此在檢查視窗（`views/import.js` 的 `aiModal`，後面模糊）逐項轉圈；結果到了由 `checklist(大綱)` 逐行揭曉找到／找不到，最後出報告；確認後由 `store.js` 變成任務或每週沒空時間 |
+| `dist/js/syllabus-ai.js` | 自己的大綱 → `/api/syllabus` → 待核對的項目：`readSyllabus(file)`（貼上的文字存成 .txt，以文字送出）、`toItems(Dify 結果)`、`rowText(項目)` 按目前語言產生顯示文字、`report(大綱)` 把要你核對的事按類別分組（日期未定、比重、要確認、其他；同一句只列一次並標出次數）；`readSyllabus` 的 `onStage` 收到 Dify 每一步的進度（伺服器以 NDJSON 逐行送出），畫面據此在檢查視窗（`views/import.js` 的 `aiModal`，後面模糊）逐項轉圈；結果到了由 `checklist(大綱)` 逐行揭曉找到／找不到，最後出報告；確認後由 `store.js` 變成任務或每週沒空時間 |
 | `dist/js/attachments.js` | 附件保存在本瀏覽器 IndexedDB；只有按「用 AI 找出項目」時，那一份大綱才會送到 `/api/syllabus`。存檔一律用 `keepFile(file, 上限 MB)`，大小上限在 `LIMIT_MB`（任務附件 10 MB、課程大綱 20 MB） |
 | `dist/js/model.js` | 從狀態推算每日畫面、空檔、課程／任務資料和 AI 建議疊加結果 |
 | `dist/js/scheduler.js` | 固定規則排程：按截止時間找空檔、避開沒空時段、限制每日讀書量等；不是 AI 模型 |

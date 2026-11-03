@@ -585,6 +585,18 @@ export function deleteTask(id) {
   emit({ toast: L(`已刪除「${t.title}」和它的讀書時段`, `Deleted "${t.title}" and its sessions`), toastIcon: 'x' });
 }
 
+/**
+ * 在科目卡把一項移到另一組：只改類型（'exam' → 名稱像考試的寫「考試」，其他寫「測驗」；'work' → 「功課」）。
+ * 預計時數和已排的讀書時段不動，要改時數打開這一項再改。
+ */
+export function setTaskGroup(id, group) {
+  const t = taskOf(state, id);
+  if (!t || !['exam', 'work'].includes(group)) return;
+  const exam = group === 'exam';
+  t.kind = exam ? (/exam|midterm|final|考試/i.test(t.title) ? L('考試', 'Exam') : L('測驗', 'Quiz')) : L('功課', 'Assignment');
+  emit({ toast: L(`已把「${t.title}」移到${exam ? '測驗和考試' : '功課'}（預計時數沒有改）`, `Moved "${t.title}" to ${exam ? 'quizzes and exams' : 'assignments'} (estimate unchanged)`), toastIcon: 'check', keepScroll: true });
+}
+
 /** Editing scheduling inputs invalidates future sessions, never silently reschedules. */
 export function updateTask(id, fields, steps) {
   const task = taskOf(state, id);
