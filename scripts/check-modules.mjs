@@ -459,4 +459,17 @@ calls.length = 0;
 await readSyllabus(new File(['Lab 3 due Friday'], 'note.txt', { type: 'text/plain' }), { fetcher: ok, context: '這份資料屬於 COMP1010。' });
 assert.equal(JSON.parse(calls[0].init.body).inputs.context, '這份資料屬於 COMP1010。', 'adding to a course tells the AI which course it is');
 
+// 24 小時制時間格：常見打法整理成 HH:MM，認不出的不動
+const { normalizeTime, normalizeDate } = await import('../dist/js/pickers.js');
+assert.equal(normalizeTime('930'), '09:30');
+assert.equal(normalizeTime('9:30'), '09:30');
+assert.equal(normalizeTime('7'), '07:00');
+assert.equal(normalizeTime('23：59'), '23:59');
+assert.equal(normalizeTime('2400'), '2400');
+assert.equal(normalizeTime('abc'), 'abc');
+assert.equal(normalizeDate('2026/12/1'), '2026-12-01');
+assert.equal(normalizeDate('12/1', 2027), '2027-12-01');
+assert.equal(normalizeDate('2026年2月3日'), '2026-02-03');
+assert.equal(normalizeDate('2026-02-30'), '2026-02-30');
+assert.equal(normalizeDate('2028-02-29'), '2028-02-29');
 console.log('Passed: corner character poses, timetable popovers, busy-time ranges, attachment limits and the syllabus AI path.');

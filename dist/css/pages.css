@@ -1165,7 +1165,7 @@ a.crow.is-dragged { opacity: 0.35; }
 .crow__edit:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; }
 @media (hover: none) { .crow__edit { opacity: 0.8; } }
 
-/* 卡上直接改一項：名稱｜截止日期｜時間｜比重｜保存 取消，下面一行小字說明 */
+/* 卡上直接改一項：名稱｜截止日期｜時間｜比重｜保存 取消 */
 .crow-edit {
   display: grid; grid-template-columns: minmax(0, 1fr) 150px 124px 84px auto; align-items: end; gap: 10px 14px;
   margin: 6px 0 8px; padding: 12px 10px 10px var(--indent); border-radius: 12px;
@@ -1177,7 +1177,6 @@ a.crow.is-dragged { opacity: 0.35; }
 .crow-edit input { font-size: 16px; color: var(--sepia); font-variant-numeric: tabular-nums lining-nums; }
 .crow-edit__title input { font-size: 17px; font-weight: 500; }
 .crow-edit__weight input { font-weight: 700; color: var(--c-deep, var(--sepia)); }
-.crow-edit__note { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--sepia-3); }
 
 /* 增加科目：一張空白的虛線索引卡 */
 .course-add {

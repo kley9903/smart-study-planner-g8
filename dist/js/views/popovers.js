@@ -1,5 +1,6 @@
 // 時間表上的彈出框內容：按讀書時段、按灰色沒空時段、用表格新增沒空時間。
 // 全部只由資料算出 HTML，不碰 DOM；app.js 負責在按到的元素旁邊打開（openPopover）。
+import { timeField, dateField } from '../pickers.js';
 import { L } from '../i18n.js';
 import { esc, icon } from '../ui.js';
 import { blockOf, stepOf, taskOf, overlay, pendingProposal, courseOf, inkOf } from '../model.js';
@@ -114,9 +115,9 @@ export function busyForm(date, start = 540) {
   return `<form data-form="busy">
     <h2 class="pop__title">${L('新增忙碌時段', 'Add busy time')}</h2>
     <label class="field"><span class="field__label">${L('名稱', 'Name')}</span><input class="input" name="label" maxlength="80" required></label>
-    <label class="field"><span class="field__label">${L('日期', 'Date')}</span><input class="input" name="date" type="date" value="${date}" required></label>
-    <label class="field"><span class="field__label">${L('開始時間', 'Start time')}</span><input class="input" type="time" name="start" value="${hm(start)}" required></label>
-    <label class="field"><span class="field__label">${L('結束時間', 'End time')}</span><input class="input" type="time" name="end" value="${hm(start + 60)}" required></label>
+    <label class="field"><span class="field__label">${L('日期', 'Date')}</span>${dateField('date', date, 'input')}</label>
+    <label class="field"><span class="field__label">${L('開始時間', 'Start time')}</span>${timeField('start', hm(start), 'input')}</label>
+    <label class="field"><span class="field__label">${L('結束時間', 'End time')}</span>${timeField('end', hm(start + 60), 'input')}</label>
     <label class="field"><span class="field__label">${L('重複方式', 'Repeat')}</span><select class="select" name="repeat"><option value="single">${L('只限這天', 'One day')}</option><option value="weekly">${L('每週同一天', 'Weekly on this day')}</option></select></label>
     <p class="demo-note">${L('跨午夜的時段請分成兩天新增。', 'For overnight events, add a separate time on each day.')}</p>
     <button class="btn btn--ink" type="submit">${L('保存', 'Save')}</button>

@@ -177,3 +177,65 @@
 .tour__text { font-size: 14px; color: var(--ink-2); line-height: 1.7; }
 .tour__acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 .tour__acts .btn--ghost { margin-right: auto; }
+
+/* =========================================================
+   日期格和時間格（js/pickers.js）：文字格＋右邊小按鈕；點開是紙本樣式的選單，
+   取代瀏覽器內建、跟著電腦語言顯示（上午／下午、2026年12月）、改不了樣式的深色彈窗。
+   時間：小時 6×4、分鐘 6×2 的格子，不用捲動；日曆：星期一開頭，今天畫圈，選中的科目色填滿。
+   顏色跟著所在科目卡（--c-deep／--c-wash），不在科目卡裡就用墨色。
+   ========================================================= */
+.pick { position: relative; display: flex; align-items: center; min-width: 0; }
+.pick > input { flex: 1; min-width: 0; padding-right: 30px; font-variant-numeric: tabular-nums lining-nums; }
+.pick__btn {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: grid; place-items: center;
+  border: 0; border-radius: 7px; background: none; color: var(--ink-3); cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.pick__btn:hover, .pick__btn[aria-expanded="true"] { background: var(--c-wash, var(--paper-2)); color: var(--c-deep, var(--ink)); }
+.pick__btn:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 1px; }
+.pick__btn .i { font-size: 15px; }
+
+.pick__menu {
+  position: absolute; z-index: 70; top: calc(100% + 8px); left: 0; padding: 12px 12px 10px; border-radius: 14px;
+  background: var(--grain, none), var(--paper-warm, #fbf6ed); color: var(--sepia, var(--ink));
+  box-shadow: 0 18px 40px -18px rgba(60, 40, 20, 0.45), 0 2px 6px rgba(60, 40, 20, 0.08), 0 0 0 1px var(--rule-warm, #e2d5c0);
+  font-family: var(--font-serif); animation: pick-in 0.14s ease-out;
+}
+.pick__menu.is-right { left: auto; right: 0; }
+.pick__menu.is-up { top: auto; bottom: calc(100% + 8px); }
+@keyframes pick-in { from { opacity: 0; transform: translateY(-4px); } }
+.pick__menu button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+.pick__menu button:focus-visible { outline: 2px solid var(--c-deep, var(--ink-2)); outline-offset: -2px; }
+
+/* 時間 */
+.pick__menu--time { width: 232px; }
+.pick__label { margin: 0 2px 6px; font-size: 12px; letter-spacing: 0.12em; color: var(--sepia-3, var(--ink-3)); }
+.pick__label + .pick__grid + .pick__label { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--rule-warm, #e2d5c0); }
+.pick__grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+.pick__grid button {
+  height: 30px; border-radius: 8px; font-size: 14.5px; font-variant-numeric: tabular-nums lining-nums; transition: background 0.12s, color 0.12s;
+}
+.pick__grid button:hover { background: var(--c-wash, var(--paper-2)); color: var(--c-deep, var(--ink)); }
+.pick__grid button[aria-pressed="true"] { background: var(--c-deep, var(--ink)); color: var(--paper-warm, #fff); font-weight: 700; }
+
+/* 日曆 */
+.pick__menu--date { width: 264px; }
+.pick__head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 8px; }
+.pick__title { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; color: var(--c-deep, var(--ink)); }
+.pick__nav { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--sepia-2, var(--ink-2)); transition: background 0.12s; }
+.pick__nav:hover { background: var(--c-wash, var(--paper-2)); color: var(--c-deep, var(--ink)); }
+.pick__nav .i { font-size: 16px; transform: rotate(180deg); }
+.pick__nav.is-next .i { transform: none; }
+.pick__week, .pick__days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.pick__week { padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--rule-warm, #e2d5c0); }
+.pick__week span { text-align: center; font-size: 12px; color: var(--sepia-3, var(--ink-3)); }
+.pick__days button {
+  height: 32px; border-radius: 50%; font-size: 14.5px; font-variant-numeric: tabular-nums lining-nums; transition: background 0.12s, color 0.12s;
+}
+.pick__days button.is-out { color: var(--sepia-3, var(--ink-3)); opacity: 0.5; }
+.pick__days button:hover { background: var(--c-wash, var(--paper-2)); color: var(--c-deep, var(--ink)); opacity: 1; }
+.pick__days button.is-today { box-shadow: inset 0 0 0 1.5px var(--seal, #b5442a); }
+.pick__days button[aria-pressed="true"] { background: var(--c-deep, var(--ink)); color: var(--paper-warm, #fff); font-weight: 700; opacity: 1; }
+.pick__foot { display: flex; justify-content: flex-end; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--rule-warm, #e2d5c0); }
+.pick__today { padding: 4px 10px; border-radius: 8px; font-size: 14px; font-weight: 700; color: var(--c-deep, var(--ink-2)) !important; }
+.pick__today:hover { background: var(--c-wash, var(--paper-2)); }
+@media (prefers-reduced-motion: reduce) { .pick__menu { animation: none; } }

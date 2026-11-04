@@ -6,6 +6,7 @@
 // 展開後以小標題（測驗和考試、功課、日期未公布）分組，類型只寫在小標題；每項一行：名稱｜日期時間｜比重，
 // 7 天內到期用朱紅標出，已過的變淡。
 // 每項右邊一枝小鉛筆：按了原地改名稱、截止日期時間、比重（rowForm）；改名時卡頭原地變輸入格，字型跟平時一樣（renameForm）。
+import { timeField, dateField } from '../pickers.js';
 import { esc, icon } from '../ui.js';
 import { ui } from '../store.js';
 import { L } from '../i18n.js';
@@ -128,14 +129,13 @@ function rowForm(t) {
   return `
             <li><form class="crow-edit" data-form="course-row" data-task="${t.id}">
               <label class="crow-edit__title"><span>${L('名稱', 'Name')}</span><input name="title" value="${esc(t.title)}" maxlength="80" required autocomplete="off"></label>
-              <label class="crow-edit__date"><span>${L('截止日期', 'Due date')}</span><input type="date" name="date" value="${t.due.date}" required></label>
-              <label class="crow-edit__time"><span>${L('時間', 'Time')}</span><input type="time" name="time" value="${hm(t.due.min)}" required></label>
+              <label class="crow-edit__date"><span>${L('截止日期', 'Due date')}</span>${dateField('date', t.due.date)}</label>
+              <label class="crow-edit__time"><span>${L('時間', 'Time')}</span>${timeField('time', hm(t.due.min))}</label>
               <label class="crow-edit__weight"><span>${L('比重', 'Weight')}</span><input name="weight" value="${esc(t.weight || '')}" maxlength="20" placeholder="${L('例如 20%', 'e.g. 20%')}" autocomplete="off"></label>
               <div class="crow-edit__actions">
                 <button class="course__save" type="submit">${icon('check')} ${L('保存', 'Save')}</button>
                 <button class="course__cancel" type="button" data-action="course-row-cancel">${L('取消', 'Cancel')}</button>
               </div>
-              <p class="crow-edit__note">${L('改了截止時間，這一項還沒開始的安排會清除，要到本週重新排程。類型和子任務到「任務」頁改。', 'Changing the deadline clears unstarted sessions for this item; schedule again on Week. Change type and steps on the Tasks page.')}</p>
             </form></li>`;
 }
 
@@ -163,5 +163,5 @@ function row(s, t) {
               <span class="crow__title">${esc(t.title)}</span>
               <span class="crow__due">${when ? `<span class="crow__when">${when}</span>` : ''}${dayShort(t.due.date)} ${hm(t.due.min)}</span>
               <span class="crow__weight">${esc(t.weight || '')}</span>
-            </a><button class="crow__edit" type="button" data-action="course-row-edit" data-task="${t.id}" aria-label="${L(`修改「${esc(t.title)}」`, `Edit "${esc(t.title)}"`)}" title="${L('修改名稱、時間、比重', 'Edit name, time, weight')}">${icon('pencil')}</button></li>`;
+            </a><button class="crow__edit" type="button" data-action="course-row-edit" data-task="${t.id}" aria-label="${L(`修改「${esc(t.title)}」`, `Edit "${esc(t.title)}"`)}">${icon('pencil')}</button></li>`;
 }

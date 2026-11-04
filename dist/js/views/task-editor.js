@@ -1,3 +1,4 @@
+import { timeField, dateField } from '../pickers.js';
 import { esc, icon } from '../ui.js';
 import { L } from '../i18n.js';
 import { hm } from '../time.js';
@@ -11,8 +12,8 @@ export function editor(s, task, date) {
       ${field(L('名稱', 'Name'), `<input class="input" name="title" required maxlength="80" value="${esc(task?.title || '')}">`, 'tform__wide')}
       ${field(L('科目', 'Course'), `<input class="input" name="course" maxlength="40" list="course-list" value="${esc(task ? s.courses[task.course].name : '')}">`)}
       ${field(L('類型', 'Type'), `<input class="input" name="kind" maxlength="30" value="${esc(task?.kind || L('功課', 'Assignment'))}" required>`)}
-      ${field(L('截止日期', 'Due date'), `<input class="input" type="date" name="date" value="${task?.due.date || date || s.today}" required>`)}
-      ${field(L('截止時間', 'Due time'), `<input class="input" type="time" name="time" value="${task ? hm(task.due.min) : '23:59'}" required>`)}
+      ${field(L('截止日期', 'Due date'), dateField('date', task?.due.date || date || s.today, 'input'))}
+      ${field(L('截止時間', 'Due time'), timeField('time', task ? hm(task.due.min) : '23:59', 'input'))}
       ${task ? '' : field(L('預計要幾小時', 'Estimated hours'), '<input class="input" type="number" name="hours" min="0.5" max="40" step="0.5" value="3" required>')}
       ${field(L('作業要求／備註', 'Requirements / notes'), `<textarea class="input" name="requirements" maxlength="5000" rows="3">${esc(task?.requirements || '')}</textarea>`, 'tform__wide')}
     </div>

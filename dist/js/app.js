@@ -9,6 +9,7 @@ import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_M
 
 const REVEAL_STEP_MS = 450; // 檢查視窗逐行揭曉的間隔
 import { editor } from './views/task-editor.js';
+import { installPickers } from './pickers.js';
 import { renderMonth, shiftMonth } from './views/month.js';
 import { stepFields, stepHelper, suggestSteps } from './views/task-editor.js';
 import { keepFile, fits, LIMIT_MB, getAttachment, removeAttachment } from './attachments.js';
@@ -577,6 +578,7 @@ document.addEventListener('click', (e) => {
   if (fn) fn(el, e);
 }, true);
 
+installPickers();
 document.getElementById('scrim').addEventListener('click', () => closePopover());
 
 /* 科目卡改名：雙擊卡頭（見 course-toggle），或按卡底「改名」；卡頭換成輸入格，代號先選好方便直接打。 */
