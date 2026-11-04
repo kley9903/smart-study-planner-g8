@@ -1115,15 +1115,69 @@ a.crow.is-dragged { opacity: 0.35; }
 .course__del .i { font-size: 15px; }
 .course__del.is-rename:hover { color: var(--c-deep, var(--ink)); background: var(--c-wash, var(--paper-2)); }
 
-/* 改名（雙擊卡頭或按「改名」）：卡頭換成代號和全名兩格，保存／取消 */
+/* 改名（雙擊卡頭或按「改名」）：卡頭原地變成輸入格，位置、字型跟平時卡頭一樣——大號科目色代號、下面全名；
+   輸入格不用白框，只在字下一條科目色淡底線，聚焦時變實線，看起來像在紙卡上直接改字。
+   「保存」是科目色實心小按鈕，「取消」是淡色文字；科目卡上直接改一項（.crow-edit）用同一套按鈕。 */
 .course__rename {
-  position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; align-items: end; gap: 12px;
-  padding: 24px 24px 20px 30px; font-family: var(--font-serif);
+  position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px 20px;
+  padding: 22px 24px 16px 30px; font-family: var(--font-serif);
 }
-.course__rename label { display: grid; gap: 4px; min-width: 0; }
-.course__rename label span { font-size: 13px; color: var(--sepia-2); }
-.course__rename .input { width: 100%; }
-.course__rename-actions { display: flex; gap: 6px; }
+.course__rename-fields { display: grid; gap: 4px; flex: 1; min-width: 0; max-width: 560px; }
+.course__rename input, .crow-edit input {
+  width: 100%; min-width: 0; margin: 0; padding: 2px 0 3px; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit;
+  border-bottom: 1.5px dashed color-mix(in srgb, var(--c-deep, var(--ink-2)) 40%, transparent); transition: border-color 0.15s, background 0.15s;
+}
+.course__rename input:hover, .crow-edit input:hover { border-bottom-color: color-mix(in srgb, var(--c-deep, var(--ink-2)) 70%, transparent); }
+.course__rename input:focus, .crow-edit input:focus {
+  outline: none; border-bottom-style: solid; border-bottom-color: var(--c-deep, var(--ink));
+  background: color-mix(in srgb, var(--c-wash, var(--paper-2)) 45%, transparent);
+}
+.course__rename input::placeholder, .crow-edit input::placeholder { color: var(--sepia-3); opacity: 0.8; font-weight: 400; }
+.course__rename-code input {
+  font-size: 36px; font-weight: 700; line-height: 1.05; letter-spacing: 0.02em; color: var(--c-deep, var(--ink));
+}
+.course__rename-name input { font-size: 15px; line-height: 1.4; color: var(--sepia-2); }
+.course__rename-actions, .crow-edit__actions { display: flex; align-items: center; gap: 4px; flex: none; }
+.course__save {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 38px; padding: 0 16px; border: 0; border-radius: 10px; cursor: pointer;
+  background: var(--c-deep, var(--ink)); color: var(--paper-warm, #fff); font-family: var(--font-serif); font-size: 15px; font-weight: 700; letter-spacing: 0.04em;
+  box-shadow: 0 2px 6px -2px rgba(70, 45, 15, 0.35); transition: filter 0.15s;
+}
+.course__save:hover { filter: brightness(1.12); }
+.course__save .i { font-size: 15px; }
+.course__cancel {
+  min-height: 38px; padding: 0 12px; border: 0; border-radius: 10px; background: none; cursor: pointer;
+  color: var(--sepia-2); font-family: var(--font-serif); font-size: 14.5px; transition: background 0.15s, color 0.15s;
+}
+.course__cancel:hover { background: var(--c-wash, var(--paper-2)); color: var(--c-deep, var(--ink)); }
+.course__save:focus-visible, .course__cancel:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 2px; }
+
+/* 每項右邊一枝小鉛筆：平時很淡，滑過那一行才變清楚；手機（不能滑過）一直看得到 */
+.crows li:has(> .crow__edit) { display: flex; align-items: center; }
+.crows li > a.crow { flex: 1; min-width: 0; }
+.crow__edit {
+  flex: none; width: 32px; height: 32px; margin-left: 2px; display: grid; place-items: center; border: 0; border-radius: 8px;
+  background: none; color: var(--sepia-3); cursor: pointer; opacity: 0.35; transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+.crow__edit .i { font-size: 15px; }
+.crows li:hover .crow__edit, .crow__edit:focus-visible { opacity: 1; }
+.crow__edit:hover { background: var(--c-wash, var(--paper-2)); color: var(--c-deep, var(--ink)); }
+.crow__edit:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; }
+@media (hover: none) { .crow__edit { opacity: 0.8; } }
+
+/* 卡上直接改一項：名稱｜截止日期｜時間｜比重｜保存 取消，下面一行小字說明 */
+.crow-edit {
+  display: grid; grid-template-columns: minmax(0, 1fr) 150px 124px 84px auto; align-items: end; gap: 10px 14px;
+  margin: 6px 0 8px; padding: 12px 10px 10px var(--indent); border-radius: 12px;
+  background: color-mix(in srgb, var(--c-wash, var(--paper-2)) 40%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c-deep, var(--ink-2)) 30%, transparent);
+}
+.crow-edit label { display: grid; gap: 2px; min-width: 0; }
+.crow-edit label span { font-size: 12.5px; color: var(--sepia-3); }
+.crow-edit input { font-size: 16px; color: var(--sepia); font-variant-numeric: tabular-nums lining-nums; }
+.crow-edit__title input { font-size: 17px; font-weight: 500; }
+.crow-edit__weight input { font-weight: 700; color: var(--c-deep, var(--sepia)); }
+.crow-edit__note { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--sepia-3); }
 
 /* 增加科目：一張空白的虛線索引卡 */
 .course-add {
@@ -1179,7 +1233,12 @@ a.crow.is-dragged { opacity: 0.35; }
   .crow__weight { grid-area: weight; min-width: 36px; font-size: 16px; }
   .course__foot { flex-direction: column; align-items: stretch; }
   .course__actions { flex-direction: column; align-items: stretch; gap: 4px; }
-  .course__rename { grid-template-columns: 1fr; padding: 22px 14px 16px 20px; }
+  .course__rename { flex-wrap: wrap; padding: 22px 14px 16px 20px; }
+  .course__rename-fields { flex-basis: 100%; }
+  .course__rename-code input { font-size: 30px; }
+  .crow-edit { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .crow-edit__title, .crow-edit__actions { grid-column: 1 / -1; }
+  .crow-edit__actions { justify-content: flex-end; }
 }
 @media (prefers-reduced-motion: reduce) {
   .course__body { animation: none; }

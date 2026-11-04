@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 const memory = new Map();
 globalThis.localStorage = { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => memory.set(k, v) };
 const { monthDates, shiftMonth } = await import('../dist/js/views/month.js');
-const { enterMine, getState, addTask, updateTask, autoPlan, inkProposal, addTaskAttachment } = await import('../dist/js/store.js');
+const { enterMine, getState, addTask, updateTask, editTaskBasics, autoPlan, inkProposal, addTaskAttachment } = await import('../dist/js/store.js');
 
 assert.equal(shiftMonth('2026-12-31', 1), '2027-01-01');
 assert.equal(shiftMonth('2026-01-31', -1), '2025-12-01');
@@ -59,4 +59,17 @@ assert.ok(JSON.parse(memory.get('ssp:mine')).tasks[0].attachments.some((f) => f.
 enterMine();
 assert.equal(getState().tasks[0].requirements, 'Updated requirements');
 assert.equal(getState().tasks[0].due.date, '2026-11-03');
-console.log('Passed: month boundaries, confirmation before scheduling, note-only edits, deadline/step invalidation, history preservation and saved task metadata.');
+// 科目卡上直接改一項：名稱和比重不動安排；改截止時間才清掉還沒開始的安排；名稱留空不保存
+const t2 = getState().tasks[0];
+const stepsBefore = JSON.stringify(t2.steps);
+assert.equal(editTaskBasics(t2.id, { title: '  Renamed  ', date: t2.due.date, min: t2.due.min, weight: ' 25% ' }), true);
+assert.equal(t2.title, 'Renamed');
+assert.equal(t2.weight, '25%');
+assert.equal(JSON.stringify(t2.steps), stepsBefore, 'Row edit must not touch steps');
+assert.equal(editTaskBasics(t2.id, { title: '   ', date: t2.due.date, min: t2.due.min }), false);
+assert.equal(t2.title, 'Renamed');
+assert.equal(editTaskBasics(t2.id, { title: 'Renamed', date: '2026-11-20', min: 17 * 60 }), true);
+assert.deepEqual(t2.due, { date: '2026-11-20', min: 1020 });
+assert.equal(t2.weight, '');
+assert.ok(getState().blocks.every((b) => b.task !== t2.id || b.date < getState().today || (b.date === getState().today && b.start <= getState().now)));
+console.log('Passed: month boundaries, confirmation before scheduling, note-only edits, deadline/step invalidation, history preservation, saved task metadata and course-card row edits.');

@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, renameCourse, setTaskGroup, partsOf,
+  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, renameCourse, editTaskBasics, setTaskGroup, partsOf,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
 
@@ -464,6 +464,7 @@ const actions = {
     const twice = lastHead.id === id && Date.now() - lastHead.at < 400;
     lastHead = twice ? {} : { id, at: Date.now() };
     ui.openCourse = ui.openCourse === id ? null : id;
+    ui.editRow = null;
     if (twice) startRename(id); else render();
   },
   'course-add': () => { ui.addCourse = null; ui.docId = null; location.hash = '#/import/add'; },
@@ -471,6 +472,14 @@ const actions = {
   'course-continue': (el) => { ui.addCourse = null; ui.docId = el.dataset.doc; },
   'course-rename': (el) => startRename(el.dataset.course),
   'course-rename-cancel': () => { ui.renameCourse = null; render(); },
+  'course-row-edit': (el) => {
+    ui.editRow = el.dataset.task;
+    render();
+    const input = document.querySelector('.crow-edit input[name="title"]');
+    input?.focus();
+    input?.select();
+  },
+  'course-row-cancel': () => { ui.editRow = null; render(); },
   'task-group': (el) => { closePopover(); setTaskGroup(el.dataset.task, el.dataset.group); },
   'course-delete': (el) => {
     const c = getState().courses[el.dataset.course];
@@ -726,6 +735,7 @@ document.addEventListener('keydown', (e) => {
     else if (ui.aiModal) actions['ai-modal-close']();
     else if (ui.dockOpen) toggleDock(false);
     else if (ui.renameCourse) actions['course-rename-cancel']();
+    else if (ui.editRow) actions['course-row-cancel']();
   }
   const t = e.target;
   if ((e.key === 'Enter' || e.key === ' ') && t.matches?.('li[data-action]')) { e.preventDefault(); t.click(); }
@@ -783,6 +793,13 @@ document.addEventListener('submit', (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
     renameCourse(e.target.dataset.course, String(f.get('name')), String(f.get('title')));
+    return;
+  }
+  if (e.target.matches('[data-form="course-row"]')) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const [h, m] = String(f.get('time') || '').split(':').map(Number);
+    editTaskBasics(e.target.dataset.task, { title: String(f.get('title')), date: String(f.get('date')), min: h * 60 + m, weight: String(f.get('weight') || '') });
     return;
   }
   if (e.target.matches('[data-form="say"]')) {

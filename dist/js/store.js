@@ -79,7 +79,7 @@ function freshUi() {
   return {
     hlTask: null, showGaps: false, day: DEMO_TODAY, docId: 'stat', taskId: 'ps4',
     editBusy: false, dockOpen: false, dockDismissed: [], hlRule: null, justInked: [], arrowFor: null,
-    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, renameCourse: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
+    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, renameCourse: null, editRow: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
   };
 }
@@ -597,6 +597,37 @@ export function setTaskGroup(id, group) {
   emit({ toast: L(`已把「${t.title}」移到${exam ? '測驗和考試' : '功課'}（預計時數沒有改）`, `Moved "${t.title}" to ${exam ? 'quizzes and exams' : 'assignments'} (estimate unchanged)`), toastIcon: 'check', keepScroll: true });
 }
 
+/** 截止時間或子任務改了：這一項還沒開始的安排和待確認的建議作廢（不偷偷重排）；已做過的保留。 */
+function dropFutureSessions(id) {
+  state.blocks = state.blocks.filter((b) => b.task !== id || b.date < state.today || (b.date === state.today && b.start <= state.now));
+  const pending = pendingProposal(state);
+  if (pending) { pending.status = 'erased'; state.proposal = null; }
+}
+
+/**
+ * 科目卡上直接改一項：名稱、截止日期時間、比重。其他（類型、子任務、預計時數）不動。
+ * 截止時間改了，跟 updateTask 一樣清掉還沒開始的安排。成功回傳 true。
+ */
+export function editTaskBasics(id, { title, date, min, weight = '' }) {
+  const task = taskOf(state, id);
+  if (!task) return false;
+  const name = String(title || '').trim();
+  if (!name) { emit({ toast: L('名稱不能留空', 'Enter a name'), toastIcon: 'alert', keepScroll: true }); return false; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !Number.isInteger(min) || min < 0 || min >= 1440) {
+    emit({ toast: L('請填寫日期和時間', 'Enter a date and time'), toastIcon: 'alert', keepScroll: true });
+    return false;
+  }
+  const changed = task.due.date !== date || task.due.min !== min;
+  if (changed) dropFutureSessions(id);
+  Object.assign(task, {
+    title: name, short: name.length > 14 ? `${name.slice(0, 13)}…` : name,
+    due: { date, min }, weight: String(weight || '').trim().slice(0, 20),
+  });
+  ui.editRow = null;
+  emit({ toast: changed ? L('已保存。截止時間改了，這一項還沒開始的安排已清除，請到本週重新排程。', 'Saved. The deadline changed, so unstarted sessions for this item were cleared; schedule again on Week.') : L('已保存', 'Saved'), toastIcon: 'check', keepScroll: true });
+  return true;
+}
+
 /** Editing scheduling inputs invalidates future sessions, never silently reschedules. */
 export function updateTask(id, fields, steps) {
   const task = taskOf(state, id);
@@ -609,11 +640,7 @@ export function updateTask(id, fields, steps) {
   // Keep retired steps when past sessions/history still refer to them.
   const archived = removed.filter((st) => ['done', 'doing'].includes(st.progress) || state.history.some((h) => h.step === st.id) || state.blocks.some((b) => b.step === st.id && (b.date < state.today || (b.date === state.today && b.start <= state.now))))
     .map((st) => ({ ...st, dropped: true, retired: true }));
-  if (changed) {
-    state.blocks = state.blocks.filter((b) => b.task !== id || b.date < state.today || (b.date === state.today && b.start <= state.now));
-    const pending = pendingProposal(state);
-    if (pending) { pending.status = 'erased'; state.proposal = null; }
-  }
+  if (changed) dropFutureSessions(id);
   Object.assign(task, {
     title: fields.title, short: fields.title.length > 14 ? `${fields.title.slice(0, 13)}…` : fields.title,
     course: courseFor(fields.course), kind: fields.kind, requirements: fields.requirements,
