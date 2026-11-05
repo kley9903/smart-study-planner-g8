@@ -108,7 +108,7 @@ GitHub 倉庫還保留以下管理設定，普通組員不用處理；下載 ZIP
 
 ## 後端目前在哪裡？
 
-**伺服器端程式只有 `functions/api/syllabus.js` 和 `functions/api/plan.js`**（Cloudflare Pages Functions，隨網站一起發布）：分別把大綱轉交給 Dify「課程資料整理｜Study Planner」、把排程資料轉交給「排程｜Study Planner」，金鑰放在 Cloudflare 的環境變數 `DIFY_API_KEY` 和 `DIFY_PLAN_KEY`，設定方法見 [部署設定](deployment.md)。本機 `node serve.mjs` 跑同一份檔案。沒有登入 API 或共用資料庫；自己的資料儲存在自己的瀏覽器。組員下載原始碼，不會下載到其他人的 localStorage 計劃。
+**伺服器端程式只有 `functions/api/syllabus.js`、`functions/api/plan.js` 和 `functions/api/chat.js`**（Cloudflare Pages Functions，隨網站一起發布）：分別把大綱轉交給 Dify「課程資料整理｜Study Planner」、把排程資料轉交給「排程｜Study Planner」、把 AI 助手的對話轉交給「AI 助手｜Study Planner」，金鑰放在 Cloudflare 的環境變數 `DIFY_API_KEY`、`DIFY_PLAN_KEY` 和 `DIFY_CHAT_KEY`，設定方法見 [部署設定](deployment.md)。本機 `node serve.mjs` 跑同一份檔案。沒有登入 API 或共用資料庫；自己的資料儲存在自己的瀏覽器。組員下載原始碼，不會下載到其他人的 localStorage 計劃。
 
 日後有人負責後端時，先約定 API 路徑、請求與回傳格式，再新增獨立的 `backend/` 目錄（這是建議位置，現在尚不存在）。前端接駁點主要在 `store.js`：把直接修改狀態或產生示範結果的相關動作接到後端 API，再按需要調整 `model.js` 與頁面。
 

@@ -48,3 +48,13 @@
 - 自動檢查通過只代表語法、檔案引用和基本 HTTP 回應正常，仍需要手動測試使用者流程。
 
 參考：[Cloudflare CI 上傳](https://developers.cloudflare.com/pages/how-to/use-direct-upload-with-continuous-integration/)、[GitHub 分支保護](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)。
+
+## AI 助手（Dify Chatflow）的金鑰
+
+AI 助手面板（自己的計劃）經 `functions/api/chat.js` 呼叫 Dify「AI 助手｜Study Planner」Chatflow，用第三把金鑰：
+
+1. 在「AI 助手｜Study Planner」的「存取點 → 後端服務 API → API 金鑰」取得金鑰（`app-` 開頭）。
+2. 在同一個 Cloudflare 頁面新增 **Secret** `DIFY_CHAT_KEY`，貼上金鑰。不要貼到聊天、程式或 README。
+3. 重新發布一次（Publish website）。
+
+沒有設定時，在 AI 助手打字會回「AI 助手暫時連不上」，網站其他部分照常運作。示範導覽不經 Dify，仍用預先寫好的回覆。

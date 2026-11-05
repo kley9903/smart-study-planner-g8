@@ -6,6 +6,7 @@ import { HERO } from '../scenarios.js';
 import { taskOf, stepOf, inkOf } from '../model.js';
 import { span, dayShort, md, hm, hoursText } from '../time.js';
 import { L } from '../i18n.js';
+import { daysText } from '../syllabus-ai.js';
 
 // 只讓「新」訊息有淡入動畫；第一次打開頁面時已有的訊息不動
 const seen = new Set();
@@ -22,7 +23,7 @@ export function renderMargin(s) {
       <div class="margin__title">
         <h2>${mine ? L('排程助手', 'Planning assistant') : L('AI 助手', 'AI assistant')}
         ${mine
-          ? `<span class="demo-stamp" title="${L('自動排程用固定規則計算；AI 對話之後接上', 'Auto-schedule uses fixed rules; AI chat comes later')}">${L('規則排程', 'Rule-based')}</span>`
+          ? ''
           : `<span class="demo-stamp" title="${L('預先寫好的示範回覆，沒有連接 AI', 'Pre-written demo replies, not connected to AI')}">${L('示範回覆', 'Demo replies')}</span>`}</h2>
         <p>${L('建議先用虛線顯示；你按「確認」才會生效。', 'Suggestions are dashed first; they take effect when you press "Confirm".')}</p>
       </div>
@@ -31,9 +32,10 @@ export function renderMargin(s) {
     <div class="margin__body" data-thread-scroll>
       <div class="thread" aria-live="polite">
         ${s.thread.map((n) => noteHtml(s, n).replace('class="note ', `class="note ${fresh.has(n.id) ? 'is-new ' : ''}`)).join('')}
+        ${ui.chatting ? `<article class="note note--ai note--typing" aria-label="${L('AI 助手正在回覆', 'The assistant is replying')}">${meta('ai')}<div class="note__body"><span class="plans__dots"><i></i><i></i><i></i></span></div></article>` : ''}
       </div>
     </div>
-    ${mine ? `<div class="composer"><p class="composer__note">${icon('info')} ${L('AI 對話之後接上；現在可以在「本週」按「自動排程」。', 'AI chat is coming later; for now, use "Auto-schedule" on This week.')}</p></div>` : composer()}
+    ${composer(mine)}
   </aside>`;
 }
 
@@ -186,7 +188,12 @@ function changeHtml(s, c, p) {
   };
   switch (c.kind) {
     case 'hatch':
+      if (c.rule.type === 'weekly') return `<li class="change"><span class="change__glyph change__glyph--hatch">${icon('pin')}</span><span><b>${L('新增每週沒空時間', 'New weekly busy time')}</b> ${daysText(c.rule.days)} ${span(c.rule.start, c.rule.end)} "${esc(c.rule.label)}"</span></li>`;
       return `<li class="change" ${target(c.rule.date, '')}><span class="change__glyph change__glyph--hatch">${icon('pin')}</span><span><b>${L('新增沒空時間', 'New busy time')}</b> ${dayShort(c.rule.date)} ${span(c.rule.start, c.rule.end)} "${esc(c.rule.label)}"<small>${L('只限這天', 'this day only')}${c.note ? `; ${c.note}` : ''}</small></span></li>`;
+    case 'progress':
+      return `<li class="change"><span class="change__glyph">${icon('check')}</span><span><b>${c.progress === 'done' ? L('記下完成', 'Mark done') : L('記下進行中', 'Mark in progress')}</b> ${name(c.step)}${c.remain ? `<small>${L(`還差 ${hoursText(c.remain)}`, `${hoursText(c.remain)} left`)}</small>` : ''}</span></li>`;
+    case 'fill':
+      return `<li class="change"><span class="change__glyph">${icon('pencil')}</span><span><b>${{ date: L('補截止日期', 'Add due date'), scope: L('補要做甚麼', 'Add what to do'), hours: L('補要多久', 'Add how long') }[c.field]}</b> ${esc(c.value)}</span></li>`;
     case 'move':
       return `<li class="change" ${target(c.to.date, `${c.block}~0`, c.block)}><span class="change__glyph">${icon('arrow')}</span><span><b>${L('移動', 'Move')}</b> ${name(from.step)}<small>${dayShort(from.date)} ${hm(from.start)} → ${dayShort(c.to.date)} ${span(c.to.start, c.to.end)}${c.short ? L(`（只放得下 ${hoursText(c.to.end - c.to.start)}）`, ` (only ${hoursText(c.to.end - c.to.start)} fits)`) : ''}</small></span></li>`;
     case 'split':
@@ -207,8 +214,8 @@ function changeHtml(s, c, p) {
 }
 
 /* ---------- 輸入框 ---------- */
-function composer() {
-  const chips = availableChips();
+function composer(mine = false) {
+  const chips = mine ? [] : availableChips(); // 自己的計劃直接跟 AI 說，不放示範情境的按鈕
   return `
     <form class="composer" data-form="say">
       ${chips.length ? `<div class="suggest"><span class="suggest__label">${L('試試：', 'Try:')}</span>${chips.map((c) => `<button class="suggest__chip" type="button" data-action="scenario" data-id="${c.id}">${esc(c.text)}</button>`).join('')}</div>` : ''}
