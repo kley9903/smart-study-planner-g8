@@ -12,6 +12,7 @@ import { parseWhen, parseHours, typeLabel } from './syllabus-ai.js';
 import { toState, proposalFrom } from './plan-ai.js';
 import { questionsFor, readDue } from './ask.js';
 import { toContext } from './chat-ai.js';
+import { createTimer, rhythmOf, stop as stopTimer, pause as pauseTimer, resume as resumeTimer, tick as tickTimer } from './focus.js';
 
 const MINE_KEY = 'mine';
 const INKS = ['blue', 'amber', 'green', 'plum'];
@@ -918,4 +919,50 @@ async function chat(text) {
   if (follow) note({ who: 'ai', html: esc(follow) });
   emit({ scrollThread: true, ...(pid ? { proposal: true } : {}) });
   if (action?.type === 'plan') await requestPlans(action.request || '');
+}
+
+/* ---------------- 番茄鐘 ---------------- */
+/**
+ * 開始專注。從一段讀書時段開始（{ block }）時，照那個方案的休息節奏，並把那一步標成進行中；
+ * 甚麼都不帶就是自由計時，做甚麼都可以，不會記實際用時。
+ */
+export function startFocus({ block = null } = {}, now = Date.now()) {
+  const b = block ? state.blocks.find((x) => x.id === block) : null;
+  const found = b ? stepOf(state, b.step) : { task: null, step: null };
+  state.focus = { timer: createTimer(rhythmOf(b?.rest), now), block: b?.id || null, task: found.task?.id || null, step: found.step?.id || null };
+  if (found.step && found.step.progress !== 'done') found.step.progress = 'doing';
+  emit({ keepScroll: true });
+}
+
+/** 停止：從讀書時段開始的，先問做完了沒有；自由計時直接結束。 */
+export function stopFocus(now = Date.now()) {
+  const f = state.focus;
+  if (!f) return;
+  f.worked = stopTimer(f.timer, now);
+  if (f.step) f.asking = true;
+  else state.focus = null;
+  emit({ keepScroll: true });
+}
+
+/** 回答「做完了嗎？」：記下實際用時（作為日後估算的依據）和進度。 */
+export function finishFocus(result, remain = null) {
+  const f = state.focus;
+  if (!f?.step) { state.focus = null; emit({ keepScroll: true }); return; }
+  const { task, step } = stepOf(state, f.step);
+  if (task && step) {
+    if (f.worked > 0) (state.actuals ||= []).push({ task: task.id, step: step.id, kind: task.kind, min: f.worked, date: state.today });
+    if (result === 'done') { step.progress = 'done'; delete step.remain; }
+    else { step.progress = 'doing'; if (remain) step.remain = remain; }
+  }
+  state.focus = null;
+  emit({ keepScroll: true, toast: result === 'done' ? L('記下了：這一步完成', 'Saved: this step is done') : L('記下了進度', 'Progress saved'), toastIcon: 'check' });
+}
+export function pauseFocus(now = Date.now()) { if (state.focus) { pauseTimer(state.focus.timer, now); emit({ keepScroll: true }); } }
+export function resumeFocus(now = Date.now()) { if (state.focus) { resumeTimer(state.focus.timer, now); emit({ keepScroll: true }); } }
+/** 每秒呼叫：到時間就轉段（專注 ↔ 小休），有轉換才重畫並回傳 true。 */
+export function tickFocus(now = Date.now()) {
+  const f = state.focus;
+  if (!f || f.asking || !tickTimer(f.timer, now)) return false;
+  emit({ keepScroll: true, toast: f.timer.phase === 'work' ? L('小休完了，繼續專注', 'Break over, back to focus') : L('專注完一輪，休息一下', 'Round done, take a break'), toastIcon: 'clock' });
+  return true;
 }
