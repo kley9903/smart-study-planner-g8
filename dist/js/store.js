@@ -4,7 +4,7 @@
 // 介面文字中英兩版：L('中文', 'English')。
 import { createDemoState, DEMO_TODAY } from './demo-data.js';
 import { HERO, heroChanges, heroMissing, CHECKIN, ESSAY, fallbackText, CHIPS, matchScenario } from './scenarios.js';
-import { blockOf, stepOf, taskOf, pendingProposal } from './model.js';
+import { blockOf, stepOf, taskOf, pendingProposal, unplannedSteps } from './model.js';
 import { md, span, dayShort, hoursText } from './time.js';
 import { recall, remember, esc } from './ui.js';
 import { L } from './i18n.js';
@@ -794,9 +794,14 @@ export async function requestPlans(request = '') {
   Object.assign(ui, { planning: true, planError: '', planOptions: null });
   if (p) { p.status = 'erased'; state.proposal = null; }
   emit({ keepScroll: true });
+  // 全部都排好了還按：當作想重新選。還沒開始的時段交回去重排，確認新方案時才換掉；已過去或進行中的不動。
+  const now = getState();
+  const later = (b) => b.date > now.today || (b.date === now.today && b.start > now.now);
+  const released = unplannedSteps(now).length ? [] : now.blocks.filter((b) => later(b) && stepOf(now, b.step).step?.progress !== 'done');
   let out;
   try {
-    const res = await fetch('/api/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: toState(getState()), request }) });
+    const sent = toState({ ...now, blocks: now.blocks.filter((b) => !released.includes(b)) });
+    const res = await fetch('/api/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: sent, request }) });
     out = await res.json();
   } catch {
     out = { ok: false, reason: 'network' };
@@ -809,7 +814,7 @@ export async function requestPlans(request = '') {
     emit({ keepScroll: true });
     return;
   }
-  ui.planOptions = out.result;
+  ui.planOptions = { ...out.result, released: released.map((b) => b.id) };
   choosePlan(out.result.plans[0].id);
 }
 
@@ -820,7 +825,10 @@ export function choosePlan(id) {
   const old = pendingProposal(state);
   if (old?.kind === 'plan') { delete state.proposals[old.id]; state.proposal = null; }
   const pid = nid('plan');
-  state.proposals[pid] = { id: pid, status: 'pending', ...proposalFrom(plan, state) };
+  const prop = proposalFrom(plan, state);
+  // 重新排程：先列出會被換掉的舊時段（時間表上變成淡色），確認時才刪
+  const swap = (ui.planOptions.released || []).map((id) => ({ kind: 'remove', block: id, replaced: true, reason: L('重新排程，換成新的時段', 'Replanned: replaced by a new session') }));
+  state.proposals[pid] = { id: pid, status: 'pending', ...prop, changes: [...swap, ...prop.changes] };
   state.proposal = pid;
   emit({ keepScroll: true, proposal: true });
 }

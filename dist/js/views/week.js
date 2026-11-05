@@ -125,7 +125,8 @@ function head(s, dates, editing) {
   // 自己的計劃：未排的段數、新增功課和自動排程都放在頁頭，不另開一列
   const mine = getMode() === 'mine';
   const left = mine ? unplannedSteps(s) : [];
-  const canPlan = mine && !editing && s.tasks.length && left.length && !pendingProposal(s) && !ui.planning && !ui.planOptions;
+  // 自動排程一直都在：還有未排的就排；全部排好了就變成「重新排程」，想反悔可以再選一次
+  const canPlan = mine && !editing && s.tasks.length && !pendingProposal(s) && !ui.planning && !ui.planOptions;
   return `
     <header class="wk-head">
       <div>
@@ -135,7 +136,7 @@ function head(s, dates, editing) {
             ? `<span>${L('先加入功課和 deadline，再按「自動排程」。', 'Add your tasks and deadlines, then press "Auto-schedule".')}</span>`
             : `<span>${L(`已排 <b>${num(total / 60)}</b> 小時讀書`, `<b>${num(total / 60)}</b> h of study planned`)}</span>
           <span>${L(`${far} 個 deadline 在 20 日內`, `${far} deadline${far === 1 ? '' : 's'} within 20 days`)}</span>`}
-          ${canPlan ? `<span class="is-alert">${L(`<b>${left.length}</b> 段未排（共 ${hoursText(left.reduce((a, x) => a + x.step.min, 0))}）`, `<b>${left.length}</b> part${left.length === 1 ? '' : 's'} not scheduled`)}</span>` : ''}
+          ${canPlan && left.length ? `<span class="is-alert">${L(`<b>${left.length}</b> 段未排（共 ${hoursText(left.reduce((a, x) => a + x.step.min, 0))}）`, `<b>${left.length}</b> part${left.length === 1 ? '' : 's'} not scheduled`)}</span>` : ''}
           ${pc ? `<span class="is-alert">${L(`<b>${pc}</b> 項等你決定`, `<b>${pc}</b> waiting for you`)}</span>` : ''}
         </p>
       </div>
@@ -144,7 +145,7 @@ function head(s, dates, editing) {
           ${mine && !editing ? `<a class="btn btn--sm ${s.tasks.length ? 'btn--ghost' : 'btn--ink'}" href="#/add-task">${icon('plus')} ${L('新增功課', 'Add task')}</a>` : ''}
           ${editing ? '' : `<button class="btn btn--sm btn--ghost" type="button" data-action="toggle-gaps" aria-pressed="${ui.showGaps}">${icon('eye')} ${ui.showGaps ? L('隱藏空檔', 'Hide free time') : L('顯示空檔', 'Show free time')}</button>`}
           <button class="btn btn--sm ${editing ? 'btn--ink' : 'btn--ghost'}" type="button" data-action="busy-edit" data-on="${editing ? 0 : 1}" aria-pressed="${editing}">${editing ? `${icon('check')} ${L('完成', 'Done')}` : `${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}`}</button>
-          ${canPlan ? `<button class="btn btn--sm btn--ink" type="button" data-action="auto-plan">${icon('clock')} ${L('自動排程', 'Auto-schedule')}</button>` : ''}
+          ${canPlan ? `<button class="btn btn--sm ${left.length ? 'btn--ink' : ''}" type="button" data-action="auto-plan">${icon('clock')} ${left.length ? L('自動排程', 'Auto-schedule') : L('重新排程', 'Replan')}</button>` : ''}
         </div>
       </div>
     </header>`;
