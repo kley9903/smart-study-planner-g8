@@ -1,10 +1,10 @@
-// 本週：示範導覽、未來 7 日的具體時間表、「下一段」、遠方 deadline。AI 助手在每頁右下角（views/dock.js）。
+// 本週：示範導覽、未來 7 日的具體時間表、「下一段」、接下來的 deadline。AI 助手在每頁右下角（views/dock.js）。
 import { esc, icon } from '../ui.js';
 import { ui, canRun, getMode } from '../store.js';
 import { renderPlanner } from '../planner.js';
 import { HERO } from '../scenarios.js';
 import {
-  windowDates, plannedTotal, nextBlock, pendingCount, pendingProposal,
+  windowDates, nextBlock, pendingCount, pendingProposal,
   taskOf, stepOf, inkOf, taskStats, courseOf, overlay, guideState, unplannedSteps,
 } from '../model.js';
 import { cardOf } from '../plan-ai.js';
@@ -118,36 +118,38 @@ function guide(s) {
     </section>`;
 }
 
+// 這週的日期是頁頭的重點，月份兩邊都寫：11月6日 – 11月12日
+function weekRange(a, b) {
+  return `${md(a)}<span class="wk-title__dash">–</span>${md(b)}`;
+}
+
 function head(s, dates, editing) {
   const pc = pendingCount(s);
-  const total = plannedTotal(s);
-  const far = s.tasks.filter((t) => diffDays(s.today, t.due.date) <= HORIZON_DAYS).length;
   // 自己的計劃：未排的段數、新增功課和自動排程都放在頁頭，不另開一列
   const mine = getMode() === 'mine';
   const left = mine ? unplannedSteps(s) : [];
   // 自動排程一直都在：還有未排的就排；全部排好了就變成「重新排程」，想反悔可以再選一次
   const canPlan = mine && !editing && s.tasks.length && !pendingProposal(s) && !ui.planning && !ui.planOptions;
+  const month = ui.calendarView === 'month';
+  const notes = [
+    canPlan && left.length ? L(`${left.length} 段未排`, `${left.length} part${left.length === 1 ? '' : 's'} not scheduled`) : '',
+    pc ? L(`${pc} 項等你決定`, `${pc} waiting for you`) : '',
+  ].filter(Boolean);
+  // 頁頭是一條工具列：日期不另外寫（下面的日子欄已經有），只留給螢幕閱讀器
   return `
-    <header class="wk-head">
-      <div>
-        <h1 class="wk-title">${ui.calendarView === 'month' ? L('截止日期總覽', 'Deadlines at a glance') : `${md(dates[0])}<span class="wk-title__dash">—</span>${md(dates[dates.length - 1])}`}</h1>
-        <p class="wk-sum">
-          ${mine && !s.tasks.length
-            ? `<span>${L('先加入功課和 deadline，再按「自動排程」。', 'Add your tasks and deadlines, then press "Auto-schedule".')}</span>`
-            : `<span>${L(`已排 <b>${num(total / 60)}</b> 小時讀書`, `<b>${num(total / 60)}</b> h of study planned`)}</span>
-          <span>${L(`${far} 個 deadline 在 20 日內`, `${far} deadline${far === 1 ? '' : 's'} within 20 days`)}</span>`}
-          ${canPlan && left.length ? `<span class="is-alert">${L(`<b>${left.length}</b> 段未排（共 ${hoursText(left.reduce((a, x) => a + x.step.min, 0))}）`, `<b>${left.length}</b> part${left.length === 1 ? '' : 's'} not scheduled`)}</span>` : ''}
-          ${pc ? `<span class="is-alert">${L(`<b>${pc}</b> 項等你決定`, `<b>${pc}</b> waiting for you`)}</span>` : ''}
-        </p>
+    <header class="wk-head wk-bar${month ? ' is-month' : ''}">
+      <h1 class="${month ? 'wk-title' : 'sr-only'}">${month ? L('截止日期總覽', 'Deadlines at a glance') : weekRange(dates[0], dates[dates.length - 1])}</h1>
+      ${month ? '' : `<div class="wk-bar__tools">
+        ${editing
+          ? `<button class="wk-bar__btn is-on" type="button" data-action="busy-edit" data-on="0" aria-pressed="true">${icon('check')} ${L('完成', 'Done')}</button>`
+          : `${mine ? `<a class="wk-bar__btn" href="#/add-task">${icon('plus')} ${L('新增功課', 'Add task')}</a>` : ''}
+        ${canPlan ? `<button class="wk-bar__btn is-main" type="button" data-action="auto-plan">${icon('clock')} ${left.length ? L('自動排程', 'Auto-schedule') : L('重新排程', 'Replan')}</button>` : ''}
+        <button class="wk-bar__btn" type="button" data-action="toggle-gaps" aria-pressed="${ui.showGaps}">${icon('eye')} ${L('空檔', 'Free time')}</button>
+        <button class="wk-bar__btn" type="button" data-action="busy-edit" data-on="1" aria-pressed="false">${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}</button>`}
       </div>
-      <div class="wk-head__side">
-        <div class="wk-tools" ${ui.calendarView === 'month' ? 'hidden' : ''}>
-          ${mine && !editing ? `<a class="btn btn--sm ${s.tasks.length ? 'btn--ghost' : 'btn--ink'}" href="#/add-task">${icon('plus')} ${L('新增功課', 'Add task')}</a>` : ''}
-          ${editing ? '' : `<button class="btn btn--sm btn--ghost" type="button" data-action="toggle-gaps" aria-pressed="${ui.showGaps}">${icon('eye')} ${ui.showGaps ? L('隱藏空檔', 'Hide free time') : L('顯示空檔', 'Show free time')}</button>`}
-          <button class="btn btn--sm ${editing ? 'btn--ink' : 'btn--ghost'}" type="button" data-action="busy-edit" data-on="${editing ? 0 : 1}" aria-pressed="${editing}">${editing ? `${icon('check')} ${L('完成', 'Done')}` : `${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}`}</button>
-          ${canPlan ? `<button class="btn btn--sm ${left.length ? 'btn--ink' : ''}" type="button" data-action="auto-plan">${icon('clock')} ${left.length ? L('自動排程', 'Auto-schedule') : L('重新排程', 'Replan')}</button>` : ''}
-        </div>
-      </div>
+      ${mine && !s.tasks.length
+        ? `<p class="wk-bar__note">${L('先加入功課和 deadline，再按「自動排程」。', 'Add your tasks and deadlines, then press "Auto-schedule".')}</p>`
+        : notes.length ? `<p class="wk-bar__note is-alert">${icon('info')} ${notes.join(' · ')}</p>` : ''}`}
     </header>`;
 }
 
@@ -236,7 +238,7 @@ function decisionBar(s) {
     </div>`;
 }
 
-/* ---------- 遠方：每份功課一行 ---------- */
+/* ---------- 接下來的 deadline：每份功課一行 ---------- */
 function horizon(s) {
   const days = HORIZON_DAYS;
   const ov = overlay(s);
@@ -268,16 +270,17 @@ function horizon(s) {
         </button>`;
     }).join('');
   return `
-    <section class="horizon" aria-label="${L('較遠的 deadline', 'Later deadlines')}">
+    <section class="horizon" aria-label="Deadline">
       <div class="horizon__head">
-        <h3>${L('遠方', 'Further ahead')}</h3><button class="link-btn" data-action="calendar-view" data-view="month">${icon('calendar')} ${L('查看月曆', 'View calendar')}</button>
-        <p>${L('7 日之後的 deadline，排程時一樣會考慮，較遠的功課可以提早開始。', 'Deadlines after these 7 days are still considered; later work can start early.')}${ui.hlTask ? ` <button class="link-btn" type="button" data-action="hl-task" data-task="">${L('取消標示', 'Clear highlight')}</button>` : L('按一行可在時間表標示該科時段。', ' Press a row to highlight its sessions.')}</p>
+        <h3>Deadline</h3>
+        ${ui.hlTask ? `<button class="link-btn" type="button" data-action="hl-task" data-task="">${L('取消標示', 'Clear highlight')}</button>` : ''}
+        <button class="link-btn horizon__cal" data-action="calendar-view" data-view="month">${icon('calendar')} ${L('查看月曆', 'View calendar')}</button>
       </div>
       <div class="horizon__scroll">
         <div class="hz" style="--days:${days};--win:${WINDOW_DAYS}">
           <div class="hz-axis">
             <span></span>
-            <span class="hz-track"><span class="hz-span hz-span--now">${L('這 7 日 · 具體時間表', 'These 7 days · timetable')}</span><span class="hz-span hz-span--later">${L('之後 · 只看 deadline', 'Later · deadlines only')}</span>${axis.join('')}</span>
+            <span class="hz-track">${axis.join('')}</span>
             <span></span>
           </div>
           ${rows}

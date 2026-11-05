@@ -57,7 +57,7 @@ export function blockPopover(s, blockId) {
         <div class="seg seg--sm" role="group" aria-label="${L('進度', 'Progress')}">
           ${[['todo', L('未開始', 'Not started')], ['doing', L('進行中', 'In progress')], ['done', L('已完成', 'Done')]].map(([k, t]) => `<button class="seg__opt" type="button" data-action="progress" data-step="${step.id}" data-p="${k}" aria-pressed="${step.progress === k}">${t}</button>`).join('')}
         </div>
-        <p class="muted" style="font-size:12.5px;margin-top:8px">${step.progress === 'doing' && step.remain ? L(`你回報還差 ${hoursText(step.remain)}。`, `You reported ${hoursText(step.remain)} left. `) : ''}${L('時段結束不會自動當作完成。', 'A session ending is not counted as done.')}</p>
+        <p class="muted" style="font-size:12.5px;margin-top:8px">${step.progress === 'doing' && step.remain ? L(`你回報還差 ${hoursText(step.remain)}。`, `You reported ${hoursText(step.remain)} left. `) : ''}</p>
       </div>
       <div class="pop__actions"><a class="btn btn--sm" href="#/tasks/${task.id}">${icon('list')} ${L('在任務頁查看', 'Open in Tasks')}</a></div>`;
   } else {
@@ -86,7 +86,6 @@ export function hatchPopover(s, { rule, sleep }, editBusy) {
       <div class="pop__eyebrow">${icon('moon')} ${L('睡眠 · 每晚重複', 'Sleep · every night')}</div>
       <div class="pop__title">${hm(s.sleep.start)}–${hm(s.sleep.end)}</div>
       ${pen ? `<div class="pop__time">${L(`AI 建議：${md(sleep)}晚上 ${hm(pen.start)} 才睡（只限今晚）`, `AI suggests: bed at ${hm(pen.start)} on ${md(sleep)} (tonight only)`)}</div>` : o ? `<div class="pop__time">${L(`${md(sleep)}晚上 ${hm(o.start)} 才睡（只限這一晚）`, `${md(sleep)}: bed at ${hm(o.start)} (that night only)`)}</div>` : ''}
-      <div class="pop__section"><p class="pop__reason">${L('AI 不會把睡眠當作讀書時間。要遲睡，它會先問你，而且只限當晚，不會改每晚的設定。', 'Sleep is never used for study. A later bedtime is only suggested for one night, after asking you.')}</p></div>
       <div class="pop__actions"><a class="btn btn--sm" href="#/time">${icon('pencil')} ${L('改睡眠時間', 'Change sleep time')}</a></div>`;
   }
   const real = s.unavailable.find((x) => x.id === rule);

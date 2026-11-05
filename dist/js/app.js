@@ -35,7 +35,7 @@ import { attachBusyPainting } from './busy-paint.js';
 
 const views = {
   week, tasks, focus: focusPage,
-  monthly: { render: (s) => `<div class="page-head"><div><h1 class="page-head__title">${L('月曆', 'Monthly')}</h1><p class="page-head__lede">${L('查看整個月的截止日期及忙碌時段，點選日期新增或查看內容。', 'View deadlines and busy times for the month. Select a date to view or add items.')}</p></div></div><section class="sheet monthly-page">${renderMonth(s)}</section>` },
+  monthly: { render: (s) => `<div class="page-head"><div><h1 class="page-head__title">${L('月曆', 'Monthly')}</h1></div></div><section class="sheet monthly-page">${renderMonth(s)}</section>` },
   'add-task': { render: (s) => `<div class="page-head"><h1 class="page-head__title">${L('新增任務', 'Add task')}</h1></div><div class="add-task-page">${editor(s, null, ui.taskDate)}${stepHelper()}</div>` },
   import: importView, start, about,
   time: { render: () => '' }, // 舊網址 #/time：在 render() 轉到本週的「改沒空的時間」

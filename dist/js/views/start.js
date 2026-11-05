@@ -40,7 +40,7 @@ export function obPlannerState() {
 function foot(note, back, primary) {
   return `
     <footer class="ob__foot">
-      <p class="ob__foot-note">${icon('info')} ${note}</p>
+      ${note ? `<p class="ob__foot-note">${icon('info')} ${note}</p>` : '<span></span>'}
       <div class="ob__actions">
         ${back ? `<button class="btn btn--ghost" type="button" data-action="ob-go" data-step="${back}">${icon('back')} 上一步</button>` : ''}
         ${primary}
@@ -118,12 +118,11 @@ function step1() {
   return `
     <p class="eyebrow">第 1 步 · 共 5 步</p>
     <h1 class="ob__title">先放入這個學期的課程大綱</h1>
-    <p class="ob__lede">AI 會從大綱找出 deadline、考試、上課時間和功課要求。原型不會讀取你的檔案，按右下角的按鈕改用 4 份示範大綱。</p>
+    <p class="ob__lede">AI 會從大綱找出 deadline、考試和上課時間。原型會改用 4 份示範大綱。</p>
     <div class="ob__body ob-drop">
       <div class="drop" data-drop>
         <div class="drop__icon">${icon('clip')}</div>
         <p class="drop__title">把 PDF 放在這裡</p>
-        <p class="drop__sub">可以一次放幾份。原型只會顯示檔名，不會讀取內容。</p>
         <div class="drop__actions">
           <label class="btn">${icon('upload')} 選擇檔案<input type="file" accept=".pdf,application/pdf" multiple hidden data-file></label>
         </div>
@@ -156,7 +155,7 @@ function step2() {
   return `
     <p class="eyebrow">第 2 步 · 共 5 步</p>
     <h1 class="ob__title">核對 AI 從大綱找到的項目</h1>
-    <p class="ob__lede">每一項都附出處頁碼。AI 肯定的可以一次確認；AI 不肯定的（紅字說明原因）可以之後在「課程資料」再核對。</p>
+    <p class="ob__lede">AI 不肯定的用紅字標出，可以之後再核對。</p>
     <div class="ob__body">
       <div class="review" style="border:1px solid var(--rule);border-radius:14px;overflow:hidden;background:var(--paper)">
         <header class="review__head">
@@ -169,7 +168,7 @@ function step2() {
         </table>
       </div>
     </div>
-    ${foot('只有確認了的項目，才會用來排計劃。', 1, primary)}`;
+    ${foot('', 1, primary)}`;
 }
 
 /* ---------- 第 3 步：睡眠 ---------- */
@@ -189,7 +188,7 @@ function step3() {
   return `
     <p class="eyebrow">第 3 步 · 共 5 步</p>
     <h1 class="ob__title">確認你的睡眠時間</h1>
-    <p class="ob__lede">確認之前，AI 不會排計劃，免得把讀書時段排到凌晨。之後每晚都會避開這段時間；要遲睡，AI 會先問你，而且只限當晚。</p>
+    <p class="ob__lede">AI 排計劃時會避開你的睡眠時間。</p>
     <div class="ob__body sleepset">
       <div>
         <div class="night" style="--n0:${n0};--n1:${n1}">
@@ -197,14 +196,13 @@ function step3() {
           <div class="night__label" style="left:${mid.toFixed(2)}%">${icon('moon')} ${hm(start)} → ${hm(end)} · ${hoursText(wake - bed)}</div>
           <div class="night__scale">${scale}</div>
         </div>
-        <p class="demo-note" style="margin-top:10px">${icon('info')} 先填了常見的時間，可以在右邊改。</p>
       </div>
       <div class="time-pickers">
         <label class="field"><span class="field__label">通常幾點睡</span><select class="select" data-ob-sleep="start">${opts(1320, 1560, start)}</select></label>
         <label class="field"><span class="field__label">通常幾點起身</span><select class="select" data-ob-sleep="end">${opts(360, 660, end)}</select></label>
       </div>
     </div>
-    ${foot('睡眠是每晚重複的沒空時間，之後可以在「本週」按「改沒空的時間」修改。', 2, `<button class="btn btn--ink btn--lg" type="button" data-action="ob-confirm-sleep">${icon('check')} 確認睡眠時間，下一步</button>`)}`;
+    ${foot('', 2, `<button class="btn btn--ink btn--lg" type="button" data-action="ob-confirm-sleep">${icon('check')} 確認睡眠時間，下一步</button>`)}`;
 }
 
 /* ---------- 第 4 步：沒空的時間 ---------- */
@@ -214,12 +212,11 @@ function step4() {
   return `
     <p class="eyebrow">第 4 步 · 共 5 步</p>
     <h1 class="ob__title">確認你沒空的時間</h1>
-    <p class="ob__lede">虛線框的灰色時段是 AI 從大綱找到的每週 9 段上課時間；其他灰色時段是你的晚飯、兼職、社團和家庭安排（示範）。沒有塗灰的時間，預設都可以讀書。</p>
+    <p class="ob__lede">灰色是你沒空的時間，其他時間都可以讀書。</p>
     <div class="ob__body">
       <div class="ob-planner">${renderPlanner(s, { dates: windowDates(s), mode: 'time', showBlocks: false, showGaps: false, interactive: false, colMin: 92 })}</div>
-      <p class="demo-note" style="margin-top:10px">${icon('info')} 正式版可以直接在格上拖拉標記，或者跟 AI 說；完整工具在「本週」的「改沒空的時間」。</p>
     </div>
-    ${foot('每週重複和只限一天的，看標籤前的圖示分辨。', 3, `<button class="btn btn--ink btn--lg" type="button" data-action="ob-confirm-hatch">${icon('check')} 確認這些時間，下一步</button>`)}`;
+    ${foot('', 3, `<button class="btn btn--ink btn--lg" type="button" data-action="ob-confirm-hatch">${icon('check')} 確認這些時間，下一步</button>`)}`;
 }
 
 /* ---------- 第 5 步：AI 排計劃 ---------- */
@@ -248,7 +245,7 @@ function step5() {
   return `
     <p class="eyebrow">第 5 步 · 共 5 步</p>
     <h1 class="ob__title">AI 排好未來 7 日，你看過再確認</h1>
-    <p class="ob__lede">AI 按你的空檔排出未來 7 日，同時考慮 7 日之後的 deadline。虛線時段是建議；確認後變成實色，計劃才生效。之後想改，可以跟 AI 助手說。</p>
+    <p class="ob__lede">虛線是 AI 的建議，確認後才生效。</p>
     <div class="ob__body draft-wrap">
       <div class="ob-planner">${renderPlanner(s, { dates: windowDates(s), mode: 'week', showGaps: false, interactive: false, justInked: ob.inked ? ids : [], stagger: ob.inked ? [] : ids })}</div>
       <aside class="draft-notes">${status}${notes}</aside>

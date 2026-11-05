@@ -10,8 +10,8 @@ import { L } from '../i18n.js';
 /** 放在時間表上方的一行說明 */
 export function busyHint() {
   const hint = isMobile()
-    ? L('按空白處新增沒空的時間；按灰色時段可以移除。', 'Tap an empty spot to add busy time; tap a gray block to remove it.')
-    : L('按住向下拖，新增沒空的時間；在灰色時段按右鍵就移除。讀書時段暫時變淡，方便看會不會撞到。', 'Drag down on the grid to add busy time; right-click a gray block to remove it. Study sessions are faded so you can see clashes.');
+    ? L('按空白處新增，按灰色移除', 'Tap empty to add, tap gray to remove')
+    : L('向下拖拉新增，右鍵移除', 'Drag to add, right-click to remove');
   return `<p class="tp__hint">${icon('info')} ${hint}</p>`;
 }
 
@@ -21,7 +21,6 @@ export function busySide(s) {
     <aside class="tp__side busy-side" aria-label="${L('沒空的時間', 'Busy times')}">
       <section class="card side-card">
         <h3>${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}</h3>
-        <p class="side-card__sub" style="line-height:1.7">${L('預設全部時間都可以讀書。把上課、兼職、睡覺等沒空的時間塗成灰色，排計劃時會避開。', 'By default every hour is free for study. Mark classes, work and sleep in gray and planning will avoid them.')}</p>
         <div class="busy-side__acts">
           <button class="btn btn--sm" type="button" data-action="new-busy" data-date="${ui.day || s.today}">${icon('plus')} ${L('用表格新增', 'Add with a form')}</button>
           <button class="btn btn--sm btn--ink" type="button" data-action="busy-edit" data-on="0">${icon('check')} ${L('完成', 'Done')}</button>
@@ -44,7 +43,6 @@ function sleepCard(s) {
   return `
     <section class="card side-card">
       <h3>${icon('moon')} ${L('睡眠 · 每晚', 'Sleep · every night')}</h3>
-      <p class="side-card__sub">${L('排計劃時一定避開', 'Planning always avoids it')}</p>
       ${ui.sleepEdit ? `
         <div class="sleep-edit">
           <label class="field"><span class="field__label">${L('幾點睡', 'Bedtime')}</span><select class="select" id="sleep-start">${opts(1320, 1560, 30, s.sleep.start)}</select></label>
@@ -56,7 +54,6 @@ function sleepCard(s) {
         </div>` : `
         <div class="sleep-big">${hm(s.sleep.start)} ${icon('arrow')} ${hm(s.sleep.end)} <small>${hoursText(dur)}</small></div>
         <div style="margin-top:10px"><button class="btn btn--sm" type="button" data-action="sleep-edit" data-on="1">${icon('pencil')} ${L('修改', 'Edit')}</button></div>`}
-      <p class="sleep-rule">${L('AI 不會把睡眠當作讀書時間。要遲睡，它會先問你，而且只限當晚，不會改這裡的設定。', 'Sleep is never used for study. A later bedtime is only ever suggested for one night, after asking you, and never changes this setting.')}</p>
       ${ov ? `<ul class="rules">${ov}</ul>` : ''}
     </section>`;
 }
@@ -70,7 +67,7 @@ function ruleWhen(r) {
 function rulesCard(s, src) {
   const list = s.unavailable.filter((r) => (r.src || 'me') === src);
   const title = src === 'syllabus' ? `${icon('file')} ${L('從課程大綱找到', 'From your syllabus')}` : `${icon('repeat')} ${L('你自己加的', 'Added by you')}`;
-  const sub = src === 'syllabus' ? L('上課時間在「課程資料」核對後才會變成沒空的時間', 'Class times become busy times after you check them in Syllabus') : L('每週重複和只限這天的安排', 'Weekly and one-day busy times');
+  const sub = src === 'syllabus' ? L('在「課程資料」核對後才生效', 'Applies after you check it in Syllabus') : '';
   const items = list
     .slice()
     .sort((a, b) => (a.type === b.type ? 0 : a.type === 'weekly' ? -1 : 1))
@@ -86,7 +83,7 @@ function rulesCard(s, src) {
     <section class="card side-card">
       <button class="rules-toggle" data-action="rules-toggle" data-src="${src}" aria-expanded="${!!ui.rulesOpen[src]}"><span>${title}</span><span>${list.length} ${icon('chevron')}</span></button>
       <div ${ui.rulesOpen[src] ? '' : 'hidden'}>
-      <p class="side-card__sub">${sub}</p>
+      ${sub ? `<p class="side-card__sub">${sub}</p>` : ''}
       <ul class="rules">${items || `<li class="muted" style="font-size:13px;padding:6px">${L('未有', 'None yet')}</li>`}</ul>
       </div>
     </section>`;

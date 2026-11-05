@@ -292,3 +292,6 @@ button.hatch:hover { box-shadow: inset 0 0 0 1.5px var(--ink-3); }
   .hz-axis, .hz-row { grid-template-columns: 84px minmax(0, 1fr) 0; column-gap: 8px; }
   .hz-meta { display: none; }
 }
+.horizon__head { align-items: center; }
+.horizon__cal { margin-left: auto; }
+.hz-axis .hz-track { height: 28px; }

@@ -20,8 +20,7 @@ function upcoming(s) {
 export const focusPage = {
   render(s) {
     const f = s.focus;
-    const head = `<div class="page-head"><div><h1 class="page-head__title">${L('專注', 'Focus')}</h1>
-      <p class="page-head__lede">${L('番茄鐘：專注一段、休息一下。從讀書時段開始的，結束時會記下你實際用了多久。', 'A focus timer: work a while, then rest. Started from a study session, it records how long you actually spent.')}</p></div></div>`;
+    const head = `<div class="page-head"><div><h1 class="page-head__title">${L('專注', 'Focus')}</h1></div></div>`;
     if (!f) {
       const list = upcoming(s);
       return `${head}

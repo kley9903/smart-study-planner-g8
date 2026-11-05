@@ -24,7 +24,6 @@ export function render(s, params) {
       <div>
         <p class="eyebrow">${L('任務', 'Tasks')}</p>
         <h1 class="page-head__title">${L('任務', 'Tasks')}</h1>
-        <p class="page-head__lede">${L('加入功課和 deadline；預計時數會拆成每段最多 2 小時，再到「本週」按「自動排程」。', 'Add tasks and deadlines. The estimate is split into parts of at most 2 hours; then press "Auto-schedule" on This week.')}</p>
       </div>
       <button class="btn btn--ink" data-action="task-form-open">${icon('plus')} ${L('新增任務', 'Add task')}</button>
     </div>`
@@ -33,11 +32,10 @@ export function render(s, params) {
       <div>
         <p class="eyebrow">${L('任務', 'Tasks')}</p>
         <h1 class="page-head__title">${L('任務', 'Tasks')}</h1>
-        <p class="page-head__lede">${L('每一步都有預計時數；AI 先估算，你確認或修改。進度由你回報，時段結束不會自動當作做完。', 'Each step has an estimate: the AI suggests one, you confirm or change it. You report progress; a session ending is not counted as done.')}</p>
       </div>
       <button class="btn btn--ink" data-action="task-form-open">${icon('plus')} ${L('新增任務', 'Add task')}</button>
     </div>`;
-  if (!task) return `${head}<div class="tasks"><nav class="tlist" aria-label="${L('任務清單', 'Task list')}"><p class="muted">${L('尚未有任務', 'No tasks yet')}</p></nav><section class="sheet tdetail task-empty"><h2>${L('任務詳情', 'Task details')}</h2><p>${L('新增任務後，可以在這裡編輯截止日期、子任務和作業要求。', 'Add a task to edit its deadline, steps and requirements here.')}</p><a class="btn" href="#/add-task">${icon('plus')} ${L('新增任務', 'Add task')}</a></section></div>`;
+  if (!task) return `${head}<div class="tasks"><nav class="tlist" aria-label="${L('任務清單', 'Task list')}"><p class="muted">${L('尚未有任務', 'No tasks yet')}</p></nav><section class="sheet tdetail task-empty"><h2>${L('任務詳情', 'Task details')}</h2><a class="btn" href="#/add-task">${icon('plus')} ${L('新增任務', 'Add task')}</a></section></div>`;
   return `
     ${head}
     ${ui.taskForm ? editor(s, null, ui.taskDate) : ''}
@@ -122,7 +120,6 @@ function detail(s, t) {
             <div class="ai-note__meta">${icon('pencil')} ${L('AI 的拆解理由 · 示範', 'Why the AI split it this way · demo')}</div>
             <p>${esc(t.aiNote)}</p>
           </div>` : ''}
-          <p class="demo-note">${icon('info')} ${mine ? L('改了時數，到「本週」按「自動排程」安排還未排的部分。', 'After changing hours, press "Auto-schedule" on This week to place the unscheduled parts.') : L('改時數會在下次排程使用；示範版不會自動重排。', 'New estimates are used in the next planning round; the demo does not reschedule.')}</p>
         </aside>
       </div>
     </section>`;
