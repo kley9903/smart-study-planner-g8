@@ -11,6 +11,7 @@ import { L } from './i18n.js';
 import { parseWhen, parseHours, typeLabel } from './syllabus-ai.js';
 import { toState, proposalFrom } from './plan-ai.js';
 import { questionsFor, readDue } from './ask.js';
+import { toContext } from './chat-ai.js';
 
 const MINE_KEY = 'mine';
 const INKS = ['blue', 'amber', 'green', 'plum'];
@@ -165,6 +166,7 @@ export function resetDemo() {
 export function say(text) {
   const t = text.trim();
   if (!t) return;
+  if (mode === 'mine') return chat(t); // 自己的計劃：交給 AI 助手 Chatflow；示範導覽仍用預先寫好的情境
   ui.draft = '';
   note({ who: 'me', text: t });
   const id = matchScenario(t);
@@ -255,6 +257,11 @@ export function inkProposal() {
         if (r.start < c.start) state.unavailable.push({ ...r, id: `-a`, end: c.start });
         if (c.end < r.end) state.unavailable.push({ ...r, id: `-b`, start: c.end });
       }
+    } else if (c.kind === 'progress') {
+      const { step } = stepOf(state, c.step);
+      if (step) { step.progress = c.progress; if (c.progress === 'doing' && c.remain) step.remain = c.remain; else delete step.remain; }
+    } else if (c.kind === 'fill') {
+      fillItem(c.doc, c.item, c.field, c.value);
     } else if (c.kind === 'drop') {
       const task = state.tasks.find((t) => t.id === c.task);
       task?.steps.forEach((st) => { if (st.progress !== 'done') st.dropped = true; });
@@ -837,15 +844,23 @@ export function answerAsk(value) {
   const a = ui.ask;
   if (!a) return false;
   const q = a.list[a.i];
-  const it = itemOf(a.docId, q.item);
-  if (!it) { nextAsk(); return true; }
-  if (q.field === 'date') {
+  if (!itemOf(a.docId, q.item)) { nextAsk(); return true; }
+  if (!fillItem(a.docId, q.item, q.field, value)) return false;
+  nextAsk();
+  return true;
+}
+
+/** 把學生給的資料填進核對表的一項（截止日期、要做甚麼、要多久）。讀不懂回傳 false。 */
+function fillItem(docId, itemId, field, value) {
+  const it = itemOf(docId, itemId);
+  if (!it) return false;
+  if (field === 'date') {
     const due = readDue(value, Number(state.today.slice(0, 4)));
     if (!due) return false;
     it.plan = { ...it.plan, date: due.date, min: due.min ?? it.plan.min };
     it.flag = due.min == null && !it.plan.min ? 'no-time' : null;
     it.reasons = [];
-  } else if (q.field === 'scope') {
+  } else if (field === 'scope') {
     const text = String(value || '').trim();
     if (!text) return false;
     it.scope = text;
@@ -855,8 +870,7 @@ export function answerAsk(value) {
     it.plan = { ...it.plan, hours };
     Object.assign(it, { confidence: 'high', byStudent: true, hoursDefault: false, steps: [] }); // 學生自己的時數：照時數重新拆步驟
   }
-  markMatches(state.docs.find((d) => d.id === a.docId));
-  nextAsk();
+  markMatches(state.docs.find((d) => d.id === docId));
   return true;
 }
 
@@ -865,3 +879,43 @@ export function skipAsk() { if (ui.ask) nextAsk(); }
 
 /** 「之後再說」：關掉，沒答的留在「要你補」。 */
 export function closeAsk() { ui.ask = null; emit({ keepScroll: true }); }
+
+/* ---------------- AI 助手 Chatflow（自己的計劃） ---------------- */
+const CHAT_FAIL = () => L('AI 助手暫時連不上，請稍後再試。', 'The assistant cannot be reached right now. Please try again later.');
+
+/** 學生打的一句話 → Chatflow；回覆寫進對話，action 變成要確認的建議，或直接去要排程方案。 */
+async function chat(text) {
+  ui.draft = '';
+  note({ who: 'me', text });
+  ui.chatting = true;
+  emit({ scrollThread: true });
+  let out;
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, context: toContext(getState()), conversation: state.chatConversation || '' }) });
+    out = await res.json();
+  } catch {
+    out = { ok: false };
+  }
+  ui.chatting = false;
+  if (!out?.ok) { note({ who: 'ai', html: esc(CHAT_FAIL()) }); emit({ scrollThread: true }); return; }
+  if (out.conversation) state.chatConversation = out.conversation;
+  const { reply, action, follow_up: follow } = out.result;
+  const change = action && {
+    busy: () => ({ kind: 'hatch', rule: { id: nid('u'), ...action.rule, label: action.rule.label || L('沒空', 'Busy'), src: 'me' } }),
+    progress: () => ({ kind: 'progress', step: action.step, progress: action.progress, ...(action.remain_min ? { remain: action.remain_min } : {}) }),
+    fill: () => ({ kind: 'fill', doc: action.doc, item: action.item, field: action.field, value: action.value }),
+  }[action.type]?.();
+  let pid = null;
+  if (change) {
+    const old = pendingProposal(state);
+    if (old) old.status = 'erased';
+    pid = nid('chat');
+    state.proposals[pid] = { id: pid, kind: 'chat', status: 'pending', changes: [change] };
+    state.proposal = pid;
+  }
+  note({ who: 'ai', html: esc(reply), ...(pid ? { proposal: pid } : {}) });
+  if (follow) note({ who: 'ai', html: esc(follow) });
+  emit({ scrollThread: true, ...(pid ? { proposal: true } : {}) });
+  if (action?.type === 'plan') await requestPlans(action.request || '');
+}
