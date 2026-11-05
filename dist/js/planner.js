@@ -35,7 +35,7 @@ export function renderPlanner(s, opts = {}) {
   const nowLabel = dates.includes(s.today) && s.now >= start && s.now <= end ? `<span class="gutter-now" style="--m:${s.now}">${hm(s.now)}</span>` : '';
 
   const foldBar = fold
-    ? `<div class="planner__fold">${icon('moon')}<div class="planner__fold-text"><span>${L('睡眠', 'Sleep')} ${hm(s.sleep.start)}–${hm(s.sleep.end)} · ${L('每晚', 'nightly')}</span><span class="fold-extra muted">${L(`${hm(start)} 前的時間已收起`, `before ${hm(start)} hidden`)}</span>${mode === 'week' ? `<a class="link-btn fold-extra" href="#/time">${L('改睡眠時間', 'Change sleep')}</a>` : ''}</div></div>`
+    ? `<div class="planner__fold">${icon('moon')}<div class="planner__fold-text"><span>${L('睡眠', 'Sleep')} ${hm(s.sleep.start)}–${hm(s.sleep.end)} · ${L('每晚', 'nightly')}</span>${mode === 'week' ? `<a class="link-btn fold-extra" href="#/time">${L('改睡眠時間', 'Change sleep')}</a>` : ''}</div></div>`
     : '';
 
   const style = [`--ppm:${ppm}`, `--p-start:${start}`, `--p-end:${end}`, `--cols:${dates.length}`, colMin ? `--col-min:${colMin}px` : ''].filter(Boolean).join(';');

@@ -18,13 +18,11 @@ export function editor(s, task, date) {
       ${field(L('作業要求／備註', 'Requirements / notes'), `<textarea class="input" name="requirements" maxlength="5000" rows="3">${esc(task?.requirements || '')}</textarea>`, 'tform__wide')}
     </div>
     <datalist id="course-list">${Object.values(s.courses).map((c) => `<option value="${esc(c.name)}"></option>`).join('')}</datalist>
-    ${task ? `<fieldset class="step-editor"><legend>${L('子任務', 'Steps')}</legend><div data-step-rows>${task.steps.filter((st) => !st.dropped).map(stepFields).join('')}</div><button class="btn btn--sm" type="button" data-action="step-add">${icon('plus')} ${L('新增子任務', 'Add step')}</button></fieldset>
-    <p class="demo-note">${L('更改截止日期或子任務時，會清除這份任務尚未開始的安排及待確認建議；已完成／進行中的紀錄會保留。到本週重新排程並確認。', 'Changing the deadline or steps clears this task’s unstarted sessions and pending suggestions. Completed and ongoing records are kept. Schedule again on Week and confirm.')}</p>` : ''}
+    ${task ? `<fieldset class="step-editor"><legend>${L('子任務', 'Steps')}</legend><div data-step-rows>${task.steps.filter((st) => !st.dropped).map(stepFields).join('')}</div><button class="btn btn--sm" type="button" data-action="step-add">${icon('plus')} ${L('新增子任務', 'Add step')}</button></fieldset>` : ''}
     ${task ? '' : `<fieldset class="step-editor" data-new-steps><legend>${L('子任務', 'Steps')}</legend>
-      <p class="demo-note">${L('可自己加，或用右邊的「建議拆法」。留空就按預計時數平均分成幾部分；有子任務時以子任務時數合計為準。', 'Add your own or use Suggest steps at right. Leave empty to split the estimate evenly; when steps exist, their hours are used.')}</p>
       <div data-step-rows></div><button class="btn btn--sm" type="button" data-action="step-add">${icon('plus')} ${L('新增子任務', 'Add step')}</button></fieldset>
     ${getMode() === 'mine' ? `<label class="field"><span class="field__label">${L('作業指引檔案（可選，每份最多 10 MB）', 'Assignment guidelines (optional, up to 10 MB each)')}</span><input class="input" type="file" name="guide" multiple></label>
-    <p class="demo-note">${L('檔案只保存在這個瀏覽器，不會上傳或交給 AI 分析。', 'Files stay in this browser. They are not uploaded or analysed by AI.')}</p>` : `<p class="demo-note">${L('導覽示範中不能上傳作業指引；開始自己的計劃後就可以。', 'Guideline upload is off in the demo tour; start your own plan to use it.')}</p>`}`}
+    <p class="demo-note">${L('檔案只存在這個瀏覽器。', 'Files stay in this browser.')}</p>` : `<p class="demo-note">${L('示範中不能上傳。', 'Upload is off in the demo.')}</p>`}`}
     <div class="tform__foot"><button class="btn btn--ink" type="submit">${icon('check')} ${L('保存任務', 'Save task')}</button></div>
   </form>`;
 }
@@ -68,18 +66,16 @@ export function suggestSteps(kind, title, hours) {
 export function stepHelper() {
   return `<aside class="card add-task-help">
     <h2>${icon('note')} ${L('AI 幫你拆子任務', 'Split into steps')}</h2>
-    <p>${L('填好名稱、類型和預計時數後，按「建議拆法」，子任務會放進左邊表單，你可以再改名、改時數或刪除。', 'Fill in the name, type and estimate, then press Suggest steps. The steps go into the form at left, where you can rename, re-time or remove them.')}</p>
     <button class="btn btn--ink" type="button" data-action="suggest-steps">${icon('pencil')} ${L('建議拆法', 'Suggest steps')}</button>
-    <p class="demo-note">${icon('info')} ${L('示範版沒有連接 AI：這裡按類型用固定範本拆分。之後接上 AI，會參考你上傳的作業指引。', 'The demo is not connected to AI: it splits by type using fixed templates. A connected AI would read your uploaded guidelines.')}</p>
-    <p>${L('保存後到本週產生排程建議，確認後才會生效。', 'After saving, generate schedule suggestions on This week; they apply only after you confirm.')}</p>
+    <p class="demo-note">${icon('info')} ${L('示範：按類型用固定範本拆分。', 'Demo: fixed templates by type.')}</p>
   </aside>`;
 }
 
 export function attachments(task, mine) {
   return `<details class="task-files"><summary>${icon('clip')} ${L('作業要求與附件', 'Requirements and attachments')} (${(task.attachments || []).length})</summary><div class="task-files__body">
-    ${task.requirements ? `<p class="task-requirements">${esc(task.requirements)}</p>` : `<p class="muted">${L('尚未填寫作業要求，可從「編輯任務」加入。', 'Add requirements using Edit task.')}</p>`}
+    ${task.requirements ? `<p class="task-requirements">${esc(task.requirements)}</p>` : `<p class="muted">${L('未有作業要求', 'No requirements yet')}</p>`}
     ${(task.attachments || []).map((file) => `<button type="button" class="btn btn--sm" data-action="file-download" data-file-id="${file.id}">${icon('file')} ${esc(file.name)}</button>`).join('')}
     ${mine ? `<label class="field"><span class="field__label">${L('加入作業說明文件（每份最多 10 MB）', 'Attach assignment guidelines (up to 10 MB each)')}</span><input class="input" type="file" data-task-file="${task.id}"></label>` : ''}
-    <p class="demo-note">${L('附件只保存在這個瀏覽器，不會上傳或交給 AI 分析；清除網站資料會一併移除。', 'Attachments stay in this browser. They are not uploaded or analysed by AI; clearing site data removes them.')}</p>
+    <p class="demo-note">${L('附件只存在這個瀏覽器。', 'Attachments stay in this browser.')}</p>
   </div></details>`;
 }

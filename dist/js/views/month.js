@@ -1,5 +1,5 @@
 // Month overview shares tasks and busy rules with the weekly planner.
-import { addDays, toDate, isoOf, weekday, dayNum, wdName, hm, hoursText } from '../time.js';
+import { addDays, toDate, isoOf, weekday, dayNum, wdName, hm, hoursText, md } from '../time.js';
 import { esc, icon } from '../ui.js';
 import { ui } from '../store.js';
 import { L } from '../i18n.js';
@@ -35,7 +35,6 @@ export function renderMonth(s) {
         <button class="btn btn--sm" data-action="month-move" data-delta="1" aria-label="${L('下個月', 'Next month')}">${icon('arrow')}</button>
       </div>
     </div>
-    <p class="month__hint">${L('看截止日期與忙碌時段；選一天查看詳情或新增。讀書安排請切回週視圖。', 'Deadlines and busy times at a glance. Select a day to view or add items; use Week for study sessions.')}</p>
     <div class="month__grid">
       ${[1, 2, 3, 4, 5, 6, 0].map((n) => `<div class="month__weekday">${wdName(n)}</div>`).join('')}
       ${dates.map((date) => {
@@ -45,18 +44,18 @@ export function renderMonth(s) {
           <span class="month__number">${dayNum(date)}</span>
           ${tasks.slice(0, 2).map((t) => `<span class="month__deadline">${esc(t.short)}</span>`).join('')}
           ${tasks.length > 2 ? `<span class="month__more">+${tasks.length - 2}</span>` : ''}
-          ${busy.length ? `<span class="month__busy">${busy.length} ${L('項沒空', 'busy')}</span>` : ''}
+          ${busy.length ? `<span class="month__busy">${busy.length} ${L('段沒空', 'busy')}</span>` : ''}
         </button>`;
       }).join('')}
     </div>
     <section class="month__agenda" aria-live="polite">
-      <div class="month__toolbar"><h3>${esc(selected)}</h3><div class="month__nav">
-        <a class="btn btn--sm" href="#/add-task?add=${selected}">${icon('plus')} ${L('新增任務', 'Add task')}</a>
-        <button class="btn btn--sm" data-action="new-busy" data-date="${selected}">${icon('hatch')} ${L('新增忙碌時段', 'Add busy time')}</button>
+      <div class="month__toolbar"><h3>${md(selected)}</h3><div class="month__nav">
+        <a class="btn btn--sm" href="#/add-task?add=${selected}">${icon('plus')} ${L('新增功課', 'Add task')}</a>
+        <button class="btn btn--sm" data-action="new-busy" data-date="${selected}">${icon('hatch')} ${L('新增沒空的時間', 'Add busy time')}</button>
       </div></div>
       ${deadlines.map((t) => `<a class="month__item" href="#/tasks/${t.id}">${icon('flag')} <b>${esc(t.title)}</b><span>${hm(t.due.min)} ${L('截止', 'due')}</span></a>`).join('')}
       ${rules.map((r) => `<a class="month__item" href="#/time">${icon('hatch')} <b>${esc(r.label)}</b><span>${hm(r.start)}–${hm(r.end)} · ${hoursText(r.end - r.start)}</span></a>`).join('')}
-      ${!deadlines.length && !rules.length ? `<p class="muted">${L('這天沒有截止項目或忙碌時段。', 'No deadlines or busy times on this day.')}</p>` : ''}
+      ${!deadlines.length && !rules.length ? `<p class="muted">${L('這天沒有安排', 'Nothing on this day')}</p>` : ''}
     </section>
   </section>`;
 }

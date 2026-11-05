@@ -44,7 +44,7 @@ export function coursesPage(s) {
       <div>
         <p class="eyebrow">${L('課程資料', 'Courses')}</p>
         <h1 class="page-head__title">${L('課程資料', 'Courses')}</h1>
-        ${courses.length ? '' : `<p class="page-head__lede">${L('還沒有科目。放入第一份課程大綱、公告，或自己打字，AI 會幫你找出測驗、考試和功課。', 'No courses yet. Add a syllabus, an announcement or your own notes; AI finds the quizzes, exams and assignments.')}</p>`}
+        ${courses.length ? '' : `<p class="page-head__lede">${L('還沒有科目，先放入一份課程大綱。', 'No courses yet. Start with a syllabus.')}</p>`}
       </div>
     </div>
     ${waiting ? `<a class="course-pending" href="#/import/add" data-action="course-continue" data-doc="${firstWaiting.id}">${icon('pencil')} ${L(`還有 ${waiting} 項等你確認`, `${waiting} item${waiting === 1 ? '' : 's'} waiting for you to confirm`)} ${icon('arrow')}</a>` : ''}
@@ -53,7 +53,6 @@ export function coursesPage(s) {
       <button class="course-add ${courses.length ? '' : 'is-first'}" type="button" data-action="course-add">
         <span class="course-add__plus">${icon('plus')}</span>
         <b>${L('增加科目', 'Add a course')}</b>
-        <small>${L('大綱、公告或自己打字都可以，之後還可以補充', 'A syllabus, an announcement or your own notes; you can add more later')}</small>
       </button>
     </div>`;
 }
@@ -85,7 +84,6 @@ function courseCard(s, c) {
         ${undated.length ? `
         <div class="course__group">
           <h3>${L('日期未公布', 'Date not announced')} <span>${undated.length}</span></h3>
-          <p class="course__hint">${L('公布後按下面的「補充資訊」加上日期。', 'Once a date is announced, add it with "Add information" below.')}</p>
           <ul class="crows ${undated.some((i) => i.weight) ? 'crows--weights' : ''}">${undated.map((i) => `
             <li><div class="crow is-undated">
               <span class="crow__title">${esc(i.what)}</span>
@@ -95,7 +93,6 @@ function courseCard(s, c) {
         </div>` : ''}
         ${!tasks.length && !undated.length ? `<p class="course__empty">${L('這科還沒有已確認的測驗、考試或功課。', 'Nothing confirmed for this course yet.')}</p>` : ''}
         <footer class="course__foot">
-          <p class="course__tip">${L('漏了甚麼？貼上公告、大綱，或自己打字補充這一科。', 'Something missing? Paste an announcement or syllabus, or type it in.')}</p>
           <div class="course__actions">
             <button class="course__more" type="button" data-action="course-more" data-course="${c.id}">${icon('plus')} ${L('補充資訊', 'Add information')}</button>
             <button class="course__del is-rename" type="button" data-action="course-rename" data-course="${c.id}">${icon('pencil')} ${L('改名', 'Rename')}</button>

@@ -23,11 +23,7 @@ export function render(s, params = []) {
     <div class="page-head">
       <div>
         ${mine ? `<a class="page-back" href="#/import">${icon('back')} ${L('課程資料', 'Courses')}</a>` : `<p class="eyebrow">${L('課程資料', 'Syllabus')}</p>`}
-        <h1 class="page-head__title">${!mine ? L('課程資料', 'Syllabus') : s.courses[ui.addCourse] ? L(`補充 ${esc(s.courses[ui.addCourse].name)} 的資訊`, `Add information to ${esc(s.courses[ui.addCourse].name)}`) : L('增加科目', 'Add a course')}</h1>
-        <p class="page-head__lede">${mine
-          ? L('大綱、公告、或自己打的字都可以，不用一次齊全；AI 找出功課、測驗和考試，你確認了才會放進科目。可以分幾次加。', 'A syllabus, an announcement or your own notes all work, and nothing has to be complete at once. AI finds assignments, quizzes and exams; only what you confirm goes into the course. Add more any time.')
-          : L('AI 會從大綱找出 deadline、考試、上課時間和功課要求，每一項都附出處頁碼。你核對、確認之後，才會用來排計劃。', 'The AI finds deadlines, exams, class times and requirements in your syllabus, each with its page number. Only what you check and confirm is used for planning.')}</p>
-      </div>
+        <h1 class="page-head__title">${!mine ? L('課程資料', 'Syllabus') : s.courses[ui.addCourse] ? L(`補充 ${esc(s.courses[ui.addCourse].name)} 的資訊`, `Add information to ${esc(s.courses[ui.addCourse].name)}`) : L('增加科目', 'Add a course')}</h1>      </div>
       ${mine ? '' : pendingAll ?`<span class="chip chip--pencil">${icon('pencil')} ${L(`還有 ${pendingAll} 項待核對`, `${pendingAll} to check`)}</span>` : `<span class="chip chip--ok">${icon('check')} ${L('全部已核對', 'All checked')}</span>`}
     </div>
     <div class="imp">
@@ -35,7 +31,7 @@ export function render(s, params = []) {
         ${mine ? pasteBox() : `<div class="drop" data-drop>
           <div class="drop__icon">${icon('clip')}</div>
           <p class="drop__title">${L('把課程大綱 PDF 放在這裡', 'Drop your syllabus PDF here')}</p>
-          <p class="drop__sub">${L('原型不會上傳或讀取檔案內容。選了檔案只會顯示檔名，然後改用示範大綱。', 'The prototype does not upload or read files. It only shows the file name and uses the demo syllabi instead.')}</p>
+          <p class="drop__sub">${L('原型不會讀取檔案，會改用示範大綱。', 'The prototype does not read files; it uses the demo syllabi.')}</p>
           <div class="drop__actions">
             <label class="btn">${icon('upload')} ${L('選擇檔案', 'Choose file')}<input type="file" accept=".pdf,application/pdf" hidden data-file></label>
             <button class="btn btn--ink" type="button" data-action="demo-docs">${icon('file')} ${L('看示範大綱', 'See demo syllabi')}</button>
@@ -197,7 +193,7 @@ function readingSteps() {
               ${STAGES.map((st, i) => `<li class="ai-step ${i < now ? 'is-done' : i === now ? 'is-now' : ''}">
                 <span class="ai-step__mark">${i < now ? icon('check') : ''}</span>${stageLabel(st)}${i === now ? '…' : ''}</li>`).join('')}
             </ol>
-            <p class="muted">${partNote() ? `${esc(partNote())}。` : ''}${L('每份通常要半分鐘到一分鐘，可以先做別的事。', 'Each file usually takes 30–60 seconds. You can do other things meanwhile.')}</p>
+            <p class="muted">${partNote() ? `${esc(partNote())}。` : ''}</p>
           </div>`;
 }
 

@@ -159,9 +159,8 @@ function decideCard(s, p) {
 
   const listReady = !hero || chosen;
   const changes = listReady
-    ? `<ol class="changes">${p.changes.map((c) => changeHtml(s, c, p)).join('')}${p.missing ? `<li class="change change--warn"><span class="change__glyph change__glyph--remove">${icon('alert')}</span><span><b>${L('仍然不夠時間', 'Still not enough time')}</b>${L('：PS4 題 12 未有時間（約 1 小時）', ': PS4 Q12 has no slot (about 1 hour)')}</span></li>` : ''}</ol>
-       <p class="decide__hint">${icon('info')} ${L('按一項改動，時間表會標出它由哪裡移到哪裡。', 'Press a change to see on the timetable where it moves from and to.')}</p>`
-    : `<p class="decide__empty">${L('先選一個做法，這裡會列出所有改動。時間表上的虛線是目前的建議。', 'Pick an option first and all the changes will be listed here. The dashed sessions on the timetable are the current suggestion.')}</p>`;
+    ? `<ol class="changes">${p.changes.map((c) => changeHtml(s, c, p)).join('')}${p.missing ? `<li class="change change--warn"><span class="change__glyph change__glyph--remove">${icon('alert')}</span><span><b>${L('仍然不夠時間', 'Still not enough time')}</b>${L('：PS4 題 12 未有時間（約 1 小時）', ': PS4 Q12 has no slot (about 1 hour)')}</span></li>` : ''}</ol>`
+    : `<p class="decide__empty">${L('先選一個做法', 'Pick an option first')}</p>`;
 
   return `
     <div class="decide">
@@ -174,7 +173,6 @@ function decideCard(s, p) {
         <button class="btn btn--ink" type="button" data-action="ink" ${hero && !chosen ? 'aria-disabled="true"' : ''}>${icon('check')} ${hero && !chosen ? L('先選一個做法', 'Pick an option first') : L(`確認改動（${n} 項）`, `Confirm (${n})`)}</button>
         <button class="btn btn--ghost" type="button" data-action="erase">${icon('x')} ${L('不要', 'Discard')}</button>
       </div>
-      <p class="decide__hint">${L('確認之前，時間表不會改變。', 'Nothing on the timetable changes until you confirm.')}</p>
     </div>`;
 }
 
