@@ -1260,7 +1260,7 @@ a.crow.is-dragged { opacity: 0.35; }
 
 /* 排程方案：一排可以左右滑的小方塊；點一份就在時間表上用虛線預覽 */
 .plans { margin: 12px 0 14px; padding: 12px 14px; border-radius: var(--radius); background: var(--paper); box-shadow: inset 0 0 0 1px var(--paper-3); }
-.plans.is-busy, .plans[role="status"] { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+.plans[role="status"] { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 .plans__wait { margin: 0; display: flex; align-items: center; gap: 8px; font-family: var(--font-serif); color: var(--ink-2); }
 .plans__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .plans__head h2 { margin: 0; font-family: var(--font-serif); font-size: 16px; color: var(--ink); }
@@ -1323,3 +1323,27 @@ a.crow.is-dragged { opacity: 0.35; }
   .ask__fig { left: 4px; scale: 1.15; }
 }
 @media (prefers-reduced-motion: reduce) { .ask__box, .ask__fig { animation: none; } }
+
+/* 正在生成：空方塊上一道光掃過（閃下閃下），標題後面三點輪流亮 */
+.plans__thinking { display: inline-flex; align-items: baseline; gap: 2px; }
+.plans__dots { display: inline-flex; gap: 3px; margin-left: 4px; }
+.plans__dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--ink); animation: plans-dot 1.2s ease-in-out infinite; }
+.plans__dots i:nth-child(2) { animation-delay: 0.2s; }
+.plans__dots i:nth-child(3) { animation-delay: 0.4s; }
+.plan-card--ghost { cursor: default; border-style: dashed; position: relative; overflow: hidden; animation: plans-in 0.3s ease-out both; animation-delay: calc(var(--i) * 70ms); }
+.plan-card--ghost::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.75) 50%, transparent 80%);
+  animation: plans-shine 1.3s ease-in-out infinite; animation-delay: calc(var(--i) * 120ms);
+}
+.ghost { display: block; height: 10px; border-radius: 3px; background: var(--paper-3); }
+.ghost--title { height: 14px; width: 80%; }
+.ghost--week { height: 30px; }
+.ghost--short { width: 55%; }
+@keyframes plans-shine { to { transform: translateX(100%); } }
+@keyframes plans-dot { 0%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
+@keyframes plans-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) {
+  .plan-card--ghost, .plan-card--ghost::after { animation: none; }
+  .plans__dots i { animation: none; opacity: 0.6; }
+}
