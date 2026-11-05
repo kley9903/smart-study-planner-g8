@@ -290,7 +290,14 @@ function horizon(s) {
  * 越左越安全（最緊一項的緩衝最大）；緩衝少於半日的標紅；取捨方案寫明代價。
  */
 function planStrip(s) {
-  if (ui.planning) return `<section class="plans is-busy" aria-live="polite"><p class="plans__wait">${icon('clock')} ${L('AI 正在想幾個排法…', 'The AI is working out a few ways to plan…')}</p></section>`;
+  // 一按下就出現：幾個閃動的空方塊，表示正在生成，不用等 AI 回來才有反應
+  if (ui.planning) return `
+    <section class="plans is-busy" aria-live="polite" aria-busy="true">
+      <header class="plans__head"><h2 class="plans__thinking">${L('AI 正在想排法', 'The AI is working out ways to plan')}<span class="plans__dots" aria-hidden="true"><i></i><i></i><i></i></span></h2></header>
+      <ol class="plans__row" aria-hidden="true">${Array.from({ length: 5 }, (_, i) => `
+        <li><div class="plan-card plan-card--ghost" style="--i:${i}"><span class="ghost ghost--title"></span><span class="ghost ghost--week"></span><span class="ghost"></span><span class="ghost ghost--short"></span></div></li>`).join('')}
+      </ol>
+    </section>`;
   if (ui.planError) return `<section class="plans" role="status"><p class="plans__wait">${icon('alert')} ${esc(ui.planError)}</p><button class="btn btn--sm btn--ghost" type="button" data-action="plan-close">${L('關閉', 'Close')}</button></section>`;
   const opts = ui.planOptions;
   if (!opts) return '';
