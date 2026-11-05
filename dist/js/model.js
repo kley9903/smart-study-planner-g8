@@ -39,7 +39,7 @@ export function overlay(s) {
     } else if (c.kind === 'split' && b) {
       o.ghosts.set(b.id, 'move');
       c.to.forEach((to, i) => o.adds.push({ ...b, ...to, id: `${b.id}~${i}`, from: b.id, reason: c.reason || b.reason, pencil: true }));
-    } else if (c.kind === 'remove' && b) o.ghosts.set(b.id, 'remove');
+    } else if (c.kind === 'remove' && b) o.ghosts.set(b.id, c.replaced ? 'move' : 'remove'); // 重新排程換走的，顯示「移走」不是「不做」
     else if (c.kind === 'defer' && b) { o.ghosts.set(b.id, 'defer'); o.defers.push(c); }
     else if (c.kind === 'add') o.adds.push({ ...c.block, pencil: true });
     else if (c.kind === 'sleep') o.sleep.push({ night: c.night, start: c.start });

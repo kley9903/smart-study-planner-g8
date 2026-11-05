@@ -110,6 +110,29 @@ const before = mine.blocks.length;
 store.inkProposal();
 assert.equal(mine.blocks.length, before + 1, 'confirming writes the chosen option into the study plan');
 assert.equal(store.ui.planOptions, null, 'and closes the options');
+// Changed your mind after confirming: with everything scheduled, the button plans again. Sessions not started yet are
+// given back to the planner, and the new option replaces them only when confirmed; past or running sessions stay.
+{
+  const confirmed = mine.blocks.filter((b) => b.task === essay.id);
+  assert.ok(confirmed.length, 'the essay is scheduled');
+  confirmed.forEach((b) => { b.date = '2099-01-05'; }); // in the future whatever the real clock says
+  const running = { id: 'b-now', task: essay.id, step: essay.steps[0].id, date: mine.today, start: mine.now - 10, end: mine.now + 50 };
+  mine.blocks.push(running);
+  let sent = null;
+  globalThis.fetch = async (url, init) => { sent = JSON.parse(init.body); return Response.json({ ok: true, result: { capacity: { enough: true }, skipped: [], plans: [optionFor('p3', 1320)] } }); };
+  await store.requestPlans();
+  assert.ok(!sent.state.blocks.some((b) => confirmed.some((c) => c.id === b.id)), 'sessions not started yet are sent back to be planned again');
+  assert.ok(sent.state.blocks.some((b) => b.id === 'b-now'), 'a running session stays');
+  const redo = pendingProposal(mine);
+  assert.deepEqual(redo.changes.filter((c) => c.kind === 'remove').map((c) => c.block).sort(), confirmed.map((b) => b.id).sort(), 'the preview shows which sessions would be replaced');
+  assert.ok(mine.blocks.some((b) => b.id === confirmed[0].id), 'nothing changes before confirming');
+  const { overlay } = await import('../dist/js/model.js');
+  assert.equal(overlay(mine).ghosts.get(confirmed[0].id), 'move', 'old sessions show as moved away, not as skipped');
+  store.inkProposal();
+  assert.deepEqual([mine.blocks.some((b) => confirmed.some((c) => c.id === b.id)), mine.blocks.some((b) => b.start === 1320), essay.steps[0].dropped], [false, true, undefined], 'confirming swaps the old sessions for the new ones');
+  mine.blocks = mine.blocks.filter((b) => b.id !== 'b-now');
+}
+
 globalThis.fetch = async () => Response.json({ ok: false, reason: 'invalid', message: 'no task can be scheduled' });
 await store.requestPlans();
 assert.equal(store.ui.planOptions, null);
