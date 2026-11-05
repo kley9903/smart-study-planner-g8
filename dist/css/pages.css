@@ -1282,3 +1282,44 @@ a.crow.is-dragged { opacity: 0.35; }
 .plan-card.is-on .plan-card__week i { background: var(--ink); opacity: 0.8; }
 .plan-card__line { font-size: 12.5px; line-height: 1.45; }
 .plan-card__line b { color: var(--ink); font-weight: 600; }
+
+/* 遊戲式對話框（文字冒險遊戲的版面）：畫面底部一條橫跨全寬、向上漸淡的對話帶；
+   角色放大站在對話帶後面左邊（不擋頁面中間），下半身被對話帶蓋住；名字標在對話帶左上，一次一題 */
+.dock.is-away { visibility: hidden; }
+.ask { position: fixed; inset: auto 0 0 0; z-index: 60; pointer-events: none; }
+.ask__stage { position: relative; padding-top: 150px; }
+.ask__box {
+  pointer-events: auto; position: relative; z-index: 1; padding: 34px max(20px, calc(50% - 380px)) 14px;
+  background: linear-gradient(to top, rgba(251, 249, 244, 0.98) 0%, rgba(251, 249, 244, 0.97) calc(100% - 26px), rgba(251, 249, 244, 0) 100%);
+  animation: ask-in 0.28s ease-out;
+}
+.ask__fig {
+  position: absolute; z-index: 0; top: 0; left: max(8px, calc(50% - 560px)); width: 122px; height: 189px; overflow: hidden;
+  scale: 1.55; transform-origin: top left; animation: ask-hop 0.45s cubic-bezier(0.3, 1.4, 0.6, 1);
+}
+.ask__fig > .dock__stand { position: absolute; inset: 0; width: 122px; height: 189px; background-repeat: no-repeat; image-rendering: pixelated; }
+.ask__name {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; padding-bottom: 3px; border-bottom: 1.5px solid var(--ink);
+  font-family: var(--font-serif); font-size: 15px; font-weight: 700; color: var(--ink);
+}
+.ask__name::before { content: ""; width: 7px; height: 7px; background: var(--seal); transform: rotate(45deg); }.ask__text { margin: 0 0 10px; min-height: 2.9em; font-family: var(--font-serif); font-size: 17px; line-height: 1.55; color: var(--ink); }
+.ask__text:not(.is-done)::after { content: "▌"; margin-left: 1px; animation: ask-caret 0.8s steps(1) infinite; }
+.ask__choices { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ask__choice { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 6px; border: 1.5px solid var(--ink-3); border-radius: 99px; background: var(--paper-2); font: inherit; font-size: 14px; color: var(--ink); cursor: pointer; }
+.ask__choice:hover, .ask__choice:focus-visible { border-color: var(--ink); background: var(--paper); }
+.ask__key { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--paper); font-size: 12px; font-weight: 700; }
+.ask__own { display: flex; gap: 6px; }
+.ask__own .input { flex: 1; min-width: 0; }
+.ask__err { margin: 6px 0 0; font-size: 13px; color: #8f2a18; }
+.ask__foot { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
+.ask__count { margin-left: auto; font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.ai-todo__ask { margin-left: 8px; font-family: var(--font-sans); }
+@keyframes ask-in { from { opacity: 0; transform: translateY(16px); } }
+@keyframes ask-hop { 0% { transform: translateY(100%); } 70% { transform: translateY(-8%); } 100% { transform: none; } }
+@keyframes ask-caret { 50% { opacity: 0; } }
+@media (max-width: 560px) {
+  .ask__stage { padding-top: 110px; }
+  .ask__box { padding: 28px 14px 10px; }
+  .ask__fig { left: 4px; scale: 1.15; }
+}
+@media (prefers-reduced-motion: reduce) { .ask__box, .ask__fig { animation: none; } }
