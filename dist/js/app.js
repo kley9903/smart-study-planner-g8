@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, renameCourse, editTaskBasics, setTaskGroup, partsOf,
+  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, renameCourse, editTaskBasics, setTaskGroup, partsOf,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
 
@@ -27,12 +27,14 @@ import * as start from './views/start.js';
 import * as about from './views/about.js';
 import { renderDock } from './views/dock.js';
 import { renderAsk } from './views/ask.js';
+import { focusPage, clock } from './views/focus.js';
+import { timeLeft } from './focus.js';
 import { blockPopover, hatchPopover, busyForm } from './views/popovers.js';
 import { createMascot } from './mascot.js';
 import { attachBusyPainting } from './busy-paint.js';
 
 const views = {
-  week, tasks,
+  week, tasks, focus: focusPage,
   monthly: { render: (s) => `<div class="page-head"><div><h1 class="page-head__title">${L('月曆', 'Monthly')}</h1><p class="page-head__lede">${L('查看整個月的截止日期及忙碌時段，點選日期新增或查看內容。', 'View deadlines and busy times for the month. Select a date to view or add items.')}</p></div></div><section class="sheet monthly-page">${renderMonth(s)}</section>` },
   'add-task': { render: (s) => `<div class="page-head"><h1 class="page-head__title">${L('新增任務', 'Add task')}</h1></div><div class="add-task-page">${editor(s, null, ui.taskDate)}${stepHelper()}</div>` },
   import: importView, start, about,
@@ -595,6 +597,12 @@ const actions = {
   'tour-prev': () => tourStep(-1),
   'tour-end': () => endTour(),
   'auto-plan': () => requestPlans(),
+  'focus-start': () => startFocus(),
+  'focus-block': (el) => { closePopover(); startFocus({ block: el.dataset.block }); location.hash = '#/focus'; },
+  'focus-pause': () => pauseFocus(),
+  'focus-resume': () => resumeFocus(),
+  'focus-stop': () => stopFocus(),
+  'focus-finish': (el) => finishFocus(el.dataset.result, Number(el.dataset.remain) || null),
   'ask-start': (el) => startAsk(el.dataset.doc),
   'ask-pick': (el) => answer(Number(el.dataset.value)),
   'ask-skip': () => { ui.askError = ''; skipAsk(); },
@@ -1051,3 +1059,15 @@ window.addEventListener('hashchange', () => render());
 ui.dockOpen = recall('dock') === '1';
 applyStatic();
 render();
+/* ---------------- 番茄鐘：每秒更新倒數，時間到就轉段；分頁標題也顯示剩下的時間 ---------------- */
+const baseTitle = document.title;
+setInterval(() => {
+  const f = getState().focus;
+  if (!f || f.asking) { if (document.title !== baseTitle) document.title = baseTitle; return; }
+  tickFocus();
+  const left = timeLeft(f.timer, Date.now());
+  document.title = `${clock(left)} · ${baseTitle}`;
+  const el = main.querySelector('[data-focus-left]');
+  if (el) el.textContent = clock(left);
+  main.querySelector('[data-focus-dial]')?.style.setProperty('--p', (1 - left / f.timer.length).toFixed(4));
+}, 1000);

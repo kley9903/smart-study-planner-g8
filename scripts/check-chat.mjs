@@ -48,6 +48,15 @@ assert.deepEqual(ctx.tasks[0], { id: 't1', title: 'Problem Set 4', course: 'STAT
 assert.deepEqual(ctx.blocks, [{ date: '2026-11-05', start: 1140, end: 1260, task: 'Problem Set 4', step: 'Q5-8' }], 'only sessions from today on, with names');
 assert.deepEqual(ctx.to_fill, [{ doc: 'd1', item: 'i7', what: 'Quiz 2', need: ['date', 'scope', 'hours'] }]);
 assert.ok(JSON.stringify(ctx).length < 4000, 'small enough to send with every message');
+{
+  const { setLang } = await import('../dist/js/i18n.js');
+  globalThis.document = { documentElement: {}, querySelectorAll: () => [] }; // setLang also relabels the page
+  setLang('zh');
+  assert.equal(toContext(s).lang, 'zh', 'the reply follows the language chosen on the site, not the language typed');
+  setLang('en');
+  assert.equal(toContext(s).lang, 'en');
+  delete globalThis.document;
+}
 s.thread = [{ who: 'me', text: 'Quiz 2 下星期二交，範圍是第 5 章' }, { who: 'ai', html: '記下日期，<b>範圍</b>也要記嗎？' }, { who: 'ai', kind: 'hello' }];
 assert.deepEqual(toContext(s).recent, [{ who: 'me', text: 'Quiz 2 下星期二交，範圍是第 5 章' }, { who: 'ai', text: '記下日期，範圍也要記嗎？' }], 'the last few lines of the chat, as plain text, so "yes, that too" makes sense');
 

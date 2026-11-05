@@ -44,7 +44,8 @@ export function proposalFrom(plan, s) {
   const changes = [];
   plan.changes.forEach((c, i) => {
     const reason = reasonText(c, s);
-    if (c.kind === 'add') changes.push({ kind: 'add', reason, block: { id: `ai-${plan.id}-${i}`, task: c.task, step: c.step, date: c.date, start: c.start, end: c.end, reason } });
+    // rest：這個方案的休息方式，番茄鐘從這段開始時照它的節奏
+    if (c.kind === 'add') changes.push({ kind: 'add', reason, block: { id: `ai-${plan.id}-${i}`, task: c.task, step: c.step, date: c.date, start: c.start, end: c.end, reason, rest: plan.knobs?.rest ?? null } });
     else if (c.kind === 'sleep') changes.push({ kind: 'sleep', night: c.night, start: c.start, reason });
     else if (c.kind === 'estimate') changes.push({ kind: 'estimate', step: c.step, min: c.min, note: reason, reason });
     else if (c.kind === 'borrow') changes.push({ kind: 'borrow', rule: c.unavailable, date: c.date, start: c.start, end: c.end, reason });

@@ -2,6 +2,7 @@
 // 摘要要小（每句都送），只放回答問題和判斷 action 需要的東西；id 讓 Chatflow 指明是哪一項。
 import { weekday } from './time.js';
 import { questionsFor } from './ask.js';
+import { getLang } from './i18n.js';
 
 const PROGRESS = { todo: 'todo', doing: 'doing', done: 'done' };
 
@@ -16,6 +17,7 @@ export function toContext(s) {
     for (const [item, need] of byItem) toFill.push({ doc: d.id, item, what: d.items.find((x) => x.id === item)?.what || '', need });
   }
   return {
+    lang: getLang() === 'zh' ? 'zh' : 'en', // 回覆用網站現在選的語言
     now: { date: s.today, min: s.now, weekday: weekday(s.today) },
     tasks: s.tasks.map((t) => ({
       id: t.id, title: t.title, course: s.courses?.[t.course]?.name || '', due: { ...t.due },

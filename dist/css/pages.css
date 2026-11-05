@@ -1347,3 +1347,24 @@ a.crow.is-dragged { opacity: 0.35; }
   .plan-card--ghost, .plan-card--ghost::after { animation: none; }
   .plans__dots i { animation: none; opacity: 0.6; }
 }
+
+/* 番茄鐘頁：一個圓形倒數（外圈按 --p 填滿），下面是按鈕；小休時換成柔和的綠色 */
+.focus { display: grid; justify-items: center; gap: 18px; padding: 28px 20px 30px; text-align: center; }
+.focus__what { margin: 0; font-family: var(--font-serif); font-size: 16px; font-weight: 700; color: var(--ink); }
+.focus__dial {
+  --k: var(--ink); width: min(260px, 70vw); aspect-ratio: 1; border-radius: 50%; display: grid; place-content: center; gap: 6px;
+  background: radial-gradient(closest-side, var(--paper) 86%, transparent 87%), conic-gradient(var(--k) calc(var(--p) * 360deg), var(--paper-3) 0);
+}
+.focus.is-break .focus__dial { --k: var(--green); }
+.focus.is-paused .focus__dial { opacity: 0.6; }
+.focus__time { font-family: var(--font-mono, ui-monospace, monospace); font-size: clamp(40px, 12vw, 56px); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.focus__phase { font-size: 13.5px; color: var(--ink-3); }
+.focus__acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.focus__ask { margin: 0; font-family: var(--font-serif); font-size: 17px; color: var(--ink); }
+.focus__from { width: min(440px, 100%); text-align: left; }
+.focus__from h2 { margin: 6px 0 8px; font-family: var(--font-serif); font-size: 14.5px; color: var(--ink-2); }
+.focus__from ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.focus__session { width: 100%; display: grid; gap: 2px; padding: 10px 12px; text-align: left; border: 1.5px solid var(--paper-3); border-radius: var(--radius); background: var(--paper-2); font: inherit; color: var(--ink-2); cursor: pointer; }
+.focus__session:hover { border-color: var(--ink-3); }
+.focus__session b { color: var(--ink); font-weight: 600; }
+.focus__session span { font-size: 12.5px; }

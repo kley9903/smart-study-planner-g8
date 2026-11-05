@@ -176,7 +176,7 @@ function nextBar(s) {
       <div class="wk-next__actions">
         ${done ? `<span class="chip chip--ok">${icon('check')} ${L('已完成', 'Done')}</span>` : doing
           ? `<button class="btn btn--sm" type="button" data-action="progress" data-step="${step.id}" data-p="done">${icon('check')} ${L('做完了', 'Finished')}</button>`
-          : `<button class="btn btn--sm" type="button" data-action="progress" data-step="${step.id}" data-p="doing">${icon('play')} ${L('開始', 'Start')}</button>`}
+          : `<button class="btn btn--sm" type="button" data-action="focus-block" data-block="${b.id}">${icon('play')} ${L('開始專注', 'Focus')}</button>`}
         <button class="btn btn--sm btn--ghost" type="button" data-action="block" data-block="${b.id}">${L('詳情', 'Details')}</button>
       </div>
     </div>`;
