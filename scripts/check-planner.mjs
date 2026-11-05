@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 const memory = new Map();
 globalThis.localStorage = { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => memory.set(k, v) };
 const { monthDates, shiftMonth } = await import('../dist/js/views/month.js');
-const { enterMine, getState, addTask, updateTask, editTaskBasics, autoPlan, inkProposal, addTaskAttachment } = await import('../dist/js/store.js');
+const { enterMine, getState, addTask, updateTask, editTaskBasics, requestPlans, inkProposal, addTaskAttachment } = await import('../dist/js/store.js');
 
 assert.equal(shiftMonth('2026-12-31', 1), '2027-01-01');
 assert.equal(shiftMonth('2026-01-31', -1), '2025-12-01');
@@ -23,10 +23,15 @@ addTask({ title: '<unsafe> report', course: 'Statistics', kind: 'Report', date: 
 const task = s.tasks[0];
 // getState refreshes the real clock, so set deterministic inputs just before planning.
 s.today = '2026-11-01'; s.now = 600;
-autoPlan();
+// The planning workflow is faked: it puts each step on 2 Nov, one after another.
+globalThis.fetch = async (url, init) => {
+  const t = JSON.parse(init.body).state.tasks[0];
+  const changes = t.steps.map((x, i) => ({ kind: 'add', task: t.id, step: x.id, date: '2026-11-02', start: 600 + i * 120, end: 600 + i * 120 + x.min, reason: { code: 'earliest_before_due', due: t.due } }));
+  return Response.json({ ok: true, result: { capacity: { enough: true }, skipped: [], plans: [{ id: 'p1', kind: 'normal', summary: { zh: '', en: '' }, short: [], stats: {}, changes }] } });
+};
+await requestPlans();
 assert.equal(s.blocks.length, 0, 'Suggested sessions must not become confirmed automatically');
 assert.equal(s.proposals[s.proposal].status, 'pending');
-assert.ok(s.thread.at(-1).html.includes('suggested'));
 inkProposal();
 assert.ok(s.blocks.length > 0);
 const firstBlock = s.blocks[0];

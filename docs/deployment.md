@@ -25,6 +25,16 @@
 
 這個轉接只接受同一網站發出的請求、單檔 15 MB 以內；任何打開網站的人都可以使用，會用到 Dify 帳戶的額度。
 
+## 排程 AI（Dify）的金鑰
+
+「本週」頁的「自動排程」經 `functions/api/plan.js` 呼叫另一個 Dify 工作流程「排程｜Study Planner」，用另一個金鑰：
+
+1. 在「排程｜Study Planner」的「存取點 → 後端服務 API → API 金鑰」取得金鑰（`app-` 開頭；跟大綱用的不是同一把）。
+2. 在同一個 Cloudflare 頁面新增 **Secret** `DIFY_PLAN_KEY`，貼上金鑰。不要貼到聊天、程式或 README。
+3. 重新發布一次（Publish website）。
+
+沒有設定時，按「自動排程」會顯示「AI 暫時連不上」，網站其他部分照常運作；Dify 連不上時也一樣，網站不會自己用另一套規則排（見專案的 ADR 0001）。本機試用：設定 `DIFY_PLAN_KEY` 環境變數，再 `node serve.mjs`。
+
 ## 協作保護
 
 目前由負責人統一整合組員交回的檔案。main 要求 Pull Request 及 **Project checks** 通過；不強制另一位成員審核，負責人可以自行合併。禁止強制推送及刪除分支，規則也套用到管理者。

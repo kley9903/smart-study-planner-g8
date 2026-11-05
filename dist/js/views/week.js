@@ -1,13 +1,13 @@
 // 本週：示範導覽、未來 7 日的具體時間表、「下一段」、遠方 deadline。AI 助手在每頁右下角（views/dock.js）。
 import { esc, icon } from '../ui.js';
 import { ui, canRun, getMode } from '../store.js';
-import { unplannedSteps } from '../scheduler.js';
 import { renderPlanner } from '../planner.js';
 import { HERO } from '../scenarios.js';
 import {
   windowDates, plannedTotal, nextBlock, pendingCount, pendingProposal,
-  taskOf, stepOf, inkOf, taskStats, courseOf, overlay, guideState,
+  taskOf, stepOf, inkOf, taskStats, courseOf, overlay, guideState, unplannedSteps,
 } from '../model.js';
+import { cardOf } from '../plan-ai.js';
 import { md, span, hm, hShort, num, addDays, dayNum, wd, wk, mdNum, isWeekend, diffDays, hoursText } from '../time.js';
 import { HORIZON_DAYS, WINDOW_DAYS } from '../demo-data.js';
 import { L } from '../i18n.js';
@@ -27,6 +27,7 @@ export function render(s) {
       <div class="week__main">
         <section class="sheet week__sheet" aria-label="${L('未來 7 日讀書計劃', 'Study plan for the next 7 days')}">
           ${head(s, dates, editing)}
+          ${editing ? '' : planStrip(s)}
           ${ui.calendarView === 'month' ? renderMonth(s) : `
           ${editing ? busyHint() : nextBar(s)}
           ${mobile ? dayPicker(s, dates) : ''}
@@ -124,7 +125,7 @@ function head(s, dates, editing) {
   // 自己的計劃：未排的段數、新增功課和自動排程都放在頁頭，不另開一列
   const mine = getMode() === 'mine';
   const left = mine ? unplannedSteps(s) : [];
-  const canPlan = mine && !editing && s.tasks.length && left.length && !pendingProposal(s);
+  const canPlan = mine && !editing && s.tasks.length && left.length && !pendingProposal(s) && !ui.planning && !ui.planOptions;
   return `
     <header class="wk-head">
       <div>
@@ -281,5 +282,42 @@ function horizon(s) {
           ${rows}
         </div>
       </div>
+    </section>`;
+}
+
+/**
+ * 排程方案：按「自動排程」後，AI 給最多約 10 份方案，左右滑動；點一份，本週時間表用虛線預覽它，按確認才寫進讀書計劃。
+ * 越左越安全（最緊一項的緩衝最大）；緩衝少於半日的標紅；取捨方案寫明代價。
+ */
+function planStrip(s) {
+  if (ui.planning) return `<section class="plans is-busy" aria-live="polite"><p class="plans__wait">${icon('clock')} ${L('AI 正在想幾個排法…', 'The AI is working out a few ways to plan…')}</p></section>`;
+  if (ui.planError) return `<section class="plans" role="status"><p class="plans__wait">${icon('alert')} ${esc(ui.planError)}</p><button class="btn btn--sm btn--ghost" type="button" data-action="plan-close">${L('關閉', 'Close')}</button></section>`;
+  const opts = ui.planOptions;
+  if (!opts) return '';
+  const current = pendingProposal(s)?.option;
+  const skipped = opts.skipped?.length ? `<p class="plans__note">${icon('info')} ${L(`${opts.skipped.length} 項沒有截止日期，這次不排`, `${opts.skipped.length} without a due date, not planned this time`)}</p>` : '';
+  const short = opts.capacity && !opts.capacity.enough ? `<p class="plans__note is-alert">${icon('alert')} ${L('時間不夠：以下是取捨方案，每份寫明代價', 'Not enough time: these trade-off plans say what each one costs')}</p>` : '';
+  const max = Math.max(60, ...opts.plans.flatMap((p) => cardOf(p, s).days));
+  return `
+    <section class="plans" aria-label="${L('排程方案', 'Plan options')}">
+      <header class="plans__head">
+        <h2>${L(`${opts.plans.length} 個排法，選一個`, `${opts.plans.length} ways to plan, pick one`)}</h2>
+        <div class="plans__acts">
+          <button class="btn btn--sm btn--ink" type="button" data-action="ink" ${current ? '' : 'disabled'}>${icon('check')} ${L('用這個', 'Use this one')}</button>
+          <button class="btn btn--sm btn--ghost" type="button" data-action="plan-close">${L('不要', 'Discard')}</button>
+        </div>
+      </header>
+      ${short}${skipped}
+      <ol class="plans__row">${opts.plans.map((p) => {
+        const c = cardOf(p, s);
+        return `<li><button class="plan-card ${c.id === current ? 'is-on' : ''} ${c.risky ? 'is-risky' : ''}" type="button" data-action="plan-pick" data-plan="${esc(c.id)}" aria-pressed="${c.id === current}">
+          <span class="plan-card__title">${esc(c.title)}</span>
+          <span class="plan-card__week" aria-hidden="true">${c.days.map((m) => `<i style="--h:${Math.round((m / max) * 100)}%"></i>`).join('')}</span>
+          <span class="plan-card__line">${L('全部做完', 'All done')} <b>${esc(c.finish)}</b></span>
+          ${c.tightest ? `<span class="plan-card__line plan-card__tight">${esc(c.tightest)}</span>` : ''}
+          ${c.costsSleep ? `<span class="plan-card__line is-alert">${L('會少睡一些', 'Costs some sleep')}</span>` : ''}
+          ${c.short.length ? `<span class="plan-card__line is-alert">${L('仍欠：', 'Still short: ')}${esc(c.short.join(', '))}</span>` : ''}
+        </button></li>`;
+      }).join('')}</ol>
     </section>`;
 }

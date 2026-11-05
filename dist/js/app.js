@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, autoPlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, renameCourse, editTaskBasics, setTaskGroup, partsOf,
+  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, renameCourse, editTaskBasics, setTaskGroup, partsOf,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
 
@@ -533,7 +533,9 @@ const actions = {
   'tour-next': () => tourStep(1),
   'tour-prev': () => tourStep(-1),
   'tour-end': () => endTour(),
-  'auto-plan': () => autoPlan(),
+  'auto-plan': () => requestPlans(),
+  'plan-pick': (el) => choosePlan(el.dataset.plan),
+  'plan-close': () => { ui.planError = ''; eraseProposal(); render(); },
   'del-task': (el) => {
     const t = taskOf(getState(), el.dataset.task);
     if (t && window.confirm(L(`刪除「${t.title}」和它已排的讀書時段？`, `Delete "${t.title}" and its scheduled sessions?`))) {

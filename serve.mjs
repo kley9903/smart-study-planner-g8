@@ -1,9 +1,10 @@
 // 本機預覽：在 src/web 執行 `node serve.mjs`（不用安裝任何套件），再打開 http://localhost:5173
 // 網站本身在 dist/，沒有 build 步驟；這個檔案不會被發布。
-// /api/syllabus 跑跟 Cloudflare 上同一份 functions/api/syllabus.js；要試 AI 讀大綱，先設定環境變數 DIFY_API_KEY。
+// /api/syllabus 和 /api/plan 跑跟 Cloudflare 上同一份 functions/api/*.js；要試 AI，先設定環境變數 DIFY_API_KEY（讀大綱）和 DIFY_PLAN_KEY（排程）。
 import http from 'node:http';
 import { Readable } from 'node:stream';
 import { onRequestPost as readSyllabus } from './functions/api/syllabus.js';
+import { onRequestPost as makePlans } from './functions/api/plan.js';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,11 +24,12 @@ const types = {
 
 http
   .createServer(async (req, res) => {
-    if (req.url.split('?')[0] === '/api/syllabus') {
+    const api = { '/api/syllabus': readSyllabus, '/api/plan': makePlans }[req.url.split('?')[0]];
+    if (api) {
       if (req.method !== 'POST') return res.writeHead(405).end();
       const url = `http://${req.headers.host}${req.url}`;
       const request = new Request(url, { method: 'POST', headers: req.headers, body: Readable.toWeb(req), duplex: 'half' });
-      const reply = await readSyllabus({ request, env: process.env });
+      const reply = await api({ request, env: process.env });
       res.writeHead(reply.status, Object.fromEntries(reply.headers));
       return Readable.fromWeb(reply.body).pipe(res); // 逐行轉送，網頁才看得到每一步的進度
     }
