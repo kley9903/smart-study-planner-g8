@@ -129,24 +129,31 @@ function aiModal(s) {
     </div>`;
 }
 
-const GROUP_MARK = { date: () => icon('calendar'), weight: () => '<b>%</b>', check: () => icon('alert'), other: () => icon('info') };
+const GROUP_MARK = { fill: () => icon('pencil'), date: () => icon('calendar'), weight: () => '<b>%</b>', check: () => icon('alert'), other: () => icon('info') };
 
 /**
- * 報告：要你核對的事按類別分組（日期未定、比重、要確認、其他），每組一個色塊標記和數目；
+ * 報告：要你核對的事按類別分組（要你補、日期未定、比重、要確認、其他），每組一個色塊標記和數目；
  * 同一句只寫一次，後面標出現幾次。找到的數目已經在上面的清單，這裡不再列。
+ * 「要你補」排最前，頁面上的報告每項有「去補」按鈕，打開那一列來填；比重可以之後才補，收起來。
  */
 function findings(doc, animate) {
   const groups = report(doc);
   if (!groups.length) return `<p class="ai-todo-clear">${icon('check')} ${L('沒有發現缺漏，可以直接逐項確認。', 'Nothing missing. Go ahead and confirm the items.')}</p>`;
+  const lines = (g) => `<ul>${g.lines.map((l) => `
+              <li><span class="ai-todo__what">${esc(l.text)}</span>${l.hint ? ` <span class="ai-todo__hint">${esc(l.hint)}</span>` : ''}${l.times > 1 ? ` <span class="ai-todo__times">×${l.times}</span>` : ''}${l.item && !animate ? ` <button class="btn btn--sm ai-todo__go" type="button" data-action="edit-item" data-item="${l.item}">${icon('pencil')} ${L('去補', 'Fill in')}</button>` : ''}</li>`).join('')}</ul>`;
+  const head = (g) => `<span class="ai-todo__icon" aria-hidden="true">${GROUP_MARK[g.kind]()}</span>${g.later ? L(`之後可補：${g.label}`, `Can wait: ${g.label}`) : g.label}<span class="ai-todo__n">${g.lines.length}</span>`;
   return `
         <div class="ai-todo ${animate ? 'is-animated' : ''}">
           <h3 class="ai-todo__title">${L('要你核對', 'Please check')}</h3>
-          ${groups.map((g, i) => `
+          ${groups.map((g, i) => (g.later ? `
+          <details class="ai-todo__group is-${g.kind} is-later" ${animate ? `style="--i:${i}"` : ''}>
+            <summary class="ai-todo__head">${head(g)}</summary>
+            ${lines(g)}
+          </details>` : `
           <section class="ai-todo__group is-${g.kind}" ${animate ? `style="--i:${i}"` : ''}>
-            <h4 class="ai-todo__head"><span class="ai-todo__icon" aria-hidden="true">${GROUP_MARK[g.kind]()}</span>${g.label}<span class="ai-todo__n">${g.lines.length}</span></h4>
-            <ul>${g.lines.map((l) => `
-              <li><span class="ai-todo__what">${esc(l.text)}</span>${l.hint ? ` <span class="ai-todo__hint">${esc(l.hint)}</span>` : ''}${l.times > 1 ? ` <span class="ai-todo__times">×${l.times}</span>` : ''}</li>`).join('')}</ul>
-          </section>`).join('')}
+            <h4 class="ai-todo__head">${head(g)}</h4>
+            ${lines(g)}
+          </section>`)).join('')}
         </div>`;
 }
 
@@ -320,11 +327,11 @@ function itemRow(doc, it) {
   return `
     <tr class="xrow--${it.state}">
       <td><span class="xtype">${esc(it.type)}</span></td>
-      <td><div class="xwhat">${esc(it.what)}</div>${it.warn && it.state === 'pencil' ? `<div class="xwarn">${icon('alert')}<span>${esc(it.warn)}</span></div>` : ''}</td>
+      <td><div class="xwhat">${esc(it.what)}${it.difficulty ? ` <span class="xdiff" title="${L('難度（AI 判斷，可改）', 'Difficulty (AI judgement)')}">${esc(it.difficulty)}</span>` : ''}</div>${it.scope ? `<div class="xscope">${esc(it.scope)}</div>` : ''}${it.warn && it.state === 'pencil' ? `<div class="xwarn">${icon('alert')}<span>${esc(it.warn)}</span></div>` : ''}</td>
       <td class="mono ${it.when === '—' ? 'is-empty' : ''}" style="font-size:13px">${esc(it.when)}</td>
       <td class="${it.weight ? '' : 'is-empty'}">${it.weight ? esc(it.weight) : '—'}</td>
       <td><span class="xsrc" ${it.quote ? `title="${esc(it.quote)}"` : ''}>${icon('file')} ${esc(it.src)}</span>${it.quote ? `<small class="xquote">${esc(it.quote)}</small>` : ''}</td>
-      <td class="xhours ${!it.hours || it.hours === '—' ? 'is-empty' : ''}">${esc(it.hours || '—')}${it.hoursNote ? `<small>${esc(it.hoursNote)}</small>` : ''}</td>
+      <td class="xhours ${!it.hours || it.hours === '—' ? 'is-empty' : ''}">${esc(it.hours || '—')}${it.steps > 1 ? `<small>${L(`分 ${it.steps} 步`, `${it.steps} steps`)}</small>` : ''}${it.hoursNote ? `<small>${esc(it.hoursNote)}</small>` : ''}</td>
       <td><div class="xact">${actions}</div></td>
     </tr>`;
 }
@@ -333,7 +340,7 @@ function editRow(doc, it) {
   return `
     <tr class="xrow--pencil">
       <td><span class="xtype">${esc(it.type)}</span></td>
-      <td><div class="xwhat">${esc(it.what)}</div></td>
+      <td><div class="xwhat">${esc(it.what)}</div>${doc.own && it.plan?.kind === 'task' ? `<label class="xscope-edit">${L('要做甚麼', 'What to do')}<input class="input input--sm" id="edit-scope" value="${esc(it.scope || '')}" placeholder="${L('例如：第 4–5 章，10 題選擇題', 'e.g. chapters 4–5, 10 multiple-choice questions')}"></label>` : ''}</td>
       <td><label class="sr-only" for="edit-when">${L('日期／時間', 'Date / time')}</label><input class="input" id="edit-when" value="${esc(it.when)}" style="min-width:150px"></td>
       <td>${esc(it.weight || '—')}</td>
       <td><span class="xsrc">${esc(it.src)}</span></td>

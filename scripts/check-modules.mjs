@@ -230,22 +230,63 @@ assert.equal(found.weightTotal, 100);
     { kind: 'weight', text: 'No weight published' }, { kind: 'weight', text: 'No weight published' }, { kind: 'weight', text: 'No weight published' },
     { kind: 'check', text: 'Week 13 is listed twice' }, '原文有「25%」，但結果裡沒有 25% 的評核項目，請核對是否漏了。', 'Course name not published.',
   ];
-  const groups = report({ items: found.items, notes, weightTotal: 90 });
-  assert.deepEqual(groups.map((g) => [g.kind, g.label]), [['date', 'Dates to settle'], ['weight', 'Weights'], ['check', 'To confirm'], ['other', 'Other']], 'grouped in this order; nothing about what was found');
+  // Items given a scope and a confident estimate, so only the date problems are left to report.
+  const sure = (i) => ({ ...i, scope: 'x', confidence: 'high' });
+  const groups = report({ items: found.items.map(sure), notes, weightTotal: 90 });
+  assert.deepEqual(groups.map((g) => [g.kind, g.label]), [['fill', 'To fill in'], ['date', 'Dates to settle'], ['weight', 'Weights'], ['check', 'To confirm'], ['other', 'Other']], 'grouped in this order; nothing about what was found');
   const by = Object.fromEntries(groups.map((g) => [g.kind, g.lines]));
-  assert.deepEqual(by.date.map((l) => l.text), ['Midterm exam', 'Group project proposal', 'Group project final report', 'Final exam'], 'items without a time or a date');
-  assert.ok(by.date[0].hint.includes('09:00') && by.date.at(-1).hint.includes(final.raw), 'each says what is missing or what the syllabus wrote');
+  assert.deepEqual(by.fill.map((l) => [l.text, l.need]), [['Final exam', ['date']]], 'a missing due date is asked under "To fill in", not listed again under dates');
+  assert.ok(by.fill[0].hint.includes(final.raw), 'and says what the syllabus wrote');
+  assert.deepEqual(by.date.map((l) => l.text), ['Midterm exam', 'Group project proposal', 'Group project final report'], 'items without a time');
+  assert.ok(by.date[0].hint.includes('09:00'), 'each says what time it was set to');
   assert.ok(by.weight[0].text.includes('90%'), 'weights that do not add up to 100% come first under weights');
   assert.equal(by.weight.find((l) => l.text === 'No weight published').times, 3, 'a repeated note is shown once with a count');
   assert.ok(by.weight.some((l) => l.text.startsWith('原文有「25%」')), 'old notes saved as plain text are still sorted: a coverage check about a percentage goes under weights');
   assert.deepEqual([by.check.map((l) => l.text), by.other.map((l) => l.text)], [['Week 13 is listed twice'], ['Course name not published.']]);
-  assert.deepEqual(report({ items: [found.items[0]], notes: [], weightTotal: null }).map((g) => [g.kind, g.lines.map((l) => l.text)]), [['check', ['No exams or quizzes found']]]);
-  assert.deepEqual(report({ items: [found.items[0], found.items[1]].map((i) => ({ ...i, flag: null })), notes: [], weightTotal: 100 }), [], 'nothing to check');
+  assert.deepEqual(report({ items: [sure(found.items[0])], notes: [], weightTotal: null }).map((g) => [g.kind, g.lines.map((l) => l.text)]), [['check', ['No exams or quizzes found']]]);
+  assert.deepEqual(report({ items: [found.items[0], found.items[1]].map((i) => ({ ...sure(i), flag: null })), notes: [], weightTotal: 100 }), [], 'nothing to check');
   assert.equal(checklist({ items: [], notes, weightTotal: null }).at(-1).text, '4 to check', 'the syllabus row counts a repeated note once');
   const rows = checklist({ items: found.items, notes: [], weightTotal: 100 });
   assert.deepEqual(rows.map((r) => r.state), ['ok', 'ok', 'ok', 'ok', 'warn', 'ok'], 'check window rows: read, work, exams, weights, dates (final TBA), syllabus');
   assert.deepEqual(rows.map((r) => r.stage), ['read', 'extract', 'extract', 'check', 'check', 'check']);
   assert.deepEqual(checklist({ items: [], notes: ['x'], weightTotal: null }).slice(1).map((r) => r.state), ['none', 'none', 'none', 'ok', 'warn']);
+}
+{
+  // The AI estimate comes from the course material, not from the type: a 10-question library quiz is 1 hour, not the 3-hour quiz default.
+  const quiz = toItems({ tasks: [{
+    title: 'Library quiz', type: 'quiz', due_date: '2026-11-18', due_time: '23:59', scope: '10 multiple-choice questions on library skills',
+    estimate: { minutes: 60, confidence: 'high', basis: 'Syllabus: 10 MCQs, 2%' }, difficulty: 'easy',
+    steps: [{ title: 'Read the library guide', minutes: 40 }, { title: 'Do the quiz', minutes: 20 }],
+  }] }).items[0];
+  assert.equal(quiz.plan.hours, 1, 'the AI estimate replaces the type default');
+  assert.deepEqual([quiz.confidence, quiz.basis, quiz.difficulty, quiz.scope], ['high', 'Syllabus: 10 MCQs, 2%', 'easy', '10 multiple-choice questions on library skills']);
+  assert.deepEqual(quiz.steps, [{ title: 'Read the library guide', min: 40 }, { title: 'Do the quiz', min: 20 }]);
+
+  // Without an AI estimate the type default is only a placeholder: it never counts as a confident estimate.
+  assert.equal(a1.confidence, 'low', 'an old output with no estimate is low confidence');
+  const guessed = toItems({ tasks: [{ title: 'Quiz 2', type: 'quiz', due_date: '2026-11-25', estimate: { minutes: 90, confidence: 'sure' } }] }).items[0];
+  assert.equal(guessed.confidence, 'low', 'anything other than "high" is low');
+  assert.deepEqual(['easy', 'medium', 'mid', 'hard', 'weird'].map((d) => toItems({ tasks: [{ title: 'X', type: 'quiz', difficulty: d }] }).items[0].difficulty), ['easy', 'mid', 'mid', 'hard', null], 'difficulty is stored as the planner expects it: easy, mid or hard');
+
+  // "To fill in" comes first: items missing what planning needs (a due date, what to do) or with a low-confidence estimate.
+  const bare = toItems({ tasks: [{ title: 'Quiz 3', type: 'quiz', due_raw: 'TBA' }] }).items[0];
+  const fill = report({ items: [quiz, guessed, bare], notes: [], weightTotal: 100 })[0];
+  assert.deepEqual([fill.kind, fill.label], ['fill', 'To fill in']);
+  assert.deepEqual(fill.lines.map((l) => [l.text, l.need]), [['Quiz 2', ['scope', 'hours']], ['Quiz 3', ['date', 'scope', 'hours']]], 'the complete library quiz is not asked about');
+  assert.equal(report({ items: [quiz], notes: [{ kind: 'weight', text: 'No weight published' }], weightTotal: null })[0].later, true, 'weights can wait: that group is marked for later');
+  assert.equal(fill.lines[0].item, guessed.id, 'each line points at its row so the page can open it for filling in');
+
+  // The row shows why the AI chose those hours, how sure it is, how hard the task is, and what to do.
+  const row = rowText(quiz);
+  assert.deepEqual([row.hours, row.hoursNote, row.difficulty, row.scope, row.steps], ['1 hour', 'Syllabus: 10 MCQs, 2%', 'Easy', '10 multiple-choice questions on library skills', 2]);
+  assert.equal(rowText(guessed).hoursNote, 'AI guess: check this', 'a low-confidence estimate says so');
+  assert.equal(rowText(a1).hoursNote, 'default, change as needed', 'no estimate at all is still a default');
+
+  // A real Dify output with the planning fields: the small quiz is 45 minutes, the name-only quiz is asked about, the essay has 4 steps.
+  const real = toItems(JSON.parse(await readFile(new URL('./fixtures/dify-syllabus-estimates.json', import.meta.url), 'utf8'))).items;
+  assert.deepEqual(real.map((i) => [i.what, i.plan.hours, i.confidence, i.difficulty, i.steps.length]), [['Library quiz', 0.75, 'high', 'easy', 1], ['Quiz 2', 1, 'low', 'mid', 1], ['Research essay', 10, 'high', 'hard', 4]]);
+  assert.deepEqual(report({ items: real, notes: [], weightTotal: null })[0].lines.map((l) => [l.text, l.need]), [['Quiz 2', ['date', 'scope', 'hours']]], 'only the name-only quiz needs filling in');
+  assert.equal(rowText(real[0]).hours, '45 min', 'less than an hour is shown in minutes, not "0.75 hours"');
 }
 
 enterMine();
@@ -335,6 +376,34 @@ inkAllItems('doc-7');
 assert.deepEqual([mathTasks().length, finalTask2.due], [1, { date: '2026-12-22', min: 840 }], 'the existing task moves; no second task');
 assert.equal(mine.blocks.some((b) => b.id === 'b-future'), false, 'unstarted sessions for the moved task are cleared');
 assert.equal(doc7.items[0].applied, 'moved');
+
+// A confirmed item becomes a task with the AI's steps and difficulty, not "Part 1, Part 2" cut by the hour.
+{
+  const [libQuiz, essay] = toItems({ tasks: [
+    { title: 'Library quiz', type: 'quiz', due_date: '2099-11-18', due_time: '23:59', scope: '10 MCQs', difficulty: 'easy',
+      estimate: { minutes: 60, confidence: 'high', basis: '10 MCQs' }, steps: [{ title: 'Read the library guide', minutes: 40 }, { title: 'Do the quiz', minutes: 20 }] },
+    { title: 'Essay 2', type: 'essay', due_date: '2099-11-30', scope: '1500 words', difficulty: 'hard',
+      estimate: { minutes: 360, confidence: 'high' }, steps: [{ title: 'Outline', minutes: 120 }, { title: 'Draft', minutes: 240 }] },
+  ] }).items;
+  addOwnDoc({ id: 'doc-ai', name: 'lib.txt', size: 1 });
+  setOwnItems('doc-ai', { course: 'LIB1000', items: [libQuiz, essay], notes: [] });
+  const [libRow, essayRow] = mine.docs.find((d) => d.id === 'doc-ai').items; // setOwnItems gives rows new ids
+  setItemState('doc-ai', libRow.id, 'ink');
+  const t = mine.tasks.at(-1);
+  assert.deepEqual(t.steps.map((st) => [st.title, st.min]), [['Read the library guide', 40], ['Do the quiz', 20]]);
+  assert.equal(t.difficulty, 'easy');
+  saveItem('doc-ai', essayRow.id, { when: '2099-11-30 23:59', hours: '3' });
+  const e = mine.tasks.at(-1);
+  assert.equal(e.steps.reduce((n, st) => n + st.min, 0), 180, 'hours the student changed win over the AI steps');
+  assert.equal(e.difficulty, 'hard');
+
+  // Filling in "what to do" from the edit row saves it on the item, so it is no longer asked.
+  setOwnItems('doc-ai', { course: '', items: toItems({ tasks: [{ title: 'Quiz 3', type: 'quiz', due_raw: 'TBA' }] }).items, notes: [] });
+  const q3 = mine.docs.find((d) => d.id === 'doc-ai').items.at(-1);
+  saveItem('doc-ai', q3.id, { when: '2099-12-01 10:00', hours: '1', scope: 'Chapters 4–5' });
+  assert.equal(q3.scope, 'Chapters 4–5');
+  assert.equal(mine.tasks.at(-1).requirements, 'Chapters 4–5', 'what to do is kept on the task');
+}
 addOwnDoc({ id: 'doc-8', name: 'reminder.txt', size: 1 }, math.id);
 setOwnItems('doc-8', { course: '', items: [finalOn('2026-12-22', 540, 'no-time'), { ...finalTBA, id: 'f-tba' }], notes: [] });
 const doc8 = mine.docs.find((d) => d.id === 'doc-8');
