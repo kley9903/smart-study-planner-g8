@@ -435,7 +435,9 @@ function applyItem(doc, it) {
     return 'moved';
   }
   if (p.kind === 'task' && p.date) {
-    it.taskId = createTask({ title: p.title, course: doc.courseName || '', kind: typeLabel(p.key), date: p.date, min: p.min, hours: p.hours, weight: it.weight || '' }).id;
+    // 用 AI 拆好的步驟；學生在核對表改過時數，就照學生的時數重新拆。
+    const aiSteps = !it.edited && it.steps?.length ? it.steps : [];
+    it.taskId = createTask({ title: p.title, course: doc.courseName || '', kind: typeLabel(p.key), date: p.date, min: p.min, hours: p.hours, weight: it.weight || '', difficulty: it.difficulty || null, requirements: it.scope || '' }, aiSteps).id;
     it.applied = 'task';
     if (m?.kind === 'dated') {
       // 之前確認過、日期未公布的同一項，現在有日期了：不再列在「日期未公布」
@@ -488,7 +490,8 @@ export function saveItem(docId, itemId, fields) {
     }
     if (hours) plan.hours = hours;
     Object.assign(it, { plan, reasons: [], flag: null, hoursDefault: false });
-    fields = {}; // 顯示文字由 rowText(plan) 產生
+    // 顯示文字由 rowText(plan) 產生；「要做甚麼」是資料，要留著
+    fields = fields.scope?.trim() ? { scope: fields.scope.trim() } : {};
   }
   Object.assign(it, fields, { state: 'ink', edited: true });
   delete it.warn;
@@ -555,7 +558,7 @@ function splitMinutes(total) {
   return out;
 }
 
-function createTask({ title, course, kind, date, min, hours, requirements = '', weight = '' }, ownSteps = []) {
+function createTask({ title, course, kind, date, min, hours, requirements = '', weight = '', difficulty = null }, ownSteps = []) {
   const id = nid('t');
   const total = ownSteps.length ? ownSteps.reduce((n, st) => n + st.min, 0) : Math.max(30, Math.round(hours * 2) * 30);
   const parts = ownSteps.length ? ownSteps : splitMinutes(total).map((m, i, all) => ({ title: all.length > 1 ? L(`第 ${i + 1} 部分`, `Part ${i + 1}`) : L('全部', 'All'), min: m }));
@@ -563,6 +566,7 @@ function createTask({ title, course, kind, date, min, hours, requirements = '', 
   state.tasks.push({
     id, course: courseFor(course), title, short: title.length > 14 ? `${title.slice(0, 13)}…` : title, kind,
     due: { date, min }, requirements, attachments: [], weight, source: null, estimateBy: 'me', estimateConfirmed: true, steps, aiNote: '',
+    ...(difficulty ? { difficulty } : {}),
   });
   return { id, total };
 }

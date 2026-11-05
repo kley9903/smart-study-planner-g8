@@ -1,0 +1,47 @@
+{
+  "_note": "Real Dify draft output (2026-11-05, course data extraction with planning fields), trimmed to course and three tasks; facts and the rest are left out.",
+  "schema_version": "1.0",
+  "status": "ok",
+  "course": { "code": "LIBR1000", "name": "Library Skills", "term": "Fall 2026", "instructors": [] },
+  "assessment_components": [],
+  "tasks": [
+    {
+      "id": "task_1", "component_id": null, "title": "Library quiz", "type": "quiz",
+      "due_raw": "2026-11-18 23:59", "due_date": "2026-11-18", "due_time": "23:59", "timezone": null, "release_raw": null,
+      "weight_percent": 2, "requirements": ["10題選擇題", "內容為在目錄中尋找書籍"], "submission": "online", "group_work": null, "details_status": "known",
+      "scope": "完成10題關於在圖書館目錄中尋找書籍的選擇題，並在線上提交。",
+      "difficulty": "easy",
+      "estimate": { "minutes": 45, "confidence": "high", "basis": "原文明確提供10題選擇題、線上完成及截止日期；範圍集中於在目錄中尋找書籍。" },
+      "steps": [{ "title": "完成10題關於在目錄中尋找書籍的選擇題", "minutes": 45 }]
+    },
+    {
+      "id": "task_2", "component_id": null, "title": "Quiz 2", "type": "quiz",
+      "due_raw": "TBA", "due_date": null, "due_time": null, "timezone": null, "release_raw": null,
+      "weight_percent": 3, "requirements": [], "submission": null, "group_work": null, "details_status": "explicitly_unannounced",
+      "scope": null,
+      "difficulty": "mid",
+      "estimate": { "minutes": 60, "confidence": "low", "basis": "原文只有測驗名稱及3%比重，未公布範圍、題數、形式或日期。" },
+      "steps": [{ "title": "根據日後公布的範圍準備並完成測驗", "minutes": 60 }]
+    },
+    {
+      "id": "task_4", "component_id": null, "title": "Research essay", "type": "report",
+      "due_raw": "2026-12-10 23:59", "due_date": "2026-12-10", "due_time": "23:59", "timezone": null, "release_raw": null,
+      "weight_percent": 40, "requirements": ["至少6個學術來源"], "submission": null, "group_work": null, "details_status": "known",
+      "scope": "撰寫一篇2000字、主題為資訊素養的研究論文，並使用至少6個學術來源。",
+      "difficulty": "hard",
+      "estimate": { "minutes": 600, "confidence": "high", "basis": "原文明確提供2000字、資訊素養主題、至少6個學術來源、40%比重及截止日期。" },
+      "steps": [
+        { "title": "確定資訊素養論題並建立論文大綱", "minutes": 120 },
+        { "title": "尋找並整理至少6個學術來源", "minutes": 150 },
+        { "title": "完成研究論文初稿", "minutes": 210 },
+        { "title": "修訂至2000字並完成定稿", "minutes": 120 }
+      ]
+    }
+  ],
+  "course_requirements": [],
+  "course_events": [],
+  "facts": [],
+  "missing_information": [],
+  "conflicts": [],
+  "warnings": []
+}

@@ -499,8 +499,17 @@ const actions = {
     toast(L('下面是示範大綱的抽取結果（預先寫好）', 'Below are the demo extraction results (pre-written)'), 'info');
   },
   item: (el) => setItemState(el.dataset.doc, el.dataset.item, el.dataset.to),
-  'edit-item': (el) => { ui.editItem = el.dataset.item || null; render(); },
-  'save-item': (el) => saveItem(el.dataset.doc, el.dataset.item, { when: $('#edit-when').value.trim() || '—', hours: $('#edit-hours').value.trim() || '—' }),
+  'edit-item': (el) => {
+    ui.editItem = el.dataset.item || null;
+    render();
+    // 從報告的「去補」來：捲到那一列，游標放在第一個要填的格
+    if (ui.editItem && el.classList.contains('ai-todo__go')) {
+      const field = $('#edit-scope') || $('#edit-when');
+      field?.scrollIntoView({ block: 'center' });
+      field?.focus({ preventScroll: true });
+    }
+  },
+  'save-item': (el) => saveItem(el.dataset.doc, el.dataset.item, { when: $('#edit-when').value.trim() || '—', hours: $('#edit-hours').value.trim() || '—', scope: $('#edit-scope')?.value || '' }),
   'ink-all': (el) => inkAllItems(el.dataset.doc),
   adjust: (el) => adjustStep(el.dataset.step, Number(el.dataset.delta)),
   'confirm-est': (el) => confirmEstimate(el.dataset.task),

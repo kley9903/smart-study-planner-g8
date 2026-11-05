@@ -1,6 +1,7 @@
 // 自己的大綱 → Dify「課程資料整理」工作流程（經伺服器端 /api/syllabus 轉接，金鑰不在網頁裡）→ 待核對的項目。
 // 每一項附 plan：確認後變成任務（{ kind: 'task' }）或沒空時段（{ kind: 'busy' }）；沒有 plan 的只作記錄。
 import { L } from './i18n.js';
+import { hoursText } from './time.js';
 
 /** 伺服器（Dify 雲端）接受的單檔上限 */
 export const AI_MAX_MB = 15;
@@ -152,10 +153,14 @@ export function toItems(result) {
     const flag = !t.due_date ? (reasons.length ? null : 'no-date') : t.due_time ? null : 'no-time';
     // 一個評核項目拆成幾份（例如 proposal + final report）時，比重屬於整個項目，不放到每一份。
     const weight = t.weight_percent ?? (perComponent[t.component_id] === 1 ? (r.assessment_components || []).find((c) => c.id === t.component_id)?.weight_percent : null);
+    // 預計所需時間依課程資料估算（測驗和考試是溫習時間）；Dify 沒給估算才用類型預設值。
+    const est = t.estimate?.minutes > 0 ? t.estimate : null;
     items.push({
       id: `task-${i}`, key, what: t.title, group: !!t.group_work, raw: t.due_raw || '', weight: weight != null ? `${weight}%` : '',
-      ...sourceOf(prefix), reasons, flag, hoursDefault: true,
-      plan: { kind: 'task', title: t.title, key, date: t.due_date || null, min, hours: TYPES[key][2] }, state: 'pencil',
+      ...sourceOf(prefix), reasons, flag, hoursDefault: !est,
+      confidence: est?.confidence === 'high' ? 'high' : 'low', basis: est?.basis || '', difficulty: { easy: 'easy', medium: 'mid', mid: 'mid', hard: 'hard' }[t.difficulty] || null, scope: t.scope || '',
+      steps: (t.steps || []).filter((st) => st?.title && st.minutes > 0).map((st) => ({ title: st.title, min: st.minutes })),
+      plan: { kind: 'task', title: t.title, key, date: t.due_date || null, min, hours: est ? est.minutes / 60 : TYPES[key][2] }, state: 'pencil',
     });
   });
 
@@ -228,6 +233,7 @@ export function checklist(doc) {
   ];
 }
 const GROUPS = [
+  ['fill', () => L('要你補', 'To fill in')],
   ['date', () => L('日期未定', 'Dates to settle')],
   ['weight', () => L('比重', 'Weights')],
   ['check', () => L('要確認', 'To confirm')],
@@ -240,10 +246,17 @@ const GROUPS = [
  */
 export function report(doc) {
   const items = doc.items.filter((i) => i.state !== 'erased');
-  const lines = { date: [], weight: [], check: [], other: [] };
+  const lines = { fill: [], date: [], weight: [], check: [], other: [] };
   for (const it of items) {
-    if (it.plan?.kind === 'task' && !it.plan.date) lines.date.push({ text: it.what, hint: it.raw ? L(`原文：${it.raw}`, `Syllabus: ${it.raw}`) : L('大綱沒寫日期', 'No date given') });
-    else if (it.flag === 'no-time') lines.date.push({ text: it.what, hint: L(`沒寫時間，暫定 ${hm(it.plan.min)}`, `No time; set to ${hm(it.plan.min)}`) });
+    // 要你補：缺必要資料（截止日期、要做什麼），或 AI 估的時數沒把握。學生改過時數的不再問。
+    const need = it.plan?.kind === 'task' ? [!it.plan.date && 'date', !it.scope && 'scope', it.confidence !== 'high' && !it.edited && 'hours'].filter(Boolean) : [];
+    if (need.length) {
+      const names = { date: L('截止日期', 'due date'), scope: L('要做甚麼', 'what to do'), hours: L('要多久', 'how long') };
+      const raw = !it.plan.date && it.raw ? L(`（原文：${it.raw}）`, ` (syllabus: ${it.raw})`) : '';
+      lines.fill.push({ text: it.what, need, item: it.id, hint: L(`缺：${need.map((n) => names[n]).join('、')}${raw}`, `Missing: ${need.map((n) => names[n]).join(', ')}${raw}`) });
+    }
+    if (it.plan?.kind === 'task' && !it.plan.date) continue;
+    if (it.flag === 'no-time') lines.date.push({ text: it.what, hint: L(`沒寫時間，暫定 ${hm(it.plan.min)}`, `No time; set to ${hm(it.plan.min)}`) });
     else if (it.flag === 'no-day') lines.date.push({ text: it.what, hint: L('看不出星期幾或時間', 'Day or time unclear') });
   }
   if (doc.weightTotal != null && Math.abs(doc.weightTotal - 100) > 0.5) {
@@ -256,7 +269,8 @@ export function report(doc) {
     if (same) same.times = (same.times || 1) + 1;
     else list.push({ text: n.text });
   }
-  return GROUPS.filter(([kind]) => lines[kind].length).map(([kind, label]) => ({ kind, label: label(), lines: lines[kind] }));
+  // 比重是補充資料，可以之後才補：畫面把這組收起來。
+  return GROUPS.filter(([kind]) => lines[kind].length).map(([kind, label]) => ({ kind, label: label(), lines: lines[kind], ...(kind === 'weight' ? { later: true } : {}) }));
 }
 
 /** 科目裡已有同名項目時的說明（match 由 store.js 判斷：不重複／改日期／補日期）。已確認的不再提示。 */
@@ -287,8 +301,12 @@ export function rowText(it) {
     what: it.what + (it.group ? L('（小組）', ' (group)') : ''),
     when: dated ? whenText(p) : it.raw || '—',
     src: it.src || (it.quote ? L('原文', 'Quote') : '—'),
-    hours: task ? L(`${p.hours} 小時`, `${p.hours} hours`) : '—',
-    hoursNote: task && it.hoursDefault ? L('預設值，請按需要修改', 'default, change as needed') : '',
+    hours: task ? hoursText(Math.round(p.hours * 60)) : '—',
+    hoursNote: !task || it.edited ? '' : it.hoursDefault ? L('預設值，請按需要修改', 'default, change as needed')
+      : it.confidence === 'high' ? it.basis || '' : L('AI 估的，沒把握：請核對', 'AI guess: check this'),
+    difficulty: { easy: L('易', 'Easy'), mid: L('中', 'Medium'), hard: L('難', 'Hard') }[it.difficulty] || '',
+    scope: it.scope || '',
+    steps: it.steps?.length || 0,
     warn: [matchText(it), ...(it.reasons || []), flag].filter(Boolean).join(' ') || undefined,
   };
 }
