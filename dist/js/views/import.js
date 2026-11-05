@@ -141,7 +141,7 @@ function findings(doc, animate) {
   if (!groups.length) return `<p class="ai-todo-clear">${icon('check')} ${L('沒有發現缺漏，可以直接逐項確認。', 'Nothing missing. Go ahead and confirm the items.')}</p>`;
   const lines = (g) => `<ul>${g.lines.map((l) => `
               <li><span class="ai-todo__what">${esc(l.text)}</span>${l.hint ? ` <span class="ai-todo__hint">${esc(l.hint)}</span>` : ''}${l.times > 1 ? ` <span class="ai-todo__times">×${l.times}</span>` : ''}${l.item && !animate ? ` <button class="btn btn--sm ai-todo__go" type="button" data-action="edit-item" data-item="${l.item}">${icon('pencil')} ${L('去補', 'Fill in')}</button>` : ''}</li>`).join('')}</ul>`;
-  const head = (g) => `<span class="ai-todo__icon" aria-hidden="true">${GROUP_MARK[g.kind]()}</span>${g.later ? L(`之後可補：${g.label}`, `Can wait: ${g.label}`) : g.label}<span class="ai-todo__n">${g.lines.length}</span>`;
+  const head = (g) => `<span class="ai-todo__icon" aria-hidden="true">${GROUP_MARK[g.kind]()}</span>${g.later ? L(`之後可補：${g.label}`, `Can wait: ${g.label}`) : g.label}<span class="ai-todo__n">${g.lines.length}</span>${g.kind === 'fill' && !animate && doc.own ? `<button class="btn btn--sm ai-todo__ask" type="button" data-action="ask-start" data-doc="${doc.id}">${L('一題一題問我', 'Ask me one by one')}</button>` : ''}`;
   return `
         <div class="ai-todo ${animate ? 'is-animated' : ''}">
           <h3 class="ai-todo__title">${L('要你核對', 'Please check')}</h3>

@@ -10,6 +10,7 @@ import { recall, remember, esc } from './ui.js';
 import { L } from './i18n.js';
 import { parseWhen, parseHours, typeLabel } from './syllabus-ai.js';
 import { toState, proposalFrom } from './plan-ai.js';
+import { questionsFor, readDue } from './ask.js';
 
 const MINE_KEY = 'mine';
 const INKS = ['blue', 'amber', 'green', 'plum'];
@@ -81,7 +82,7 @@ function freshUi() {
     editBusy: false, dockOpen: false, dockDismissed: [], hlRule: null, justInked: [], arrowFor: null,
     draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, renameCourse: null, editRow: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
-    planning: false, planOptions: null, planError: '',
+    planning: false, planOptions: null, planError: '', ask: null,
   };
 }
 
@@ -815,3 +816,52 @@ export function choosePlan(id) {
   state.proposal = pid;
   emit({ keepScroll: true, proposal: true });
 }
+
+/* ---------------- AI 助手一題一題問（遊戲式對話框） ---------------- */
+/** 開始問這份資料「要你補」的項目；沒有要問的就不開。 */
+export function startAsk(docId) {
+  const doc = state.docs.find((d) => d.id === docId);
+  const list = doc ? questionsFor(doc) : [];
+  ui.ask = list.length ? { docId, list, i: 0 } : null;
+  emit({ keepScroll: true });
+}
+
+function nextAsk() {
+  ui.ask.i += 1;
+  if (ui.ask.i >= ui.ask.list.length) ui.ask = null;
+  emit({ keepScroll: true });
+}
+
+/** 回答目前這一題（選項的值或打的字）。讀不懂回傳 false，留在同一題。 */
+export function answerAsk(value) {
+  const a = ui.ask;
+  if (!a) return false;
+  const q = a.list[a.i];
+  const it = itemOf(a.docId, q.item);
+  if (!it) { nextAsk(); return true; }
+  if (q.field === 'date') {
+    const due = readDue(value, Number(state.today.slice(0, 4)));
+    if (!due) return false;
+    it.plan = { ...it.plan, date: due.date, min: due.min ?? it.plan.min };
+    it.flag = due.min == null && !it.plan.min ? 'no-time' : null;
+    it.reasons = [];
+  } else if (q.field === 'scope') {
+    const text = String(value || '').trim();
+    if (!text) return false;
+    it.scope = text;
+  } else {
+    const hours = typeof value === 'number' ? value / 60 : parseHours(value);
+    if (!hours) return false;
+    it.plan = { ...it.plan, hours };
+    Object.assign(it, { confidence: 'high', byStudent: true, hoursDefault: false, steps: [] }); // 學生自己的時數：照時數重新拆步驟
+  }
+  markMatches(state.docs.find((d) => d.id === a.docId));
+  nextAsk();
+  return true;
+}
+
+/** 「不知道」：這題不改，問下一題。 */
+export function skipAsk() { if (ui.ask) nextAsk(); }
+
+/** 「之後再說」：關掉，沒答的留在「要你補」。 */
+export function closeAsk() { ui.ask = null; emit({ keepScroll: true }); }

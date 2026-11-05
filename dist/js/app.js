@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, renameCourse, editTaskBasics, setTaskGroup, partsOf,
+  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, renameCourse, editTaskBasics, setTaskGroup, partsOf,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
 
@@ -26,6 +26,7 @@ import * as importView from './views/import.js';
 import * as start from './views/start.js';
 import * as about from './views/about.js';
 import { renderDock } from './views/dock.js';
+import { renderAsk } from './views/ask.js';
 import { blockPopover, hatchPopover, busyForm } from './views/popovers.js';
 import { createMascot } from './mascot.js';
 import { attachBusyPainting } from './busy-paint.js';
@@ -102,6 +103,7 @@ function render(info = {}) {
   document.body.dataset.route = r.name;
   updateNav(r.name === 'add-task' ? 'tasks' : r.name, s);
   drawDock(s, r, changed);
+  drawAsk();
 
   if (changed) {
     window.scrollTo(0, 0);
@@ -179,6 +181,63 @@ function drawDock(s, r, navigated) {
   dock.classList.toggle('has-bubble', !!d.bubble);
   mascot.shown({ hidden: false, open: d.open, bubble: d.bubble, navigated });
 }
+
+/* ---------------- 遊戲式對話框（AI 助手一題一題問） ---------------- */
+const askLayer = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'ask-layer' }));
+let askHtml = '';
+let askKey = '';
+let typing = null;
+function drawAsk() {
+  const html = renderAsk();
+  dock.classList.toggle('is-away', !!ui.ask); // 角色跳到對話框旁邊，右下角先空出來
+  if (html === askHtml) return;
+  askLayer.innerHTML = html;
+  askHtml = html;
+  const box = askLayer.querySelector('.ask');
+  if (!box) { askKey = ''; return; }
+  const key = box.dataset.askKey;
+  const text = box.querySelector('[data-type]');
+  if (key !== askKey) {
+    askKey = key;
+    typeOut(text);
+    // 有選項時先聚焦第一個選項，按 1–4 才不會打進輸入格
+    (askLayer.querySelector('.ask__choice') || askLayer.querySelector('#ask-input'))?.focus({ preventScroll: true });
+  } else text.classList.add('is-done');
+}
+/** 逐字打出問題；減少動態效果時直接整句顯示。 */
+function typeOut(el) {
+  clearInterval(typing);
+  const full = el.textContent;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.classList.add('is-done'); return; }
+  let n = 0;
+  el.textContent = '';
+  el.dataset.full = full;
+  typing = setInterval(() => {
+    n += 1;
+    el.textContent = full.slice(0, n);
+    if (n >= full.length) { clearInterval(typing); el.classList.add('is-done'); }
+  }, 28);
+}
+function revealAsk() {
+  const el = askLayer.querySelector('[data-type]');
+  if (!el || el.classList.contains('is-done')) return;
+  clearInterval(typing);
+  el.textContent = el.dataset.full || el.textContent;
+  el.classList.add('is-done');
+}
+function answer(value) {
+  if (answerAsk(value)) { ui.askDraft = ''; ui.askError = ''; }
+  else { ui.askError = L('看不懂，可以換個寫法再試，或按「不知道」', 'Could not read that. Try writing it another way, or press "Don\'t know"'); }
+  render();
+}
+askLayer.addEventListener('click', (e) => {
+  if (!e.target.closest('button, input, a')) revealAsk(); // 點一下就整句顯示，不讓學生乾等
+});
+askLayer.addEventListener('input', (e) => { if (e.target.id === 'ask-input') ui.askDraft = e.target.value; });
+askLayer.addEventListener('submit', (e) => {
+  e.preventDefault();
+  answer(new FormData(e.target).get('answer'));
+});
 
 function setDockOpen(open) {
   ui.dockOpen = open;
@@ -490,7 +549,9 @@ const actions = {
   },
   'ai-modal-close': () => {
     const done = ui.aiModal?.phase === 'done';
+    const doc = ui.aiModal?.doc;
     ui.aiModal = null;
+    if (done && doc) startAsk(doc); // 讀完有「要你補」的，助手接著一題一題問
     render();
     if (done) document.querySelector('.xtable')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   },
@@ -534,6 +595,10 @@ const actions = {
   'tour-prev': () => tourStep(-1),
   'tour-end': () => endTour(),
   'auto-plan': () => requestPlans(),
+  'ask-start': (el) => startAsk(el.dataset.doc),
+  'ask-pick': (el) => answer(Number(el.dataset.value)),
+  'ask-skip': () => { ui.askError = ''; skipAsk(); },
+  'ask-later': () => { ui.askError = ''; closeAsk(); },
   'plan-pick': (el) => choosePlan(el.dataset.plan),
   'plan-close': () => { ui.planError = ''; eraseProposal(); render(); },
   'del-task': (el) => {
@@ -741,6 +806,13 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') endTour();
     else if (e.key === 'ArrowRight') tourStep(1);
     else if (e.key === 'ArrowLeft') tourStep(-1);
+    return;
+  }
+  if (ui.ask) {
+    // 對話框開著：1–4 選選項（在輸入格打字時除外），Esc 之後再說
+    if (e.key === 'Escape') { actions['ask-later'](); return; }
+    const pick = /^[1-4]$/.test(e.key) && e.target.id !== 'ask-input' && askLayer.querySelectorAll('.ask__choice')[Number(e.key) - 1];
+    if (pick) { e.preventDefault(); pick.click(); }
     return;
   }
   if (e.key === 'Escape') {

@@ -302,7 +302,7 @@ export function rowText(it) {
     when: dated ? whenText(p) : it.raw || '—',
     src: it.src || (it.quote ? L('原文', 'Quote') : '—'),
     hours: task ? hoursText(Math.round(p.hours * 60)) : '—',
-    hoursNote: !task || it.edited ? '' : it.hoursDefault ? L('預設值，請按需要修改', 'default, change as needed')
+    hoursNote: !task || it.edited || it.byStudent ? '' : it.hoursDefault ? L('預設值，請按需要修改', 'default, change as needed')
       : it.confidence === 'high' ? it.basis || '' : L('AI 估的，沒把握：請核對', 'AI guess: check this'),
     difficulty: { easy: L('易', 'Easy'), mid: L('中', 'Medium'), hard: L('難', 'Hard') }[it.difficulty] || '',
     scope: it.scope || '',
