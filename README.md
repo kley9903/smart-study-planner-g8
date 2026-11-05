@@ -32,7 +32,7 @@
 | 按鈕點擊、表單操作、切換頁面 | [app.js](dist/js/app.js) |
 | 新增功課、確認計劃、更新進度、保存資料 | [store.js](dist/js/store.js) |
 | 計算空檔、每日資料及建議變動 | [model.js](dist/js/model.js) |
-| 自動排程的規則 | [scheduler.js](dist/js/scheduler.js) |
+| 自動排程（排程方案） | [plan-ai.js](dist/js/plan-ai.js)、[functions/api/plan.js](functions/api/plan.js)；規則在 Dify 排程工作流程 |
 | 示範課程、功課、截止日期及時段 | [demo-data.js](dist/js/demo-data.js) |
 | 預先寫好的 AI 示範回覆 | [scenarios.js](dist/js/scenarios.js) |
 | 中英文切換 | [i18n.js](dist/js/i18n.js)，以及頁面內的 `L('中文', 'English')` |

@@ -182,3 +182,17 @@ export function horizonModel(s) {
   }
   return { days: HORIZON_DAYS, flags, lanes: Math.max(1, lanes.length) };
 }
+
+/** 還沒做完、也沒有排在「現在之後」的步驟（已截止或已放棄的不算）；頁頭用來顯示「N 段未排」。 */
+export function unplannedSteps(s) {
+  const out = [];
+  for (const task of s.tasks) {
+    if (task.due.date < s.today || (task.due.date === s.today && task.due.min <= s.now)) continue;
+    for (const step of task.steps) {
+      if (step.dropped || step.progress === 'done') continue;
+      const ahead = s.blocks.some((b) => b.step === step.id && (b.date > s.today || (b.date === s.today && b.end > s.now)));
+      if (!ahead) out.push({ task, step });
+    }
+  }
+  return out;
+}

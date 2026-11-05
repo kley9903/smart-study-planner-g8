@@ -5,11 +5,11 @@
 import { createDemoState, DEMO_TODAY } from './demo-data.js';
 import { HERO, heroChanges, heroMissing, CHECKIN, ESSAY, fallbackText, CHIPS, matchScenario } from './scenarios.js';
 import { blockOf, stepOf, taskOf, pendingProposal } from './model.js';
-import { planSteps } from './scheduler.js';
 import { md, span, dayShort, hoursText } from './time.js';
 import { recall, remember, esc } from './ui.js';
 import { L } from './i18n.js';
 import { parseWhen, parseHours, typeLabel } from './syllabus-ai.js';
+import { toState, proposalFrom } from './plan-ai.js';
 
 const MINE_KEY = 'mine';
 const INKS = ['blue', 'amber', 'green', 'plum'];
@@ -81,6 +81,7 @@ function freshUi() {
     editBusy: false, dockOpen: false, dockDismissed: [], hlRule: null, justInked: [], arrowFor: null,
     draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, renameCourse: null, editRow: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
+    planning: false, planOptions: null, planError: '',
   };
 }
 
@@ -245,9 +246,21 @@ export function inkProposal() {
       const { step } = stepOf(state, c.step);
       step.min = c.min;
       step.estNote = c.note;
+    } else if (c.kind === 'borrow') {
+      // 借用單次沒空時間的一部分：把那段切開，借出的時間變成可用
+      const r = state.unavailable.find((x) => x.id === c.rule);
+      if (r) {
+        state.unavailable = state.unavailable.filter((x) => x !== r);
+        if (r.start < c.start) state.unavailable.push({ ...r, id: `-a`, end: c.start });
+        if (c.end < r.end) state.unavailable.push({ ...r, id: `-b`, start: c.end });
+      }
+    } else if (c.kind === 'drop') {
+      const task = state.tasks.find((t) => t.id === c.task);
+      task?.steps.forEach((st) => { if (st.progress !== 'done') st.dropped = true; });
     }
   }
   p.status = 'inked';
+  ui.planOptions = null;
   state.proposal = null;
   ui.justInked = inked;
   ui.arrowFor = null;
@@ -276,6 +289,7 @@ export function eraseProposal() {
   const p = pendingProposal(state);
   if (!p) return;
   p.status = 'erased';
+  ui.planOptions = null;
   state.proposal = null;
   ui.arrowFor = null;
   const msg = {
@@ -749,39 +763,6 @@ export function addTaskAttachment(taskId, metadata) {
   emit({ toast: L('附件已保存在此瀏覽器', 'Attachment saved in this browser'), keepScroll: true });
 }
 
-export function autoPlan() {
-  if (pendingProposal(state)) { emit({ toast: L('先確認或不要目前的建議', 'Confirm or discard the current suggestion first'), toastIcon: 'info' }); return; }
-  if (!state.tasks.length) { emit({ toast: L('先加入功課和 deadline', 'Add a task and its deadline first'), toastIcon: 'info' }); return; }
-  const { blocks, missing } = planSteps(state);
-  if (!blocks.length && !missing.length) { emit({ toast: L('全部功課都已排好', 'Everything is already scheduled'), toastIcon: 'check' }); return; }
-  const lacking = missing.length
-    ? L(
-      `<br>放不下（截止前未有足夠空檔）：${missing.map(({ task, step }) => `<b>${esc(task.short)}</b> ${esc(step.title)}（${hoursText(step.min)}，${dayShort(task.due.date)} 截止）`).join('、')}。可以減少沒空的時間、調低預計時數，或分給之後的日子。`,
-      `<br>Did not fit (not enough free time before the deadline): ${missing.map(({ task, step }) => `<b>${esc(task.short)}</b> ${esc(step.title)} (${hoursText(step.min)}, due ${dayShort(task.due.date)})`).join(', ')}. Try freeing up busy time or lowering the estimate.`,
-    )
-    : '';
-  if (!blocks.length) {
-    note({ who: 'ai', html: L(`這 7 日排不到新的時段。${lacking}`, `No new sessions fit in these 7 days.${lacking}`) });
-    emit({ toast: L('未來 7 日沒有足夠空檔', 'Not enough free time in the next 7 days'), toastIcon: 'alert', scrollThread: true });
-    return;
-  }
-  blocks.forEach((b) => { b.id = nid('b'); });
-  const total = blocks.reduce((a, b) => a + b.end - b.start, 0);
-  const pid = nid('plan');
-  state.proposals[pid] = { id: pid, kind: 'plan', status: 'pending', changes: blocks.map((block) => ({ kind: 'add', block })) };
-  state.proposal = pid;
-  const n = blocks.length;
-  note({
-    who: 'ai',
-    html: L(
-      `我排了 <b>${n}</b> 段，共 ${hoursText(total)}，都在各自的截止前。虛線是建議，確認後才會生效。${lacking}`,
-      `I scheduled <b>${n}</b> session${n === 1 ? '' : 's'} (${hoursText(total)}), each before its deadline. Dashed means suggested; nothing changes until you confirm.${lacking}`,
-    ),
-    proposal: pid,
-  });
-  emit({ scrollThread: true, proposal: true, toast: L(`排了 ${n} 段，等你確認`, `${n} session${n === 1 ? '' : 's'} suggested; waiting for you`), toastIcon: 'pencil' });
-}
-
 /* ---------------- 首次使用 ---------------- */
 export function obRestart() {
   ob = freshOb();
@@ -792,4 +773,45 @@ export function obFinish() {
   state = fresh();
   Object.assign(ui, freshUi());
   ui.justInked = state.blocks.map((b) => b.id);
+}
+
+/* ---------------- 排程方案（Dify「排程｜Study Planner」） ---------------- */
+/** 按「排程」或 AI 助手要求：把目前的資料交給排程工作流程，拿回最多約 10 份方案；先預覽最安全的一份。 */
+export async function requestPlans(request = '') {
+  if (ui.planning) return;
+  const p = pendingProposal(state);
+  if (p && p.kind !== 'plan') { emit({ toast: L('先確認或不要目前的建議', 'Confirm or discard the current suggestion first'), toastIcon: 'info' }); return; }
+  if (!state.tasks.length) { emit({ toast: L('先加入功課和 deadline', 'Add a task and its deadline first'), toastIcon: 'info' }); return; }
+  Object.assign(ui, { planning: true, planError: '', planOptions: null });
+  if (p) { p.status = 'erased'; state.proposal = null; }
+  emit({ keepScroll: true });
+  let out;
+  try {
+    const res = await fetch('/api/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: toState(getState()), request }) });
+    out = await res.json();
+  } catch {
+    out = { ok: false, reason: 'network' };
+  }
+  ui.planning = false;
+  if (!out?.ok || !out.result?.plans?.length) {
+    ui.planError = out?.reason === 'invalid'
+      ? L('現在沒有可以排的功課：可能都已排好，或還缺截止日期。', 'Nothing to schedule right now: everything may already be planned, or due dates are missing.')
+      : L('AI 暫時連不上，請稍後再試。', 'The AI cannot be reached right now. Please try again later.');
+    emit({ keepScroll: true });
+    return;
+  }
+  ui.planOptions = out.result;
+  choosePlan(out.result.plans[0].id);
+}
+
+/** 點一個方案：用虛線預覽它的時段（換掉之前預覽的方案）。 */
+export function choosePlan(id) {
+  const plan = ui.planOptions?.plans.find((x) => x.id === id);
+  if (!plan) return;
+  const old = pendingProposal(state);
+  if (old?.kind === 'plan') { delete state.proposals[old.id]; state.proposal = null; }
+  const pid = nid('plan');
+  state.proposals[pid] = { id: pid, status: 'pending', ...proposalFrom(plan, state) };
+  state.proposal = pid;
+  emit({ keepScroll: true, proposal: true });
 }

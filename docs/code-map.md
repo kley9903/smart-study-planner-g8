@@ -14,7 +14,7 @@
 | 按鈕點擊後做甚麼、切換頁面 | `dist/js/app.js` |
 | 新增功課、確認計劃、回報進度、保存資料等動作 | `dist/js/store.js` |
 | 根據已有資料算出空檔、每日畫面、建議變動 | `dist/js/model.js` |
-| 自動排程的規則 | `dist/js/scheduler.js` |
+| 自動排程（排程方案） | 前端 `dist/js/plan-ai.js`、方案小方塊在 `dist/js/views/week.js`，伺服器端轉接 `functions/api/plan.js`；排時段的規則在 Dify「排程｜Study Planner」的 Python 節點 |
 | 示範課程、功課、時段 | `dist/js/demo-data.js` |
 | AI 助手的預先寫好回覆 | `dist/js/scenarios.js`（目前不是 AI API） |
 | 中英文切換 | `dist/js/i18n.js`，以及各頁面的 `L('中文', 'English')` |
@@ -70,7 +70,7 @@
 | `dist/js/syllabus-ai.js` | 自己的大綱 → `/api/syllabus` → 待核對的項目：一次放入的幾個檔案加文字由 `app.js` 逐份交給 `readSyllabus(file)`，`mergeFound` 合成一份（同名只留一項，有日期的優先）；`readSyllabus(file)`（貼上的文字存成 .txt，以文字送出；圖片由伺服器送到工作流程的 image 欄位，先逐字辨識再整理）、`toItems(Dify 結果)`、`rowText(項目)` 按目前語言產生顯示文字、`report(大綱)` 把要你核對的事按類別分組（日期未定、比重、要確認、其他；同一句只列一次並標出次數）；`readSyllabus` 的 `onStage` 收到 Dify 每一步的進度（伺服器以 NDJSON 逐行送出），畫面據此在檢查視窗（`views/import.js` 的 `aiModal`，後面模糊）逐項轉圈；結果到了由 `checklist(大綱)` 逐行揭曉找到／找不到，最後出報告；確認後由 `store.js` 變成任務或每週沒空時間 |
 | `dist/js/attachments.js` | 附件保存在本瀏覽器 IndexedDB；只有按「用 AI 找出項目」時，那一份大綱才會送到 `/api/syllabus`。存檔一律用 `keepFile(file, 上限 MB)`，大小上限在 `LIMIT_MB`（任務附件 10 MB、課程大綱 20 MB） |
 | `dist/js/model.js` | 從狀態推算每日畫面、空檔、課程／任務資料和 AI 建議疊加結果 |
-| `dist/js/scheduler.js` | 固定規則排程：按截止時間找空檔、避開沒空時段、限制每日讀書量等；不是 AI 模型 |
+| `dist/js/plan-ai.js` | 排程方案：把網站資料轉成排程工作流程的輸入、把選中的方案變成待確認的建議、方塊上的文字；不自己排時段 |
 | `dist/js/planner.js` | 多頁共用的時間表繪製元件、時段和變動箭嘴 |
 | `dist/js/demo-data.js` | 虛構課程、功課、時間表和匯入結果，供示範使用 |
 | `dist/js/scenarios.js` | 預先寫好的對話情境、AI 示範回覆和選項 |
@@ -108,7 +108,7 @@ GitHub 倉庫還保留以下管理設定，普通組員不用處理；下載 ZIP
 
 ## 後端目前在哪裡？
 
-**目前唯一的伺服器端程式是 `functions/api/syllabus.js`**（Cloudflare Pages Functions，隨網站一起發布）：把大綱轉交給 Dify「課程資料整理｜Study Planner」工作流程，金鑰放在 Cloudflare 的環境變數 `DIFY_API_KEY`，設定方法見 [部署設定](deployment.md)。本機 `node serve.mjs` 跑同一份檔案。沒有登入 API 或共用資料庫；自己的資料儲存在自己的瀏覽器。組員下載原始碼，不會下載到其他人的 localStorage 計劃。
+**伺服器端程式只有 `functions/api/syllabus.js` 和 `functions/api/plan.js`**（Cloudflare Pages Functions，隨網站一起發布）：分別把大綱轉交給 Dify「課程資料整理｜Study Planner」、把排程資料轉交給「排程｜Study Planner」，金鑰放在 Cloudflare 的環境變數 `DIFY_API_KEY` 和 `DIFY_PLAN_KEY`，設定方法見 [部署設定](deployment.md)。本機 `node serve.mjs` 跑同一份檔案。沒有登入 API 或共用資料庫；自己的資料儲存在自己的瀏覽器。組員下載原始碼，不會下載到其他人的 localStorage 計劃。
 
 日後有人負責後端時，先約定 API 路徑、請求與回傳格式，再新增獨立的 `backend/` 目錄（這是建議位置，現在尚不存在）。前端接駁點主要在 `store.js`：把直接修改狀態或產生示範結果的相關動作接到後端 API，再按需要調整 `model.js` 與頁面。
 

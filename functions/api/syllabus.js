@@ -88,7 +88,7 @@ async function run({ base, key, file, inputs, fetcher, send }) {
 }
 
 /** 讀 Dify 的 SSE 串流：每個事件交給 onEvent，回傳 workflow_finished 事件的 data。 */
-async function readEvents(body, onEvent) {
+export async function readEvents(body, onEvent) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -113,7 +113,7 @@ async function readEvents(body, onEvent) {
 }
 
 /** 工作流程的輸出變數裡，找出 { valid, data, errors } 那一個（可能是字串）。 */
-function unwrap(outputs = {}) {
+export function unwrap(outputs = {}) {
   for (const value of Object.values(outputs || {})) {
     let v = value;
     if (typeof v === 'string') { try { v = JSON.parse(v); } catch { continue; } }
