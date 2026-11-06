@@ -46,6 +46,7 @@ export function coursesPage(s) {
         <h1 class="page-head__title">${L('課程資料', 'Courses')}</h1>
         ${courses.length ? '' : `<p class="page-head__lede">${L('還沒有科目，先放入一份課程大綱。', 'No courses yet. Start with a syllabus.')}</p>`}
       </div>
+      <label class="btn" title="${L('在 Canvas「日曆」打開「Calendar Feed」的連結，會下載 .ics 檔', 'In Canvas Calendar, open the "Calendar Feed" link to download an .ics file')}">${icon('upload')} ${L('加入 Canvas 日曆', 'Add Canvas calendar')}<input type="file" accept=".ics,text/calendar" hidden data-file></label>
     </div>
     ${waiting ? `<a class="course-pending" href="#/import/add" data-action="course-continue" data-doc="${firstWaiting.id}">${icon('pencil')} ${L(`還有 ${waiting} 項等你確認`, `${waiting} item${waiting === 1 ? '' : 's'} waiting for you to confirm`)} ${icon('arrow')}</a>` : ''}
     <div class="courses">

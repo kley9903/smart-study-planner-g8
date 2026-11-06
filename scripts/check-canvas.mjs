@@ -5,8 +5,15 @@ import assert from 'node:assert/strict';
 const memory = new Map();
 globalThis.localStorage = { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => memory.set(k, v) };
 
-const { parseFeed, readIcs, canvasFound, keyFromTitle } = await import('../dist/js/canvas.js');
-const { getState, enterMine, addCanvasDocs, setItemState } = await import('../dist/js/store.js');
+const { parseFeed, readIcs, canvasFound, keyFromTitle, cleanTitle } = await import('../dist/js/canvas.js');
+const { getState, enterMine, addCanvasDocs, deleteTask } = await import('../dist/js/store.js');
+
+/* ---------- a date written in the title is dropped (the due date has its own field) ---------- */
+assert.equal(cleanTitle('[2026.10.28] Submission: Basic HTML/CSS and Personal Website Building'), 'Submission: Basic HTML/CSS and Personal Website Building');
+assert.equal(cleanTitle('Essay 1 (2026-11-20)'), 'Essay 1');
+assert.equal(cleanTitle('Week [3] reading'), 'Week [3] reading', 'other brackets stay');
+assert.equal(cleanTitle('[2026.10.28]'), '[2026.10.28]', 'a title that is only a date is kept');
+assert.equal(parseFeed('BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:event-assignment-7\r\nDTSTART;VALUE=DATE:20261106\r\nSUMMARY:[2026.10.28] Submission: Basic HTML [COMP4900 (T1-T3)]\r\nEND:VEVENT\r\nEND:VCALENDAR')[0].title, 'Submission: Basic HTML');
 
 const ICS = [
   'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:icalendar-ruby', 'X-WR-CALNAME:Student Calendar (Canvas)',
@@ -46,19 +53,29 @@ const lab = groups[0].items[0];
 assert.deepEqual([lab.state, lab.plan.kind, lab.plan.date, lab.plan.min, lab.src], ['pencil', 'task', '2026-11-20', 1439, 'Canvas'], 'an all-day due date is due at 23:59');
 assert.deepEqual([groups[1].items[0].key, groups[1].items[0].plan.min], ['exam', 540], 'an exam starts at its start time');
 
-/* ---------- importing into your own plan ---------- */
+/* ---------- importing into your own plan: no confirming, straight into each course ---------- */
 enterMine();
-assert.equal(addCanvasDocs(groups), 3);
-let docs = getState().docs.filter((d) => d.source === 'canvas');
-assert.deepEqual(docs.map((d) => [d.name, d.courseName, d.items.length]), [['Canvas · COMP2711', 'COMP2711', 1], ['Canvas · LEGL1000', 'LEGL1000', 2]]);
-const legl = docs[1];
-setItemState(legl.id, legl.items[0].id, 'ink');
-setItemState(legl.id, legl.items[1].id, 'erased');
-assert.ok(Object.values(getState().courses).some((c) => c.name === 'LEGL1000'), 'confirming an item makes the course');
-assert.ok(getState().tasks.some((t) => t.title === 'Midterm Exam' && t.due.date === '2026-12-09'), 'and the task');
-assert.equal(addCanvasDocs(canvasFound(events, '2026-11-06')), 1, 'importing again brings back only the item still waiting');
-docs = getState().docs.filter((d) => d.source === 'canvas');
-assert.equal(docs.length, 2, 'the same course reuses its Canvas source');
-assert.deepEqual(docs[1].items.map((i) => [i.what, i.state]), [['Midterm Exam', 'ink'], ['Module 1 Quiz', 'erased']]);
+const names = () => Object.values(getState().courses).map((c) => c.name).sort();
+const titles = () => getState().tasks.map((t) => `${getState().courses[t.course]?.name} ${t.title} ${t.due.date}`).sort();
+assert.deepEqual(addCanvasDocs(groups), { courses: 2, added: 3, moved: 0 });
+assert.deepEqual(names(), ['COMP2711', 'LEGL1000'], 'each Canvas course becomes its own course');
+assert.deepEqual(titles(), ['COMP2711 Lab Report 3 2026-11-20', 'LEGL1000 Midterm Exam 2026-12-09', 'LEGL1000 Module 1 Quiz 2026-12-12'], 'every item is a task already');
+assert.equal(getState().docs.flatMap((d) => d.items).filter((i) => i.state === 'pencil').length, 0, 'nothing waits to be confirmed');
 
-console.log('Passed: reading Canvas calendar files, choosing items and importing twice.');
+// Delete a wrong one; Canvas moves another deadline; import again.
+deleteTask(getState().tasks.find((t) => t.title === 'Module 1 Quiz').id);
+const later = parseFeed(ICS.replace('DTSTART;VALUE=DATE;VALUE=DATE:20261120', 'DTSTART;VALUE=DATE;VALUE=DATE:20261127'));
+assert.deepEqual(addCanvasDocs(canvasFound(later, '2026-11-06')), { courses: 1, added: 0, moved: 1 });
+assert.deepEqual(titles(), ['COMP2711 Lab Report 3 2026-11-27', 'LEGL1000 Midterm Exam 2026-12-09'], 'a deleted task does not come back; a moved deadline follows Canvas');
+assert.equal(getState().docs.filter((d) => d.source === 'canvas').length, 2, 'the same course reuses its Canvas source');
+
+// Items left waiting by the earlier version are added on the next import.
+const old = getState().docs.find((d) => d.courseName === 'COMP2711');
+old.items.push({ ...canvasFound(parseFeed(ICS.replace('event-assignment-1001', 'event-assignment-1009').replace('Lab Report 3', 'Lab Report 4')), '2026-11-06')[0].items[0], id: 'left-over' });
+assert.equal(old.items.at(-1).state, 'pencil');
+const withNew = parseFeed(ICS.replace('event-assignment-1002', 'event-assignment-1009').replace('Old Homework', 'Lab Report 4').replace('20261001', '20261201'));
+assert.equal(addCanvasDocs(canvasFound(withNew, '2026-11-06')).added, 1);
+assert.ok(titles().includes('COMP2711 Lab Report 4 2026-12-01'));
+assert.equal(old.items.filter((i) => i.uid === 'event-assignment-1009').length, 1, 'the waiting copy is replaced, not doubled');
+
+console.log('Passed: reading Canvas calendar files, choosing items, adding them straight into courses and importing again.');
