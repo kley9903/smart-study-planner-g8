@@ -87,8 +87,10 @@
 .note--ai .note__body { font-family: var(--font-serif); color: #353b49; }
 /* 對話：小秘書在左邊（虛線），你寫的在右邊（圓角氣泡）。「你」的名字只留給讀屏軟件 */
 .note--ai, .note--sys { justify-self: start; max-width: 94%; }
-.dock__panel .note--ai { padding: 9px 14px 11px; background: var(--paper-2); border: 1px solid var(--rule); border-left: 1px solid var(--rule); border-radius: 16px 16px 16px 4px; }
-.dock__panel .note--ai .note__meta { margin-bottom: 3px; }
+/* 名字在氣泡上面，氣泡只包回覆的字 */
+.dock__panel .note--ai { padding-left: 0; border-left: 0; }
+.dock__panel .note--ai .note__meta { margin: 0 0 4px 4px; }
+.dock__panel .note--ai .note__body { width: fit-content; padding: 9px 14px; background: #fff; border: 1px solid var(--rule); border-radius: 16px 16px 16px 4px; box-shadow: 0 1px 2px rgba(48, 40, 24, 0.06); }
 .note--me { justify-self: end; max-width: 82%; padding: 9px 14px; background: #fff; border: 1px solid var(--rule); border-radius: 16px 16px 4px 16px; box-shadow: 0 1px 2px rgba(48, 40, 24, 0.06); }
 .note--me .note__meta { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .note--me .note__body { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
