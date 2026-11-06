@@ -48,9 +48,16 @@ function toEvent(ev) {
   if (!start) return null;
   const end = ev.DTEND ? when(ev.DTEND) : null;
   return {
-    kind, uid, title: tag ? tag[1] : summary, course: code || '', section: rest.join(' ').replace(/^\(|\)$/g, ''),
+    kind, uid, title: cleanTitle(tag ? tag[1] : summary), course: code || '', section: rest.join(' ').replace(/^\(|\)$/g, ''),
     date: start.date, min: start.min, endDate: end?.date || null, endMin: end?.min ?? null,
   };
+}
+
+/** 老師有時把日期寫在標題前後，例如「[2026.10.28] Submission: …」；截止日另有欄位，標題就不用重複。 */
+const DATE_TAG = String.raw`[\[(（【]\s*\d{4}[./-]\d{1,2}[./-]\d{1,2}\s*[\])）】]`;
+export function cleanTitle(title) {
+  const t = String(title).replace(new RegExp(`^\\s*${DATE_TAG}\\s*[-–:：]?\\s*`), '').replace(new RegExp(`\\s*[-–]?\\s*${DATE_TAG}\\s*$`), '').trim();
+  return t || String(title).trim();
 }
 
 /** DTSTART／DTEND → { date, min }：只有日期的 min 是 null；UTC（Z 結尾）轉成香港時間；有 TZID 或沒有時區的照寫。 */

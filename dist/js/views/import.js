@@ -53,7 +53,6 @@ export function render(s, params = []) {
           </ol>`}
         </section>
       </div>
-      ${mine && !ui.addCourse ? canvasBox() : ''}
 
       ${mine ? '' : doc ? `<div class="docs" role="group" aria-label="${L('已放入的大綱', 'Syllabi added')}">
         ${s.docs.map((d) => docCard(s, d, d.id === doc.id)).join('')}
@@ -183,16 +182,6 @@ function pasteBox() {
           </div>
           ${ui.dropMsg ? `<p class="drop__msg" role="status">${esc(ui.dropMsg)}</p>` : ''}
         </div>`;
-}
-
-/** Canvas 日曆檔（.ics）：放入就匯入各科的功課和考試日期（每科一份，等你核對）。也可以直接拖進上面的框。 */
-function canvasBox() {
-  return `
-      <section class="sheet canvas-feed" aria-label="Canvas">
-        <span class="canvas-feed__label">${L('從 Canvas 日曆匯入', 'Import from Canvas calendar')}</span>
-        <span class="canvas-feed__how muted">${L('在 Canvas「日曆」打開「Calendar Feed」的連結，會下載 .ics 檔', 'In Canvas Calendar, open the "Calendar Feed" link to download an .ics file')}</span>
-        <label class="btn btn--ink">${icon('upload')} ${L('放入 .ics 檔', 'Add .ics file')}<input type="file" accept=".ics,text/calendar" hidden data-file></label>
-      </section>`;
 }
 
 /** AI 正在讀：每一步是 Dify 實際走到的節點（伺服器即時送來），不是計時器。 */

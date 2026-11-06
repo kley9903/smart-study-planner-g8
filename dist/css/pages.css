@@ -351,9 +351,6 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
    ========================================================= */
 .imp { display: grid; gap: 22px; }
 .imp__top { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 22px; }
-.canvas-feed { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 20px; }
-.canvas-feed__label { font-weight: 700; }
-.canvas-feed__how { flex: 1 1 240px; font-size: 0.9em; }
 .drop {
   position: relative; display: grid; place-items: center; text-align: center; gap: 12px;
   min-height: 250px; padding: 30px; border-radius: var(--radius-lg);
