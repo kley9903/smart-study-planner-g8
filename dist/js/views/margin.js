@@ -19,15 +19,9 @@ export function renderMargin(s) {
   const mine = getMode() === 'mine';
   return `
   <aside class="margin" id="margin" aria-label="${mine ? L('排程助手', 'Planning assistant') : L('AI 助手（示範）', 'AI assistant (demo)')}">
-    <header class="margin__head">
-      <div class="margin__title">
-        <h2>${mine ? L('排程助手', 'Planning assistant') : L('AI 助手', 'AI assistant')}
-        ${mine
-          ? ''
-          : `<span class="demo-stamp" title="${L('預先寫好的示範回覆，沒有連接 AI', 'Pre-written demo replies, not connected to AI')}">${L('示範回覆', 'Demo replies')}</span>`}</h2>
-      </div>
-      <button class="icon-btn margin__close" type="button" data-action="dock-toggle" aria-label="${L('縮小', 'Minimize')}">${icon('minus')}</button>
-    </header>
+    ${mine ? '' : `<header class="margin__head">
+      <span class="demo-stamp" title="${L('預先寫好的示範回覆，沒有連接 AI', 'Pre-written demo replies, not connected to AI')}">${L('示範回覆', 'Demo replies')}</span>
+    </header>`}
     <div class="margin__body" data-thread-scroll>
       <div class="thread" aria-live="polite">
         ${s.thread.map((n) => noteHtml(s, n).replace('class="note ', `class="note ${fresh.has(n.id) ? 'is-new ' : ''}`)).join('')}
