@@ -8,14 +8,25 @@ import { span, dayShort, dayLabel, md, hm, hoursText } from '../time.js';
 import { L } from '../i18n.js';
 import { daysText } from '../syllabus-ai.js';
 
-// 只讓「新」訊息有淡入動畫；第一次打開頁面時已有的訊息不動
-const seen = new Set();
+// 只讓「新」訊息有升上來的動畫；第一次打開頁面時已有的訊息不動。
+// 送出後畫面會馬上再畫一次（顯示「正在回覆」），所以記住每則訊息第一次出現的時間，
+// 動畫期間重畫時用負的 animation-delay 接著播，不會被打斷或重頭再來。
+const RISE_MS = 500;
+const seenAt = new Map();
 let primed = false;
+let typingAt = 0;
+const rise = (at) => {
+  const ago = Date.now() - at;
+  return ago < RISE_MS ? { cls: 'is-new ', style: ` style="animation-delay:${-ago}ms"` } : null;
+};
 
 export function renderMargin(s) {
-  const fresh = new Set(primed ? s.thread.filter((n) => !seen.has(n.id)).map((n) => n.id) : []);
-  s.thread.forEach((n) => seen.add(n.id));
+  const now = Date.now();
+  s.thread.forEach((n) => { if (!seenAt.has(n.id)) seenAt.set(n.id, primed ? now : 0); });
   primed = true;
+  if (!ui.chatting) typingAt = 0;
+  else if (!typingAt) typingAt = now;
+  const typing = rise(typingAt);
   const mine = getMode() === 'mine';
   return `
   <aside class="margin" id="margin" aria-label="${mine ? L('小秘書', 'Little Secretary') : L('AI 助手（示範）', 'AI assistant (demo)')}">
@@ -25,8 +36,8 @@ export function renderMargin(s) {
     <div class="margin__body" data-thread-scroll>
       <p class="margin__date" aria-hidden="true">${dayLabel(s.today)}</p>
       <div class="thread" aria-live="polite">
-        ${s.thread.map((n) => noteHtml(s, n).replace('class="note ', `class="note ${fresh.has(n.id) ? 'is-new ' : ''}`)).join('')}
-        ${ui.chatting ? `<article class="note note--ai note--typing" aria-label="${L('AI 助手正在回覆', 'The assistant is replying')}">${meta('ai')}<div class="note__body"><span class="plans__dots"><i></i><i></i><i></i></span></div></article>` : ''}
+        ${s.thread.map((n) => { const r = rise(seenAt.get(n.id)); return r ? noteHtml(s, n).replace('class="note ', `${r.style.trim()} class="note ${r.cls}`) : noteHtml(s, n); }).join('')}
+        ${ui.chatting ? `<article class="note note--ai note--typing ${typing ? 'is-new' : ''}"${typing ? typing.style : ''} aria-label="${L('AI 助手正在回覆', 'The assistant is replying')}">${meta('ai')}<div class="note__body"><span class="plans__dots"><i></i><i></i><i></i></span></div></article>` : ''}
       </div>
     </div>
     ${composer(mine)}
