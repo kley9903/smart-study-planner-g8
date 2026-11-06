@@ -1,20 +1,68 @@
-// Canvas 日曆訂閱連結（.ics）→ 經伺服器 /api/canvas 讀取 → 每一科一份待核對的項目（跟 AI 讀大綱的結果同一個樣子）。
+// Canvas 日曆檔（.ics）→ 每一科一份待核對的項目（跟 AI 讀大綱的結果同一個樣子）。
+// 學生在 Canvas「日曆」頁按「Calendar Feed」的連結，瀏覽器會下載 .ics 檔；把檔案放進網站，在瀏覽器裡直接讀，不經伺服器。
+// （Canvas 不准網站從伺服器代讀這條連結，正式網站經 Cloudflare 讀會被擋，所以改成這樣。）
 // 只收今天或之後的功課，以及標題看得出是考試或測驗的活動；其他活動（講座、參觀）不收。
 // Canvas 只給日期、沒給時間的功課，是 23:59 截止（Canvas 把 23:59 的截止日寫成全日）。
 import { typeHours } from './syllabus-ai.js';
 
-/** 讀日曆。失敗丟出帶 reason 的錯誤：'bad-url'、'not-found'、'canvas'、'offline'、'no-server'。 */
-export async function readCanvas(url, { fetcher = fetch } = {}) {
-  let res;
-  try {
-    res = await fetcher('/api/canvas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
-  } catch (cause) {
-    throw Object.assign(new Error('offline', { cause }), { reason: 'offline' });
+const TZ = 'Asia/Hong_Kong';
+export const ICS_MAX_MB = 5;
+
+/** 讀一個 .ics 檔 → 事件清單。不是日曆檔丟出 reason 'not-calendar'，太大丟出 'too-big'。 */
+export async function readIcs(file) {
+  if (file.size > ICS_MAX_MB * 1024 * 1024) throw Object.assign(new Error('too big'), { reason: 'too-big' });
+  const text = await file.text();
+  if (!/^BEGIN:VCALENDAR/m.test(text)) throw Object.assign(new Error('not a calendar'), { reason: 'not-calendar' });
+  return parseFeed(text);
+}
+
+/**
+ * .ics 文字 → [{ kind: 'assignment' | 'event', uid, title, course, section, date, min, endDate, endMin }]。
+ * date 是 YYYY-MM-DD（香港時間）；min 是當天第幾分鐘，只有日期沒有時間時是 null。說明文字不收。
+ */
+export function parseFeed(text) {
+  const lines = String(text).replace(/\r?\n[ \t]/g, '').split(/\r?\n/);
+  const events = [];
+  let ev = null;
+  for (const line of lines) {
+    if (line === 'BEGIN:VEVENT') { ev = {}; continue; }
+    if (line === 'END:VEVENT') { if (ev) events.push(ev); ev = null; continue; }
+    if (!ev) continue;
+    const m = /^([A-Z-]+)((?:;[^:]*)?):(.*)$/.exec(line);
+    if (m) ev[m[1]] = { params: m[2], value: m[3] };
   }
-  const out = await res.json().catch(() => null);
-  if (!out) throw Object.assign(new Error(`HTTP ${res.status}`), { reason: res.status === 404 ? 'no-server' : 'canvas' });
-  if (!out.ok) throw Object.assign(new Error(out.message || 'failed'), { reason: out.reason || 'canvas' });
-  return out.events || [];
+  return events.map(toEvent).filter(Boolean);
+}
+
+const unescape = (s) => String(s || '').replace(/\\([\\,;nN])/g, (_, c) => (c === 'n' || c === 'N' ? '\n' : c));
+
+function toEvent(ev) {
+  if (!ev.DTSTART || !ev.SUMMARY) return null;
+  const uid = ev.UID?.value || '';
+  const kind = /^event-assignment-/.test(uid) ? 'assignment' : 'event';
+  // Canvas 的標題是「名稱 [COMP2711 (L1-L3)]」：方括號裡是科目代號和班別
+  const summary = unescape(ev.SUMMARY.value).trim();
+  const tag = /^(.*?)\s*\[([^\]]+)\]$/.exec(summary);
+  const [code, ...rest] = (tag ? tag[2] : '').trim().split(/\s+/);
+  const start = when(ev.DTSTART);
+  if (!start) return null;
+  const end = ev.DTEND ? when(ev.DTEND) : null;
+  return {
+    kind, uid, title: tag ? tag[1] : summary, course: code || '', section: rest.join(' ').replace(/^\(|\)$/g, ''),
+    date: start.date, min: start.min, endDate: end?.date || null, endMin: end?.min ?? null,
+  };
+}
+
+/** DTSTART／DTEND → { date, min }：只有日期的 min 是 null；UTC（Z 結尾）轉成香港時間；有 TZID 或沒有時區的照寫。 */
+function when({ params, value }) {
+  const d = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z?))?$/.exec(value || '');
+  if (!d) return null;
+  if (/VALUE=DATE(?!-)/.test(params) || !d[4]) return { date: `${d[1]}-${d[2]}-${d[3]}`, min: null };
+  if (!d[7]) return { date: `${d[1]}-${d[2]}-${d[3]}`, min: Number(d[4]) * 60 + Number(d[5]) };
+  const at = new Date(Date.UTC(+d[1], +d[2] - 1, +d[3], +d[4], +d[5]));
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .formatToParts(at).map((x) => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, min: Number(p.hour) * 60 + Number(p.minute) };
 }
 
 const EXAM = /mid-?term|\bexam|考試/i; // 「Final Project」不是考試，「Final Exam」靠 exam 認出

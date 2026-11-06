@@ -6,7 +6,7 @@ import {
   getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, editTaskBasics, setTaskGroup, partsOf,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
-import { readCanvas, canvasFound } from './canvas.js';
+import { readIcs, canvasFound, ICS_MAX_MB } from './canvas.js';
 
 const REVEAL_STEP_MS = 450; // 檢查視窗逐行揭曉的間隔
 import { editor } from './views/task-editor.js';
@@ -475,29 +475,6 @@ const actions = {
     addOwnDoc(doc, ui.addCourse);
     actions['doc-read']({ dataset: { doc: doc.id } });
   },
-  'canvas-read': async () => {
-    const box = document.querySelector('[data-canvas-url]');
-    const url = box?.value.trim() || '';
-    if (ui.canvasReading) return;
-    if (!url) { box?.focus(); toast(L('先貼上 Canvas 日曆的訂閱連結。', 'Paste your Canvas calendar feed link first.'), 'alert'); return; }
-    ui.canvasReading = true;
-    ui.canvasUrl = url;
-    render();
-    try {
-      const groups = canvasFound(await readCanvas(url), getState().today);
-      const added = addCanvasDocs(groups);
-      ui.canvasReading = false;
-      ui.canvasUrl = '';
-      render();
-      toast(added
-        ? L(`從 Canvas 找到 ${groups.length} 科、${added} 項，請逐項核對`, `Found ${added} item${added === 1 ? '' : 's'} in ${groups.length} course${groups.length === 1 ? '' : 's'} on Canvas. Check each one.`)
-        : L('Canvas 日曆裡沒有新的功課或考試。', 'No new assignments or exams in your Canvas calendar.'), added ? 'check' : 'info');
-    } catch (err) {
-      ui.canvasReading = false;
-      render();
-      toast(canvasProblem(err), 'alert');
-    }
-  },
   'basket-remove': (el) => {
     ui.basket = ui.basket.filter((f) => f.id !== el.dataset.fileId);
     removeAttachment(el.dataset.fileId).catch(() => {});
@@ -960,12 +937,21 @@ function revealChecks(id) {
   setTimeout(tick, REVEAL_STEP_MS);
 }
 
-const canvasProblem = (err) => ({
-  'bad-url': L('這不是 Canvas 日曆的訂閱連結。請到 Canvas「日曆」頁右下角的「Calendar Feed」複製。', 'This is not a Canvas calendar feed link. Copy it from "Calendar Feed" on the Canvas Calendar page.'),
-  'not-found': L('Canvas 不認得這條連結，可能已經換了新的。請重新複製。', 'Canvas does not recognise this link; it may have been reset. Copy it again.'),
-  offline: L('連不上伺服器，請檢查網絡後再試。', 'Cannot reach the server. Check your connection and try again.'),
-  'no-server': L('這個網址沒有 Canvas 轉接服務。請用 node serve.mjs 預覽，或在已發布的網站使用。', 'No Canvas relay at this address. Preview with node serve.mjs or use the published site.'),
-}[err.reason] || L('讀不到 Canvas 日曆，請稍後再試。', 'Could not read your Canvas calendar. Try again later.'));
+/** 放入 Canvas 日曆檔（.ics）：在瀏覽器裡讀，每科一份等你核對。 */
+async function importIcs(file) {
+  try {
+    const groups = canvasFound(await readIcs(file), getState().today);
+    const added = addCanvasDocs(groups);
+    if (current.name === 'import' && current.params?.[0] !== 'add') location.hash = '#/import/add';
+    toast(added
+      ? L(`從 Canvas 找到 ${groups.length} 科、${added} 項，請逐項核對`, `Found ${added} item${added === 1 ? '' : 's'} in ${groups.length} course${groups.length === 1 ? '' : 's'} on Canvas. Check each one.`)
+      : L('Canvas 日曆裡沒有新的功課或考試。', 'No new assignments or exams in your Canvas calendar.'), added ? 'check' : 'info');
+  } catch (err) {
+    toast(err.reason === 'too-big'
+      ? L(`「${file.name}」超過 ${ICS_MAX_MB} MB，不像 Canvas 日曆檔。`, `"${file.name}" is over ${ICS_MAX_MB} MB; it does not look like a Canvas calendar.`)
+      : L(`「${file.name}」不是日曆檔（.ics）。`, `"${file.name}" is not a calendar file (.ics).`), 'alert');
+  }
+}
 
 const readProblem = (err) => ({
   'too-big': err.image
@@ -1014,6 +1000,7 @@ async function takeFiles(files) {
   if (!names) return;
   if (getMode() === 'mine' && current.name === 'import') {
     for (const file of files) {
+      if (/[.]ics$/i.test(file.name)) { await importIcs(file); continue; } // Canvas 日曆檔另外讀，不交給 AI
       if (!/[.](pdf|docx|pptx|txt|md|jpe?g|png|gif|webp)$/i.test(file.name)) { toast(L(`「${file.name}」不是 PDF、Word、PPT、文字檔或圖片（JPG、PNG、WEBP），沒有放入。`, `"${file.name}" is not a PDF, Word, PowerPoint, text file or image (JPG, PNG, WEBP), so it was skipped.`), 'alert'); continue; }
       try {
         ui.basket.push(await keepFile(file, LIMIT_MB.syllabus));
