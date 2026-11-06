@@ -239,7 +239,7 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .dock.is-waking .dock__tag, .dock.is-waking .dock__bubble { opacity: 0; transform: translateY(8px); pointer-events: none; }
 .dock.is-open .dock__me { display: none; }
 /* 面板上方留 86px 給趴在右上角的她 */
-.dock__panel { position: relative; width: min(400px, calc(100vw - 36px)); height: min(620px, calc(100vh - var(--header-h) - 124px)); margin-bottom: 18px; }
+.dock__panel { position: relative; width: min(440px, calc(100vw - 36px)); height: min(620px, calc(100vh - var(--header-h) - 124px)); margin-bottom: 18px; }
 .dock__panel .margin { position: relative; top: auto; height: 100%; max-height: none; border: 1px solid var(--rule); box-shadow: var(--shadow-pop); }
 .dock__perch { position: absolute; right: 22px; bottom: 100%; z-index: 1; width: 122px; height: 88px; margin-bottom: -3px; padding: 0; border: 0; background: none; overflow: hidden; cursor: pointer; }
 .dock__perch .dock__rest, .dock__perch .dock__yawn { position: absolute; left: 0; top: 0; width: 122px; height: 88px; }

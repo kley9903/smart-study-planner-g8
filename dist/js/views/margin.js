@@ -25,7 +25,6 @@ export function renderMargin(s) {
         ${mine
           ? ''
           : `<span class="demo-stamp" title="${L('預先寫好的示範回覆，沒有連接 AI', 'Pre-written demo replies, not connected to AI')}">${L('示範回覆', 'Demo replies')}</span>`}</h2>
-        <p>${L('建議先用虛線顯示；你按「確認」才會生效。', 'Suggestions are dashed first; they take effect when you press "Confirm".')}</p>
       </div>
       <button class="icon-btn margin__close" type="button" data-action="dock-toggle" aria-label="${L('縮小', 'Minimize')}">${icon('minus')}</button>
     </header>
@@ -52,7 +51,7 @@ function noteHtml(s, n) {
   }
   if (n.kind === 'checkin') return checkinNote(s, n);
   if (n.kind === 'hello') {
-    return `<article class="note note--ai">${meta('ai')}<div class="note__body">${L('加入功課和 deadline 後，按「自動排程」，我會把讀書時段放進你未來 7 日的空檔。每段都要你確認才會生效。', 'Add your tasks and deadlines, then press "Auto-schedule" and I will place study sessions in your free time over the next 7 days. Each one needs your confirmation.')}</div></article>`;
+    return `<article class="note note--ai">${meta('ai')}<div class="note__body">${L('有甚麼要安排，直接跟我說。', 'Tell me what you need to plan.')}</div></article>`;
   }
   const p = n.proposal ? s.proposals[n.proposal] : null;
   const parts = [];
@@ -219,9 +218,9 @@ function composer(mine = false) {
       ${chips.length ? `<div class="suggest"><span class="suggest__label">${L('試試：', 'Try:')}</span>${chips.map((c) => `<button class="suggest__chip" type="button" data-action="scenario" data-id="${c.id}">${esc(c.text)}</button>`).join('')}</div>` : ''}
       <div class="composer__box">
         <label class="sr-only" for="say-input">${L('寫給 AI 助手', 'Message the AI assistant')}</label>
-        <textarea id="say-input" name="text" rows="1" placeholder="${L('跟 AI 說，例如：明天要全日幫家人搬屋', 'Tell the AI, e.g. I have to help my family move house tomorrow')}" data-draft>${esc(ui.draft)}</textarea>
+        <textarea id="say-input" name="text" rows="1" placeholder="${L('例如：明天要幫家人搬屋', 'e.g. Helping my family move tomorrow')}" data-draft>${esc(ui.draft)}</textarea>
         <button class="composer__send" type="submit" aria-label="${L('送出', 'Send')}">${icon('send')}</button>
       </div>
-      <p class="composer__note">${icon('info')} ${L('示範版沒有連接 AI，只認得上面的示範句子。', 'The demo is not connected to AI; it only understands the sample sentences above.')}</p>
+      ${mine ? '' : `<p class="composer__note">${icon('info')} ${L('示範版沒有連接 AI，只認得上面的示範句子。', 'The demo is not connected to AI; it only understands the sample sentences above.')}</p>`}
     </form>`;
 }
