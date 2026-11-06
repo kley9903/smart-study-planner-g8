@@ -244,15 +244,11 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .dock__perch { position: absolute; right: 22px; bottom: 100%; z-index: 1; width: 122px; height: 88px; margin-bottom: -3px; padding: 0; border: 0; background: none; overflow: hidden; cursor: pointer; }
 .dock__perch .dock__rest, .dock__perch .dock__yawn { position: absolute; left: 0; top: 0; width: 122px; height: 88px; }
 .dock__perch .dock__rest { display: block; }
-/* 面板像一頁筆記：左上貼一條紙膠帶，內頁有淡橫線（跟著內容捲動），最上面寫今天的日期 */
+/* 面板像一頁筆記：左上貼一條紙膠帶，最上面寫今天的日期（試過內頁橫線，文字對不上線，太雜亂，不用） */
 .dock__panel::before {
   content: ""; position: absolute; left: 22px; top: -11px; z-index: 2; width: 96px; height: 24px; pointer-events: none;
   background: var(--grain), var(--margin-line); opacity: 0.55; transform: rotate(-5deg);
   clip-path: polygon(0 0, 100% 0, 96% 20%, 100% 40%, 96% 60%, 100% 80%, 97% 100%, 3% 100%, 0 80%, 4% 60%, 0 40%, 4% 20%);
-}
-.dock__panel .margin__body {
-  background-image: linear-gradient(to bottom, transparent 27px, rgba(122, 146, 186, 0.16) 27px, rgba(122, 146, 186, 0.16) 28px);
-  background-size: 100% 28px; background-position: 0 12px; background-attachment: local;
 }
 .margin__date {
   display: inline-block; margin: 6px 0 14px 14px; padding: 0 2px 3px;
