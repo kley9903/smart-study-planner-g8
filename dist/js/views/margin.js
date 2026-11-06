@@ -4,35 +4,40 @@ import { esc, icon } from '../ui.js';
 import { ui, availableChips, getMode } from '../store.js';
 import { HERO } from '../scenarios.js';
 import { taskOf, stepOf, inkOf } from '../model.js';
-import { span, dayShort, md, hm, hoursText } from '../time.js';
+import { span, dayShort, dayLabel, md, hm, hoursText } from '../time.js';
 import { L } from '../i18n.js';
 import { daysText } from '../syllabus-ai.js';
 
-// 只讓「新」訊息有淡入動畫；第一次打開頁面時已有的訊息不動
-const seen = new Set();
+// 只讓「新」訊息有升上來的動畫；第一次打開頁面時已有的訊息不動。
+// 送出後畫面會馬上再畫一次（顯示「正在回覆」），所以記住每則訊息第一次出現的時間，
+// 動畫期間重畫時用負的 animation-delay 接著播，不會被打斷或重頭再來。
+const RISE_MS = 500;
+const seenAt = new Map();
 let primed = false;
+let typingAt = 0;
+const rise = (at) => {
+  const ago = Date.now() - at;
+  return ago < RISE_MS ? { cls: 'is-new ', style: ` style="animation-delay:${-ago}ms"` } : null;
+};
 
 export function renderMargin(s) {
-  const fresh = new Set(primed ? s.thread.filter((n) => !seen.has(n.id)).map((n) => n.id) : []);
-  s.thread.forEach((n) => seen.add(n.id));
+  const now = Date.now();
+  s.thread.forEach((n) => { if (!seenAt.has(n.id)) seenAt.set(n.id, primed ? now : 0); });
   primed = true;
+  if (!ui.chatting) typingAt = 0;
+  else if (!typingAt) typingAt = now;
+  const typing = rise(typingAt);
   const mine = getMode() === 'mine';
   return `
-  <aside class="margin" id="margin" aria-label="${mine ? L('排程助手', 'Planning assistant') : L('AI 助手（示範）', 'AI assistant (demo)')}">
-    <header class="margin__head">
-      <div class="margin__title">
-        <h2>${mine ? L('排程助手', 'Planning assistant') : L('AI 助手', 'AI assistant')}
-        ${mine
-          ? ''
-          : `<span class="demo-stamp" title="${L('預先寫好的示範回覆，沒有連接 AI', 'Pre-written demo replies, not connected to AI')}">${L('示範回覆', 'Demo replies')}</span>`}</h2>
-        <p>${L('建議先用虛線顯示；你按「確認」才會生效。', 'Suggestions are dashed first; they take effect when you press "Confirm".')}</p>
-      </div>
-      <button class="icon-btn margin__close" type="button" data-action="dock-toggle" aria-label="${L('縮小', 'Minimize')}">${icon('minus')}</button>
-    </header>
+  <aside class="margin" id="margin" aria-label="${mine ? L('小秘書', 'Little Secretary') : L('AI 助手（示範）', 'AI assistant (demo)')}">
+    ${mine ? '' : `<header class="margin__head">
+      <span class="demo-stamp" title="${L('預先寫好的示範回覆，沒有連接 AI', 'Pre-written demo replies, not connected to AI')}">${L('示範回覆', 'Demo replies')}</span>
+    </header>`}
     <div class="margin__body" data-thread-scroll>
+      <p class="margin__date" aria-hidden="true">${dayLabel(s.today)}</p>
       <div class="thread" aria-live="polite">
-        ${s.thread.map((n) => noteHtml(s, n).replace('class="note ', `class="note ${fresh.has(n.id) ? 'is-new ' : ''}`)).join('')}
-        ${ui.chatting ? `<article class="note note--ai note--typing" aria-label="${L('AI 助手正在回覆', 'The assistant is replying')}">${meta('ai')}<div class="note__body"><span class="plans__dots"><i></i><i></i><i></i></span></div></article>` : ''}
+        ${s.thread.map((n) => { const r = rise(seenAt.get(n.id)); return r ? noteHtml(s, n).replace('class="note ', `${r.style.trim()} class="note ${r.cls}`) : noteHtml(s, n); }).join('')}
+        ${ui.chatting ? `<article class="note note--ai note--typing ${typing ? 'is-new' : ''}"${typing ? typing.style : ''} aria-label="${L('AI 助手正在回覆', 'The assistant is replying')}">${meta('ai')}<div class="note__body"><span class="plans__dots"><i></i><i></i><i></i></span></div></article>` : ''}
       </div>
     </div>
     ${composer(mine)}
@@ -42,7 +47,7 @@ export function renderMargin(s) {
 function meta(who) {
   if (who === 'me') return `<div class="note__meta">${icon('nib')} ${L('你', 'You')}</div>`;
   return getMode() === 'mine'
-    ? `<div class="note__meta">${icon('clock')} ${L('排程助手', 'Planning assistant')}</div>`
+    ? `<div class="note__meta">${L('小秘書', 'Little Secretary')}</div>`
     : `<div class="note__meta">${icon('pencil')} AI · ${L('示範回覆', 'demo reply')}</div>`;
 }
 
@@ -52,7 +57,7 @@ function noteHtml(s, n) {
   }
   if (n.kind === 'checkin') return checkinNote(s, n);
   if (n.kind === 'hello') {
-    return `<article class="note note--ai">${meta('ai')}<div class="note__body">${L('加入功課和 deadline 後，按「自動排程」，我會把讀書時段放進你未來 7 日的空檔。每段都要你確認才會生效。', 'Add your tasks and deadlines, then press "Auto-schedule" and I will place study sessions in your free time over the next 7 days. Each one needs your confirmation.')}</div></article>`;
+    return `<article class="note note--ai">${meta('ai')}<div class="note__body">${L('有甚麼要安排，直接跟我說。', 'Tell me what you need to plan.')}</div></article>`;
   }
   const p = n.proposal ? s.proposals[n.proposal] : null;
   const parts = [];
@@ -218,10 +223,10 @@ function composer(mine = false) {
     <form class="composer" data-form="say">
       ${chips.length ? `<div class="suggest"><span class="suggest__label">${L('試試：', 'Try:')}</span>${chips.map((c) => `<button class="suggest__chip" type="button" data-action="scenario" data-id="${c.id}">${esc(c.text)}</button>`).join('')}</div>` : ''}
       <div class="composer__box">
-        <label class="sr-only" for="say-input">${L('寫給 AI 助手', 'Message the AI assistant')}</label>
-        <textarea id="say-input" name="text" rows="1" placeholder="${L('跟 AI 說，例如：明天要全日幫家人搬屋', 'Tell the AI, e.g. I have to help my family move house tomorrow')}" data-draft>${esc(ui.draft)}</textarea>
+        <label class="sr-only" for="say-input">${mine ? L('寫給小秘書', 'Message Little Secretary') : L('寫給 AI 助手', 'Message the AI assistant')}</label>
+        <textarea id="say-input" name="text" rows="1" placeholder="${L('例如：明天要幫家人搬屋', 'e.g. Helping my family move tomorrow')}" data-draft>${esc(ui.draft)}</textarea>
         <button class="composer__send" type="submit" aria-label="${L('送出', 'Send')}">${icon('send')}</button>
       </div>
-      <p class="composer__note">${icon('info')} ${L('示範版沒有連接 AI，只認得上面的示範句子。', 'The demo is not connected to AI; it only understands the sample sentences above.')}</p>
+      ${mine ? '' : `<p class="composer__note">${icon('info')} ${L('示範版沒有連接 AI，只認得上面的示範句子。', 'The demo is not connected to AI; it only understands the sample sentences above.')}</p>`}
     </form>`;
 }

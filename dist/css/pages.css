@@ -78,6 +78,10 @@
 .note { position: relative; padding-left: 14px; }
 .note.is-new { animation: note-in 0.35s var(--ease) both; }
 @keyframes note-in { from { opacity: 0; transform: translateY(6px); } }
+/* 聊天：新訊息和「正在回覆」的點點從下面升上來，不是突然出現 */
+.dock__panel .note.is-new { animation: note-rise 0.45s cubic-bezier(0.22, 1.2, 0.36, 1) both; }
+@keyframes note-rise { from { opacity: 0; transform: translateY(26px); } 60% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dock__panel .note.is-new { animation: none; } }
 .note__meta { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-3); margin-bottom: 5px; letter-spacing: 0.02em; }
 .note__meta .i { font-size: 13px; }
 .note__body { font-size: 14.5px; line-height: 1.7; }
@@ -85,8 +89,15 @@
 .note__body b { font-weight: 700; }
 .note--ai { border-left: 2px dashed var(--graphite-2); }
 .note--ai .note__body { font-family: var(--font-serif); color: #353b49; }
-.note--me { border-left: 2.5px solid var(--ink); }
-.note--me .note__body { color: var(--ink); font-weight: 500; }
+/* 對話：小秘書在左邊（虛線），你寫的在右邊（圓角氣泡）。「你」的名字只留給讀屏軟件 */
+.note--ai, .note--sys { justify-self: start; max-width: 94%; }
+/* 名字在氣泡上面，氣泡只包回覆的字 */
+.dock__panel .note--ai { padding-left: 0; border-left: 0; }
+.dock__panel .note--ai .note__meta { margin: 0 0 4px 4px; }
+.dock__panel .note--ai .note__body { width: fit-content; padding: 9px 14px; background: #fff; border: 1px solid var(--rule); border-radius: 16px 16px 16px 4px; box-shadow: 0 1px 2px rgba(48, 40, 24, 0.06); }
+.note--me { justify-self: end; max-width: 82%; padding: 9px 14px; background: #fff; border: 1px solid var(--rule); border-radius: 16px 16px 4px 16px; box-shadow: 0 1px 2px rgba(48, 40, 24, 0.06); }
+.note--me .note__meta { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.note--me .note__body { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
 .note--sys { border-left: 2px solid var(--ok); }
 .note--sys .note__body { font-size: 13.5px; color: var(--green-deep); }
 .note__attach { margin-top: 12px; }
@@ -239,11 +250,30 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 .dock.is-waking .dock__tag, .dock.is-waking .dock__bubble { opacity: 0; transform: translateY(8px); pointer-events: none; }
 .dock.is-open .dock__me { display: none; }
 /* 面板上方留 86px 給趴在右上角的她 */
-.dock__panel { position: relative; width: min(400px, calc(100vw - 36px)); height: min(620px, calc(100vh - var(--header-h) - 124px)); margin-bottom: 18px; }
+.dock__panel { position: relative; width: min(440px, calc(100vw - 36px)); height: min(620px, calc(100vh - var(--header-h) - 124px)); margin-bottom: 18px; }
+/* 「正在打字」氣泡：送出後立即出現，點點大一點、跳得明顯一點 */
+.dock__panel .note--typing .note__body { padding: 12px 16px; }
+.dock__panel .note--typing .plans__dots { gap: 5px; margin: 0; vertical-align: middle; }
+.dock__panel .note--typing .plans__dots i { width: 7px; height: 7px; background: var(--ink-3); }
+/* 打開時由下面升上來（連趴在上面的她一起） */
+.dock__panel.is-rising { animation: panel-rise 0.42s cubic-bezier(0.2, 0.9, 0.3, 1) both; transform-origin: bottom right; }
+@keyframes panel-rise { from { opacity: 0; transform: translateY(48px) scale(0.97); } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dock__panel.is-rising { animation: none; } }
 .dock__panel .margin { position: relative; top: auto; height: 100%; max-height: none; border: 1px solid var(--rule); box-shadow: var(--shadow-pop); }
 .dock__perch { position: absolute; right: 22px; bottom: 100%; z-index: 1; width: 122px; height: 88px; margin-bottom: -3px; padding: 0; border: 0; background: none; overflow: hidden; cursor: pointer; }
 .dock__perch .dock__rest, .dock__perch .dock__yawn { position: absolute; left: 0; top: 0; width: 122px; height: 88px; }
 .dock__perch .dock__rest { display: block; }
+/* 面板像一頁筆記：左上貼一條紙膠帶，最上面寫今天的日期（試過內頁橫線，文字對不上線，太雜亂，不用） */
+.dock__panel::before {
+  content: ""; position: absolute; left: 22px; top: -11px; z-index: 2; width: 96px; height: 24px; pointer-events: none;
+  background: var(--grain), var(--margin-line); opacity: 0.55; transform: rotate(-5deg);
+  clip-path: polygon(0 0, 100% 0, 96% 20%, 100% 40%, 96% 60%, 100% 80%, 97% 100%, 3% 100%, 0 80%, 4% 60%, 0 40%, 4% 20%);
+}
+.margin__date {
+  display: inline-block; margin: 6px 0 14px 14px; padding: 0 2px 3px;
+  font-family: var(--font-serif); font-size: 13px; letter-spacing: 0.04em; color: var(--ink-3);
+  border-bottom: 2px solid color-mix(in srgb, var(--margin-line) 70%, transparent);
+}
 .margin__head { align-items: center; }
 .margin__title { flex: 1; min-width: 0; }
 .margin__title h2 { font-size: 18px; flex-wrap: wrap; }
