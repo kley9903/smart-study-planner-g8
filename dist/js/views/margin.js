@@ -4,7 +4,7 @@ import { esc, icon } from '../ui.js';
 import { ui, availableChips, getMode } from '../store.js';
 import { HERO } from '../scenarios.js';
 import { taskOf, stepOf, inkOf } from '../model.js';
-import { span, dayShort, md, hm, hoursText } from '../time.js';
+import { span, dayShort, dayLabel, md, hm, hoursText } from '../time.js';
 import { L } from '../i18n.js';
 import { daysText } from '../syllabus-ai.js';
 
@@ -23,6 +23,7 @@ export function renderMargin(s) {
       <span class="demo-stamp" title="${L('預先寫好的示範回覆，沒有連接 AI', 'Pre-written demo replies, not connected to AI')}">${L('示範回覆', 'Demo replies')}</span>
     </header>`}
     <div class="margin__body" data-thread-scroll>
+      <p class="margin__date" aria-hidden="true">${dayLabel(s.today)}</p>
       <div class="thread" aria-live="polite">
         ${s.thread.map((n) => noteHtml(s, n).replace('class="note ', `class="note ${fresh.has(n.id) ? 'is-new ' : ''}`)).join('')}
         ${ui.chatting ? `<article class="note note--ai note--typing" aria-label="${L('AI 助手正在回覆', 'The assistant is replying')}">${meta('ai')}<div class="note__body"><span class="plans__dots"><i></i><i></i><i></i></span></div></article>` : ''}
