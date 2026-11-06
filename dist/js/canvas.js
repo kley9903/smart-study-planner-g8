@@ -88,6 +88,21 @@ export function keyFromTitle(title = '') {
 }
 
 /**
+ * Canvas 項目的預設時數：日曆只有標題，看不出份量。課程的每週小功課很多，所以比大綱的預設小得多；
+ * 只有專題、文章、報告、匯報、考試才用大綱的預設。學生之後可以改（hoursDefault 會標「預設值」）。
+ */
+const TINY = /attendance|survey|questionnaire|poll|check-?in|sign[- ]?up|intake|introduc|出席|問卷/i; // 半小時
+const SMALL = /reflection|peer|discussion|forum|post|journal|participation|feedback|反思|討論/i; // 1 小時
+export function canvasHours(title, key) {
+  const t = String(title || '');
+  if (TINY.test(t)) return 0.5; // 先看這些字：「Reflection Report」「Project Peer Evaluation」是小功課
+  if (SMALL.test(t)) return 1;
+  if (key === 'exam' || ['project', 'essay', 'report', 'presentation'].includes(key)) return typeHours(key);
+  if (key === 'quiz') return 1;
+  return 2; // 一般功課、Lab
+}
+
+/**
  * 事件清單 → [{ course, items }]，按科目分開（沒有科目代號的歸「Canvas」）。today 是 YYYY-MM-DD。
  * 每一項有 uid（Canvas 的編號），再匯入一次時用來認出已經有的。
  */
@@ -102,7 +117,7 @@ export function canvasFound(events, today) {
     by.get(course).push({
       id: `cv-${ev.uid}`, uid: ev.uid, key, what: ev.title, group: false, raw: '', weight: '',
       src: 'Canvas', quote: '', reasons: [], flag: null, hoursDefault: true, confidence: 'low', basis: '', difficulty: null, scope: '', steps: [],
-      plan: { kind: 'task', title: ev.title, key, date: ev.date, min: ev.min ?? 1439, hours: typeHours(key) }, state: 'pencil',
+      plan: { kind: 'task', title: ev.title, key, date: ev.date, min: ev.min ?? 1439, hours: canvasHours(ev.title, key) }, state: 'pencil',
     });
   }
   return [...by].map(([course, items]) => ({ course, items: items.sort((a, b) => a.plan.date.localeCompare(b.plan.date) || a.plan.min - b.plan.min) }));

@@ -1,13 +1,35 @@
 // AI 助手 Chatflow：每句話附上的計劃摘要，和把 Chatflow 的 action 變成網站的建議。
 // 摘要要小（每句都送），只放回答問題和判斷 action 需要的東西；id 讓 Chatflow 指明是哪一項。
-import { weekday } from './time.js';
+import { weekday, addDays } from './time.js';
 import { questionsFor } from './ask.js';
 import { getLang } from './i18n.js';
 
 const PROGRESS = { todo: 'todo', doing: 'doing', done: 'done' };
 
-/** 網站狀態 → Chatflow 的 context。 */
+// 伺服器只收 20000 字以內的 context；留一點位，太大就把較遠的時段合計成每日一行。
+export const CONTEXT_MAX = 18000;
+
+/** 網站狀態 → Chatflow 的 context（太大時：最近幾天的時段逐段列出，之後的按日子合計）。 */
 export function toContext(s) {
+  const full = fullContext(s);
+  if (JSON.stringify(full).length <= CONTEXT_MAX) return full;
+  for (const days of [7, 3, 1, 0]) {
+    const until = addDays(s.today, days);
+    const near = full.blocks.filter((b) => b.date < until);
+    const later = new Map();
+    for (const b of full.blocks) {
+      if (b.date < until) continue;
+      const d = later.get(b.date) || { date: b.date, blocks: 0, minutes: 0 };
+      d.blocks += 1;
+      d.minutes += b.end - b.start;
+      later.set(b.date, d);
+    }
+    const out = { ...full, blocks: near, blocks_later_by_day: [...later.values()] };
+    if (JSON.stringify(out).length <= CONTEXT_MAX || days === 0) return out;
+  }
+}
+
+function fullContext(s) {
   const stepOf = (id) => { for (const t of s.tasks) { const st = t.steps.find((x) => x.id === id); if (st) return [t, st]; } return [null, null]; };
   const toFill = [];
   for (const d of s.docs || []) {

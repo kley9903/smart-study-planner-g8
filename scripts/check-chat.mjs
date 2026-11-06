@@ -32,6 +32,7 @@ assert.equal(res.status, 403);
 
 /* ---------- the summary sent with each message ---------- */
 const { toContext } = await import('../dist/js/chat-ai.js');
+const { addDays: addDaysIso } = await import('../dist/js/time.js');
 const s = {
   today: '2026-11-05', now: 900,
   tasks: [{ id: 't1', title: 'Problem Set 4', course: 'c1', due: { date: '2026-11-07', min: 1439 }, steps: [{ id: 't1-1', title: 'Q1-4', min: 90, progress: 'done' }, { id: 't1-2', title: 'Q5-8', min: 120, progress: 'doing', remain: 30 }, { id: 't1-3', title: 'x', min: 30, dropped: true }] }],
@@ -59,6 +60,20 @@ assert.ok(JSON.stringify(ctx).length < 4000, 'small enough to send with every me
 }
 s.thread = [{ who: 'me', text: 'Quiz 2 下星期二交，範圍是第 5 章' }, { who: 'ai', html: '記下日期，<b>範圍</b>也要記嗎？' }, { who: 'ai', kind: 'hello' }];
 assert.deepEqual(toContext(s).recent, [{ who: 'me', text: 'Quiz 2 下星期二交，範圍是第 5 章' }, { who: 'ai', text: '記下日期，範圍也要記嗎？' }], 'the last few lines of the chat, as plain text, so "yes, that too" makes sense');
+
+/* A big plan (many confirmed blocks) still fits the server's 20000-character limit: later days are summed per day. */
+{
+  const { CONTEXT_MAX } = await import('../dist/js/chat-ai.js');
+  const step = s.tasks[0].steps[0];
+  const many = { ...s, thread: [], blocks: Array.from({ length: 400 }, (_, i) => ({ id: `x${i}`, step: step.id, date: addDaysIso(s.today, i % 14), start: 510, end: 600 })) };
+  const big = toContext(many);
+  assert.ok(JSON.stringify(big).length <= CONTEXT_MAX, JSON.stringify(big).length);
+  assert.ok(big.blocks.length > 0 && big.blocks.every((b) => b.date < addDaysIso(s.today, 7)), 'the coming days are still listed block by block');
+  const later = big.blocks_later_by_day;
+  assert.ok(later.length > 0 && later.every((d) => d.blocks > 0 && d.minutes === d.blocks * 90), later);
+  assert.equal(big.blocks.length + later.reduce((n, d) => n + d.blocks, 0), many.blocks.filter((b) => b.date >= s.today).length, 'no block is lost, only summed');
+  assert.equal(toContext(s).blocks_later_by_day, undefined, 'a normal plan is sent in full');
+}
 
 /* ---------- what the site does with the answer ---------- */
 const store = await import('../dist/js/store.js');
