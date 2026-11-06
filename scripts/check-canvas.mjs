@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 const memory = new Map();
 globalThis.localStorage = { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => memory.set(k, v) };
 
-const { parseFeed, readIcs, canvasFound, keyFromTitle, cleanTitle } = await import('../dist/js/canvas.js');
+const { parseFeed, readIcs, canvasFound, keyFromTitle, cleanTitle, canvasHours } = await import('../dist/js/canvas.js');
 const { getState, enterMine, addCanvasDocs, deleteTask } = await import('../dist/js/store.js');
 
 /* ---------- a date written in the title is dropped (the due date has its own field) ---------- */
@@ -52,6 +52,11 @@ assert.deepEqual(groups.map((g) => [g.course, g.items.map((i) => i.what)]), [['C
 const lab = groups[0].items[0];
 assert.deepEqual([lab.state, lab.plan.kind, lab.plan.date, lab.plan.min, lab.src], ['pencil', 'task', '2026-11-20', 1439, 'Canvas'], 'an all-day due date is due at 23:59');
 assert.deepEqual([groups[1].items[0].key, groups[1].items[0].plan.min], ['exam', 540], 'an exam starts at its start time');
+/* Canvas only gives a title: small weekly items get small default hours, marked as defaults. */
+const hrs = (t) => canvasHours(t, keyFromTitle(t));
+assert.deepEqual(['Intake Survey', 'Attendance Record Week 9', 'Reflection Report 2', 'Peer Evaluation', 'Module 1 Quiz', 'Homework 3', 'Lab Report 3'].map(hrs), [0.5, 0.5, 1, 1, 1, 2, 2]);
+assert.deepEqual(['Final Project Presentation', 'Midterm Exam', 'Essay 2', 'Group Project Peer Evaluation'].map(hrs), [4, 8, 6, 1], 'big items keep the syllabus defaults');
+assert.deepEqual([lab.plan.hours, lab.hoursDefault], [2, true]);
 
 /* ---------- importing into your own plan: no confirming, straight into each course ---------- */
 enterMine();
