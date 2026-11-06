@@ -69,9 +69,18 @@ function status(s) {
   return L('有事找我', 'Ask me anything');
 }
 
+// 面板打開時由下面升上來。面板每次重畫都重新建立，所以記住打開的時間，
+// 動畫期間重畫就用負的 animation-delay 接著播；之後重畫不再播。
+const OPEN_MS = 420;
+let openedAt = 0;
+
 /** quiet：新增任務等要打字的頁面，不冒泡泡 */
 export function renderDock(s, { quiet = false } = {}) {
   const open = !!ui.dockOpen;
+  if (!open) openedAt = 0;
+  else if (!openedAt) openedAt = Date.now();
+  const ago = Date.now() - openedAt;
+  const rising = open && ago < OPEN_MS ? ` is-rising" style="animation-delay:${-ago}ms` : '';
   const b = !open && !quiet ? bubbleFor(s) : null;
   const bubble = b && !ui.dockDismissed.includes(b.id) ? b : null;
   const minimize = L(`縮小${assistantName()}`, `Minimize ${assistantName()}`);
@@ -80,7 +89,7 @@ export function renderDock(s, { quiet = false } = {}) {
     bubble: bubble?.id || '',
     html: `
       ${open ? `
-        <div class="dock__panel" role="dialog" aria-modal="false" aria-label="${assistantName()}">
+        <div class="dock__panel${rising}" role="dialog" aria-modal="false" aria-label="${assistantName()}">
           <button class="dock__perch" type="button" data-action="dock-toggle" aria-label="${minimize}"><span class="dock__rest"></span><span class="dock__yawn"></span></button>
           ${renderMargin(s)}
         </div>` : ''}
