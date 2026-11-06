@@ -12,6 +12,7 @@ import { parseWhen, parseHours, typeLabel } from './syllabus-ai.js';
 import { toState, proposalFrom } from './plan-ai.js';
 import { questionsFor, readDue } from './ask.js';
 import { toContext } from './chat-ai.js';
+import { createAiRequests } from './ai-requests.js';
 import { createTimer, rhythmOf, stop as stopTimer, pause as pauseTimer, resume as resumeTimer, tick as tickTimer } from './focus.js';
 
 const MINE_KEY = 'mine';
@@ -20,6 +21,7 @@ let ORIGINAL = createDemoState();
 let mode = recall('mode') === 'mine' ? 'mine' : 'demo';
 let state = mode === 'mine' ? loadMine() : fresh();
 let seq = 0;
+const aiRequests = createAiRequests();
 const nid = (prefix) => `${prefix}${Date.now().toString(36)}${++seq}`;
 
 function fresh() {
@@ -55,6 +57,7 @@ function loadMine() {
 export const getMode = () => mode;
 
 export function enterMine() {
+  aiRequests.reset();
   mode = 'mine';
   remember('mode', 'mine');
   state = loadMine();
@@ -62,6 +65,7 @@ export function enterMine() {
 }
 
 export function enterDemo() {
+  aiRequests.reset();
   mode = 'demo';
   remember('mode', 'demo');
   state = fresh();
@@ -72,6 +76,7 @@ export function enterDemo() {
 export function relang() {
   ORIGINAL = createDemoState();
   if (mode === 'demo') {
+    aiRequests.reset();
     state = fresh();
     Object.assign(ui, freshUi());
   }
@@ -84,7 +89,7 @@ function freshUi() {
     editBusy: false, dockOpen: false, dockDismissed: [], hlRule: null, justInked: [], arrowFor: null,
     draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, renameCourse: null, editRow: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
-    planning: false, planOptions: null, planError: '', ask: null,
+    planning: false, planOptions: null, planError: '', ask: null, chatting: false,
   };
 }
 
@@ -158,6 +163,7 @@ function blocked() {
 
 /* ---------------- 示範資料 ---------------- */
 export function resetDemo() {
+  aiRequests.reset();
   state = fresh();
   Object.assign(ui, freshUi());
   emit({ toast: L('已重設示範資料', 'Demo data reset'), reset: true });
@@ -815,6 +821,7 @@ export function obRestart() {
   ob = freshOb();
 }
 export function obFinish() {
+  aiRequests.reset();
   mode = 'demo';
   remember('mode', 'demo');
   state = fresh();
@@ -836,24 +843,19 @@ export async function requestPlans(request = '') {
   const now = getState();
   const later = (b) => b.date > now.today || (b.date === now.today && b.start > now.now);
   const released = unplannedSteps(now).length ? [] : now.blocks.filter((b) => later(b) && stepOf(now, b.step).step?.progress !== 'done');
-  let out;
-  try {
-    const sent = toState({ ...now, blocks: now.blocks.filter((b) => !released.includes(b)) });
-    const res = await fetch('/api/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ state: sent, request }) });
-    out = await res.json();
-  } catch {
-    out = { ok: false, reason: 'network' };
-  }
-  ui.planning = false;
-  if (!out?.ok || !out.result?.plans?.length) {
-    ui.planError = out?.reason === 'invalid'
-      ? L('現在沒有可以排的功課：可能都已排好，或還缺截止日期。', 'Nothing to schedule right now: everything may already be planned, or due dates are missing.')
-      : L('AI 暫時連不上，請稍後再試。', 'The AI cannot be reached right now. Please try again later.');
-    emit({ keepScroll: true });
-    return;
-  }
-  ui.planOptions = { ...out.result, released: released.map((b) => b.id) };
-  choosePlan(out.result.plans[0].id);
+  const sent = toState({ ...now, blocks: now.blocks.filter((b) => !released.includes(b)) });
+  return aiRequests.send('plan', { state: sent, request }, (out) => {
+    ui.planning = false;
+    if (!out?.ok || !out.result?.plans?.length) {
+      ui.planError = out?.reason === 'invalid'
+        ? L('現在沒有可以排的功課：可能都已排好，或還缺截止日期。', 'Nothing to schedule right now: everything may already be planned, or due dates are missing.')
+        : L('AI 暫時連不上，請稍後再試。', 'The AI cannot be reached right now. Please try again later.');
+      emit({ keepScroll: true });
+      return;
+    }
+    ui.planOptions = { ...out.result, released: released.map((b) => b.id) };
+    choosePlan(out.result.plans[0].id);
+  });
 }
 
 /** 點一個方案：用虛線預覽它的時段（換掉之前預覽的方案）。 */
@@ -932,39 +934,34 @@ const CHAT_FAIL = () => L('AI 助手暫時連不上，請稍後再試。', 'The 
 
 /** 學生打的一句話 → Chatflow；回覆寫進對話，action 變成要確認的建議，或直接去要排程方案。 */
 async function chat(text) {
+  if (ui.chatting) return;
   ui.draft = '';
   note({ who: 'me', text });
   ui.chatting = true;
   emit({ scrollThread: true });
-  let out;
-  try {
-    const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, context: toContext(getState()), conversation: state.chatConversation || '' }) });
-    out = await res.json();
-  } catch {
-    out = { ok: false };
-  }
-  ui.chatting = false;
-  if (!out?.ok) { note({ who: 'ai', html: esc(CHAT_FAIL()) }); emit({ scrollThread: true }); return; }
-  if (out.conversation) state.chatConversation = out.conversation;
-  const { reply, action, follow_up: follow } = out.result;
-  const change = action && {
-    busy: () => ({ kind: 'hatch', rule: { id: nid('u'), ...action.rule, label: action.rule.label || L('沒空', 'Busy'), src: 'me' } }),
-    progress: () => ({ kind: 'progress', step: action.step, progress: action.progress, ...(action.remain_min ? { remain: action.remain_min } : {}) }),
-    fill: () => ({ kind: 'fill', doc: action.doc, item: action.item, field: action.field, value: action.value }),
-  }[action.type]?.();
-  let pid = null;
-  if (change) {
-    const old = pendingProposal(state);
-    if (old) old.status = 'erased';
-    pid = nid('chat');
-    state.proposals[pid] = { id: pid, kind: 'chat', status: 'pending', changes: [change] };
-    state.proposal = pid;
-  }
-  note({ who: 'ai', html: esc(reply), ...(pid ? { proposal: pid } : {}) });
-  if (follow) note({ who: 'ai', html: esc(follow) });
-  emit({ scrollThread: true, ...(pid ? { proposal: true } : {}) });
-  if (action?.type === 'plan') await requestPlans(action.request || '');
+  return aiRequests.send('chat', { message: text, context: toContext(getState()), conversation: state.chatConversation || '' }, async (out) => {
+    ui.chatting = false;
+    if (!out?.ok) { note({ who: 'ai', html: esc(CHAT_FAIL()) }); emit({ scrollThread: true }); return; }
+    if (out.conversation) state.chatConversation = out.conversation;
+    const { reply, action, follow_up: follow } = out.result;
+    const change = action && {
+      busy: () => ({ kind: 'hatch', rule: { id: nid('u'), ...action.rule, label: action.rule.label || L('沒空', 'Busy'), src: 'me' } }),
+      progress: () => ({ kind: 'progress', step: action.step, progress: action.progress, ...(action.remain_min ? { remain: action.remain_min } : {}) }),
+      fill: () => ({ kind: 'fill', doc: action.doc, item: action.item, field: action.field, value: action.value }),
+    }[action.type]?.();
+    let pid = null;
+    if (change) {
+      const old = pendingProposal(state);
+      if (old) old.status = 'erased';
+      pid = nid('chat');
+      state.proposals[pid] = { id: pid, kind: 'chat', status: 'pending', changes: [change] };
+      state.proposal = pid;
+    }
+    note({ who: 'ai', html: esc(reply), ...(pid ? { proposal: pid } : {}) });
+    if (follow) note({ who: 'ai', html: esc(follow) });
+    emit({ scrollThread: true, ...(pid ? { proposal: true } : {}) });
+    if (action?.type === 'plan') await requestPlans(action.request || '');
+  });
 }
 
 /* ---------------- 番茄鐘 ---------------- */
