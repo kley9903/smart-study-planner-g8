@@ -693,27 +693,41 @@ export function addOwnDoc({ id, name, size, parts }, course = null) {
 }
 
 /**
- * Canvas 日曆讀到的項目：每一科一份資料（source: 'canvas'，沒有檔案）。再匯入一次時用回同一份：
- * 已確認或已刪除的不再出現，未確認的換成這次的結果。回傳加入了多少項待核對。
+ * Canvas 日曆讀到的項目：不用逐項確認，直接放進各科（每一科一份資料，source: 'canvas'，沒有檔案；科目沒有就建立）。
+ * 放錯的之後在科目卡刪除就好。再匯入一次時用回同一份：已經加入過的（按 Canvas 的編號認）不會再加，
+ * 所以刪掉的功課不會回來；Canvas 上改了截止時間的，任務跟著改。回傳 { courses, added, moved }。
  */
 export function addCanvasDocs(groups) {
-  let added = 0, first = null;
+  let added = 0, moved = 0;
+  const touched = new Set();
   for (const { course, items } of groups) {
     let doc = state.docs.find((d) => d.own && d.source === 'canvas' && (d.courseName === course || state.courses[d.course]?.name === course));
     if (!doc) {
       doc = { id: nid('canvas-'), name: `Canvas · ${course}`, size: 0, source: 'canvas', own: true, pages: null, items: [], course: null, courseName: course, notes: [], weightTotal: null };
       state.docs.push(doc);
     }
-    const seen = new Set(doc.items.filter((i) => i.state !== 'pencil').map((i) => i.uid));
-    const fresh = items.filter((it) => !seen.has(it.uid)).map((it) => ({ ...it, id: nid(`${it.id}-`) }));
-    doc.items = [...doc.items.filter((i) => i.state !== 'pencil'), ...fresh];
-    markMatches(doc);
-    added += fresh.length;
-    if (fresh.length && !first) first = doc;
+    const had = new Map(doc.items.map((i) => [i.uid, i]));
+    for (const it of items) {
+      const old = had.get(it.uid);
+      if (old?.state === 'pencil') doc.items = doc.items.filter((i) => i !== old); // 舊版留下的待核對：換成這次的，直接加入
+      else if (old) {
+        // 已經加入過：Canvas 改了截止時間，而任務還在，就跟著改
+        const task = old.taskId && taskOf(state, old.taskId);
+        if (task && (task.due.date !== it.plan.date || task.due.min !== it.plan.min)) {
+          moveDue(task, { date: it.plan.date, min: it.plan.min });
+          old.plan = { ...old.plan, date: it.plan.date, min: it.plan.min };
+          moved++;
+          touched.add(doc.id);
+        }
+        continue;
+      }
+      const item = { ...it, id: nid(`${it.id}-`), state: 'ink' };
+      doc.items.push(item);
+      if (applyItem(doc, item) === 'task') { added++; touched.add(doc.id); }
+    }
   }
-  if (first) ui.docId = first.id;
   emit({ keepScroll: true });
-  return added;
+  return { courses: touched.size, added, moved };
 }
 
 /** AI 讀完一份自己的大綱：放入待核對的項目（已確認的保留，未確認的換成這次的結果）。 */

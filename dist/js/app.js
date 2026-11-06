@@ -937,19 +937,18 @@ function revealChecks(id) {
   setTimeout(tick, REVEAL_STEP_MS);
 }
 
-/** 放入 Canvas 日曆檔（.ics）：在瀏覽器裡讀，每科一份等你核對。 */
+/** 放入 Canvas 日曆檔（.ics）：在瀏覽器裡讀，直接放進各科（不用逐項確認，放錯的之後刪除）。 */
 async function importIcs(file) {
   try {
-    const groups = canvasFound(await readIcs(file), getState().today);
-    const added = addCanvasDocs(groups);
-    if (current.name === 'import' && current.params?.[0] !== 'add') location.hash = '#/import/add';
-    toast(added
-      ? L(`從 Canvas 找到 ${groups.length} 科、${added} 項，請逐項核對`, `Found ${added} item${added === 1 ? '' : 's'} in ${groups.length} course${groups.length === 1 ? '' : 's'} on Canvas. Check each one.`)
-      : L('Canvas 日曆裡沒有新的功課或考試。', 'No new assignments or exams in your Canvas calendar.'), added ? 'check' : 'info');
+    const { courses, added, moved } = addCanvasDocs(canvasFound(await readIcs(file), getState().today));
+    const parts = [added && L(`加入 ${added} 項`, `added ${added} item${added === 1 ? '' : 's'}`), moved && L(`更新 ${moved} 項的截止時間`, `moved ${moved} deadline${moved === 1 ? '' : 's'}`)].filter(Boolean);
+    toast(parts.length
+      ? L(`Canvas：${courses} 科，${parts.join('、')}`, `Canvas: ${courses} course${courses === 1 ? '' : 's'}, ${parts.join(', ')}`)
+      : L('Canvas 日曆裡沒有新的功課或考試。', 'No new assignments or exams in your Canvas calendar.'), parts.length ? 'check' : 'info');
   } catch (err) {
     toast(err.reason === 'too-big'
       ? L(`「${file.name}」超過 ${ICS_MAX_MB} MB，不像 Canvas 日曆檔。`, `"${file.name}" is over ${ICS_MAX_MB} MB; it does not look like a Canvas calendar.`)
-      : L(`「${file.name}」不是日曆檔（.ics）。`, `"${file.name}" is not a calendar file (.ics).`), 'alert');
+      : L(`「${file.name}」不是日曆檔。請在 Canvas「日曆」打開「Calendar Feed」的連結，下載 .ics 檔。`, `"${file.name}" is not a calendar file. In Canvas Calendar, open the "Calendar Feed" link to download an .ics file.`), 'alert');
   }
 }
 
@@ -999,6 +998,7 @@ async function takeFiles(files) {
   const names = [...files].map((f) => f.name).join('、');
   if (!names) return;
   if (getMode() === 'mine' && current.name === 'import') {
+    const before = ui.basket.length;
     for (const file of files) {
       if (/[.]ics$/i.test(file.name)) { await importIcs(file); continue; } // Canvas 日曆檔另外讀，不交給 AI
       if (!/[.](pdf|docx|pptx|txt|md|jpe?g|png|gif|webp)$/i.test(file.name)) { toast(L(`「${file.name}」不是 PDF、Word、PPT、文字檔或圖片（JPG、PNG、WEBP），沒有放入。`, `"${file.name}" is not a PDF, Word, PowerPoint, text file or image (JPG, PNG, WEBP), so it was skipped.`), 'alert'); continue; }
@@ -1009,7 +1009,8 @@ async function takeFiles(files) {
         if (err.reason !== 'too-big') break; // 太大的跳過，存不進去就停
       }
     }
-    if (current.params?.[0] !== 'add') location.hash = '#/import/add';
+    // 只放了 Canvas 日曆檔時留在原頁（已直接放進各科）；有大綱檔案才去「增加科目」頁交給 AI
+    if (ui.basket.length > before && current.params?.[0] !== 'add') location.hash = '#/import/add';
     render();
     return;
   }
