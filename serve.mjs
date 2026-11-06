@@ -6,6 +6,7 @@ import { Readable } from 'node:stream';
 import { onRequestPost as readSyllabus } from './functions/api/syllabus.js';
 import { onRequestPost as makePlans } from './functions/api/plan.js';
 import { onRequestPost as chat } from './functions/api/chat.js';
+import { onRequestPost as canvas } from './functions/api/canvas.js';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +26,7 @@ const types = {
 
 http
   .createServer(async (req, res) => {
-    const api = { '/api/syllabus': readSyllabus, '/api/plan': makePlans, '/api/chat': chat }[req.url.split('?')[0]];
+    const api = { '/api/syllabus': readSyllabus, '/api/plan': makePlans, '/api/chat': chat, '/api/canvas': canvas }[req.url.split('?')[0]];
     if (api) {
       if (req.method !== 'POST') return res.writeHead(405).end();
       const url = `http://${req.headers.host}${req.url}`;

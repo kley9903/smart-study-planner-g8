@@ -3,9 +3,10 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, setDocCourse, deleteCourse, renameCourse, editTaskBasics, setTaskGroup, partsOf,
+  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, editTaskBasics, setTaskGroup, partsOf,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
+import { readCanvas, canvasFound } from './canvas.js';
 
 const REVEAL_STEP_MS = 450; // 檢查視窗逐行揭曉的間隔
 import { editor } from './views/task-editor.js';
@@ -474,6 +475,29 @@ const actions = {
     addOwnDoc(doc, ui.addCourse);
     actions['doc-read']({ dataset: { doc: doc.id } });
   },
+  'canvas-read': async () => {
+    const box = document.querySelector('[data-canvas-url]');
+    const url = box?.value.trim() || '';
+    if (ui.canvasReading) return;
+    if (!url) { box?.focus(); toast(L('先貼上 Canvas 日曆的訂閱連結。', 'Paste your Canvas calendar feed link first.'), 'alert'); return; }
+    ui.canvasReading = true;
+    ui.canvasUrl = url;
+    render();
+    try {
+      const groups = canvasFound(await readCanvas(url), getState().today);
+      const added = addCanvasDocs(groups);
+      ui.canvasReading = false;
+      ui.canvasUrl = '';
+      render();
+      toast(added
+        ? L(`從 Canvas 找到 ${groups.length} 科、${added} 項，請逐項核對`, `Found ${added} item${added === 1 ? '' : 's'} in ${groups.length} course${groups.length === 1 ? '' : 's'} on Canvas. Check each one.`)
+        : L('Canvas 日曆裡沒有新的功課或考試。', 'No new assignments or exams in your Canvas calendar.'), added ? 'check' : 'info');
+    } catch (err) {
+      ui.canvasReading = false;
+      render();
+      toast(canvasProblem(err), 'alert');
+    }
+  },
   'basket-remove': (el) => {
     ui.basket = ui.basket.filter((f) => f.id !== el.dataset.fileId);
     removeAttachment(el.dataset.fileId).catch(() => {});
@@ -935,6 +959,13 @@ function revealChecks(id) {
   render();
   setTimeout(tick, REVEAL_STEP_MS);
 }
+
+const canvasProblem = (err) => ({
+  'bad-url': L('這不是 Canvas 日曆的訂閱連結。請到 Canvas「日曆」頁右下角的「Calendar Feed」複製。', 'This is not a Canvas calendar feed link. Copy it from "Calendar Feed" on the Canvas Calendar page.'),
+  'not-found': L('Canvas 不認得這條連結，可能已經換了新的。請重新複製。', 'Canvas does not recognise this link; it may have been reset. Copy it again.'),
+  offline: L('連不上伺服器，請檢查網絡後再試。', 'Cannot reach the server. Check your connection and try again.'),
+  'no-server': L('這個網址沒有 Canvas 轉接服務。請用 node serve.mjs 預覽，或在已發布的網站使用。', 'No Canvas relay at this address. Preview with node serve.mjs or use the published site.'),
+}[err.reason] || L('讀不到 Canvas 日曆，請稍後再試。', 'Could not read your Canvas calendar. Try again later.'));
 
 const readProblem = (err) => ({
   'too-big': err.image

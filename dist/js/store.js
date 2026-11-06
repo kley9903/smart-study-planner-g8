@@ -692,6 +692,30 @@ export function addOwnDoc({ id, name, size, parts }, course = null) {
   emit({ toast: L(`已保存「${name}」`, `Saved "${name}"`), keepScroll: true });
 }
 
+/**
+ * Canvas 日曆讀到的項目：每一科一份資料（source: 'canvas'，沒有檔案）。再匯入一次時用回同一份：
+ * 已確認或已刪除的不再出現，未確認的換成這次的結果。回傳加入了多少項待核對。
+ */
+export function addCanvasDocs(groups) {
+  let added = 0, first = null;
+  for (const { course, items } of groups) {
+    let doc = state.docs.find((d) => d.own && d.source === 'canvas' && (d.courseName === course || state.courses[d.course]?.name === course));
+    if (!doc) {
+      doc = { id: nid('canvas-'), name: `Canvas · ${course}`, size: 0, source: 'canvas', own: true, pages: null, items: [], course: null, courseName: course, notes: [], weightTotal: null };
+      state.docs.push(doc);
+    }
+    const seen = new Set(doc.items.filter((i) => i.state !== 'pencil').map((i) => i.uid));
+    const fresh = items.filter((it) => !seen.has(it.uid)).map((it) => ({ ...it, id: nid(`${it.id}-`) }));
+    doc.items = [...doc.items.filter((i) => i.state !== 'pencil'), ...fresh];
+    markMatches(doc);
+    added += fresh.length;
+    if (fresh.length && !first) first = doc;
+  }
+  if (first) ui.docId = first.id;
+  emit({ keepScroll: true });
+  return added;
+}
+
 /** AI 讀完一份自己的大綱：放入待核對的項目（已確認的保留，未確認的換成這次的結果）。 */
 export function setOwnItems(docId, { course, courseTitle = '', items, notes, weightTotal = null }) {
   const doc = state.docs.find((d) => d.id === docId);
