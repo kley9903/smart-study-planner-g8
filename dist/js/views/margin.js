@@ -36,7 +36,7 @@ export function renderMargin(s) {
 function meta(who) {
   if (who === 'me') return `<div class="note__meta">${icon('nib')} ${L('你', 'You')}</div>`;
   return getMode() === 'mine'
-    ? `<div class="note__meta">${icon('clock')} ${L('小秘書', 'Little Secretary')}</div>`
+    ? `<div class="note__meta">${L('小秘書', 'Little Secretary')}</div>`
     : `<div class="note__meta">${icon('pencil')} AI · ${L('示範回覆', 'demo reply')}</div>`;
 }
 
