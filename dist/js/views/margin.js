@@ -18,7 +18,7 @@ export function renderMargin(s) {
   primed = true;
   const mine = getMode() === 'mine';
   return `
-  <aside class="margin" id="margin" aria-label="${mine ? L('排程助手', 'Planning assistant') : L('AI 助手（示範）', 'AI assistant (demo)')}">
+  <aside class="margin" id="margin" aria-label="${mine ? L('小秘書', 'Little Secretary') : L('AI 助手（示範）', 'AI assistant (demo)')}">
     ${mine ? '' : `<header class="margin__head">
       <span class="demo-stamp" title="${L('預先寫好的示範回覆，沒有連接 AI', 'Pre-written demo replies, not connected to AI')}">${L('示範回覆', 'Demo replies')}</span>
     </header>`}
@@ -36,7 +36,7 @@ export function renderMargin(s) {
 function meta(who) {
   if (who === 'me') return `<div class="note__meta">${icon('nib')} ${L('你', 'You')}</div>`;
   return getMode() === 'mine'
-    ? `<div class="note__meta">${icon('clock')} ${L('排程助手', 'Planning assistant')}</div>`
+    ? `<div class="note__meta">${icon('clock')} ${L('小秘書', 'Little Secretary')}</div>`
     : `<div class="note__meta">${icon('pencil')} AI · ${L('示範回覆', 'demo reply')}</div>`;
 }
 
