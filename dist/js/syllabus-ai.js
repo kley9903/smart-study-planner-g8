@@ -73,6 +73,8 @@ const TYPES = {
 const keyOf = (t) => { const k = String(t || '').toLowerCase(); return TYPES[k]?.[2] ? k : 'other'; };
 /** 項目類型的名稱（跟著目前的介面語言） */
 export const typeLabel = (key) => { const [zh, en] = TYPES[key] || TYPES.other; return L(zh, en); };
+/** 這類項目預設要幾小時（AI 沒估算時用） */
+export const typeHours = (key) => (TYPES[key] || TYPES.other)[2];
 const DAY_ZH = ['日', '一', '二', '三', '四', '五', '六'];
 const DAY_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const toMin = (hm) => { const m = /^(\d{1,2}):(\d{2})/.exec(hm || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };

@@ -53,6 +53,7 @@ export function render(s, params = []) {
           </ol>`}
         </section>
       </div>
+      ${mine && !ui.addCourse ? canvasBox() : ''}
 
       ${mine ? '' : doc ? `<div class="docs" role="group" aria-label="${L('已放入的大綱', 'Syllabi added')}">
         ${s.docs.map((d) => docCard(s, d, d.id === doc.id)).join('')}
@@ -184,6 +185,17 @@ function pasteBox() {
         </div>`;
 }
 
+/** Canvas 日曆的訂閱連結：貼上就匯入各科的功課和考試日期（每科一份，等你核對）。 */
+function canvasBox() {
+  return `
+      <section class="sheet canvas-feed" aria-label="Canvas">
+        <label class="canvas-feed__label" for="canvas-url">${L('從 Canvas 日曆匯入', 'Import from Canvas calendar')}</label>
+        <input class="input" id="canvas-url" type="url" data-canvas-url value="${esc(ui.canvasUrl || '')}" autocomplete="off" spellcheck="false"
+          placeholder="https://canvas.ust.hk/feeds/calendars/….ics">
+        <button class="btn btn--ink" type="button" data-action="canvas-read" ${ui.canvasReading ? 'disabled' : ''}>${icon('upload')} ${ui.canvasReading ? L('讀取中…', 'Reading…') : L('匯入', 'Import')}</button>
+      </section>`;
+}
+
 /** AI 正在讀：每一步是 Dify 實際走到的節點（伺服器即時送來），不是計時器。 */
 function readingSteps() {
   const now = STAGES.indexOf(ui.readStage);
@@ -210,6 +222,7 @@ function ownPanel(doc) {
   const parts = partsOf(doc);
   const typed = parts.length === 1 && /[.]txt$/i.test(doc.name);
   const size = doc.size ? `${Math.max(0.1, doc.size / 1048576).toFixed(1)} MB` : '';
+  if (doc.source === 'canvas') return canvasPanel(doc);
   const what = typed ? L('你貼上或打的文字', 'Text you pasted or typed') : parts.length > 1 ? L(`${parts.length} 份資料`, `${parts.length} files`) + (size ? ` · ${size}` : '') : size;
   return `
     <section class="sheet review own-doc" id="review" aria-label="${esc(doc.name)}">
@@ -237,6 +250,21 @@ function ownPanel(doc) {
         </div>
         <p class="own-doc__manual">${L('AI 沒找到的，也可以', 'Anything the AI missed, you can also')} <a href="#/add-task">${L('自己加一項功課或考試', 'add yourself as a task')} ${icon('arrow')}</a></p>
       </div>
+    </section>`;
+}
+
+function canvasPanel(doc) {
+  return `
+    <section class="sheet review own-doc" id="review" aria-label="${esc(doc.name)}">
+      <header class="review__head">
+        <div>
+          <h2>${esc(doc.name)}</h2>
+          <p>${L('Canvas 日曆 · 保存在這個瀏覽器', 'Canvas calendar · Saved in this browser')}</p>
+        </div>
+        <div class="own-doc__acts">
+          <button class="btn btn--ghost" type="button" data-action="doc-remove" data-doc="${doc.id}">${icon('x')} ${L('移除', 'Remove')}</button>
+        </div>
+      </header>
     </section>`;
 }
 
