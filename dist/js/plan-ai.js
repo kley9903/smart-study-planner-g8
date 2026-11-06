@@ -31,6 +31,7 @@ const shortOf = (s, id) => s.tasks.find((t) => t.id === id)?.short || id;
 /** 一項改動的理由（目前語言）。 */
 function reasonText(c, s) {
   const r = c.reason || {};
+  if (r.code === 'spread_before_due') return L(`${shortOf(s, c.task)} 在 ${dayShort(r.due.date)} ${hm(r.due.min)} 截止；分成幾天做，每天一點。`, `${shortOf(s, c.task)} is due ${dayShort(r.due.date)} ${hm(r.due.min)}; spread over a few days, a bit each day.`);
   if (r.code === 'earliest_before_due') return L(`${shortOf(s, c.task)} 在 ${dayShort(r.due.date)} ${hm(r.due.min)} 截止；這是截止前最早的空檔。`, `${shortOf(s, c.task)} is due ${dayShort(r.due.date)} ${hm(r.due.min)}; this is the earliest free slot before then.`);
   if (r.code === 'late_sleep') return L(`遲 ${r.minutes} 分鐘睡，會少睡一些。`, `Sleep ${r.minutes} minutes later; this costs sleep.`);
   if (r.code === 'simplify') return L(`簡化：由 ${hoursText(r.from)} 減到 ${hoursText(c.min)}。`, `Simplified: from ${hoursText(r.from)} to ${hoursText(c.min)}.`);
