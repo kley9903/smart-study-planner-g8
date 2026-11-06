@@ -118,9 +118,30 @@ export function whenText(plan) {
 
 // 沒對到任何一項的提醒分成幾類（報告裡分組）：'date' 日期、'weight' 比重、'check' 要確認（衝突）、'other' 其他。
 // 硬性檢查的句子以「原文有「」開頭：有 % 的是比重，其他是日期。以前存成純文字的提醒也用這個分類。
-const kindOfText = (t) => (String(t).startsWith('原文有「') ? (/%/.test(t) ? 'weight' : 'date') : 'other');
+// 硬性檢查（原文有、結果沒有的日期和比重）歸「原文對照」（'source'），連同「另外還有 N 處…」那句。
+const kindOfText = (t) => (/^原文有「|^另外還有 \d+ 處原文/.test(String(t)) ? 'source' : 'other');
 const kindOfPath = (path = '') => (/weight/i.test(path) ? 'weight' : /date|time|due/i.test(path) ? 'date' : 'other');
-const notesOf = (doc) => (doc.notes || []).map((n) => (typeof n === 'string' ? { kind: kindOfText(n), text: n } : n));
+// 以前存下的硬性檢查提醒是 { kind: 'date' }：按文字重新分類。
+const notesOf = (doc) => (doc.notes || []).map((n) => {
+  const text = typeof n === 'string' ? n : n.text;
+  const kind = kindOfText(text);
+  return { kind: kind !== 'other' || typeof n === 'string' ? kind : n.kind, text };
+});
+
+/**
+ * 「原文有「…」，但結果裡找不到 X 這個日期…」→ { date: X, text: 原文那一小段 }：
+ * 表格的 | 換成 ·，丟掉空格子和開頭被截斷的半格，太長就截短。其他句子原樣。
+ */
+export function sourceLine(note) {
+  const m = /^原文有「([\s\S]*)」，但結果裡(?:找不到 (.+?) 這個日期|沒有 (\S+?%) 的評核項目)/.exec(String(note));
+  if (!m) return { text: String(note) };
+  let cells = m[1].split('|').map((c) => c.trim()).filter(Boolean);
+  if (cells.length > 1 && cells[0].startsWith('…')) cells = cells.slice(1);
+  let text = cells.join(' · ').replace(/^…\s*/, '');
+  if (text.length > 72) text = `${text.slice(0, 71).trimEnd()}…`;
+  return { date: m[2] || m[3], text };
+}
+const sourceCount = (texts) => [...new Set(texts)].reduce((sum, t) => sum + (Number(/^另外還有 (\d+) 處/.exec(t)?.[1]) || 1), 0);
 
 /**
  * Dify 的課程 JSON → { course, items, notes }。items 都是 'pencil'（待核對），
@@ -220,7 +241,8 @@ export function checklist(doc) {
   const exams = count((i) => EXAMS.has(i.key));
   const undated = count((i) => i.plan?.kind === 'task' && !i.plan.date);
   const total = doc.weightTotal;
-  const gaps = new Set(notesOf(doc).map((n) => n.text)).size; // 同一句重複只算一處
+  // 原文對照：原文有、結果沒有的日期和比重；同一句重複只算一處，「另外還有 N 處」算 N 處（跟報告的「原文對照」一組同數）。
+  const gaps = sourceCount(notesOf(doc).filter((n) => n.kind === 'source').map((n) => n.text));
   return [
     { stage: 'read', label: L('讀取大綱', 'Read the syllabus'), state: 'ok', text: L('完成', 'Done') },
     { stage: 'extract', label: L('功課', 'Assignments'), ...found(work, ['項']) },
@@ -235,6 +257,7 @@ export function checklist(doc) {
 const GROUPS = [
   ['fill', () => L('要你補', 'To fill in')],
   ['date', () => L('日期未定', 'Dates to settle')],
+  ['source', () => L('原文對照', 'Against the syllabus')],
   ['weight', () => L('比重', 'Weights')],
   ['check', () => L('要確認', 'To confirm')],
   ['other', () => L('其他', 'Other')],
@@ -246,18 +269,20 @@ const GROUPS = [
  */
 export function report(doc) {
   const items = doc.items.filter((i) => i.state !== 'erased');
-  const lines = { fill: [], date: [], weight: [], check: [], other: [] };
+  const lines = { fill: [], date: [], source: [], weight: [], check: [], other: [] };
   for (const it of items) {
+    const dated = !(it.plan?.kind === 'task' && !it.plan.date);
+    const when = !dated ? '' : it.flag === 'no-time' ? L(`沒寫時間，暫定 ${hm(it.plan.min)}`, `No time; set to ${hm(it.plan.min)}`)
+      : it.flag === 'no-day' ? L('看不出星期幾或時間', 'Day or time unclear') : '';
     // 要你補：缺必要資料（截止日期、要做什麼），或 AI 估的時數沒把握。學生改過時數的不再問。
+    // 同一項沒寫時間的話，寫在同一行，不在「日期未定」再列一次。
     const need = it.plan?.kind === 'task' ? [!it.plan.date && 'date', !it.scope && 'scope', it.confidence !== 'high' && !it.edited && 'hours'].filter(Boolean) : [];
     if (need.length) {
       const names = { date: L('截止日期', 'due date'), scope: L('要做甚麼', 'what to do'), hours: L('要多久', 'how long') };
       const raw = !it.plan.date && it.raw ? L(`（原文：${it.raw}）`, ` (syllabus: ${it.raw})`) : '';
-      lines.fill.push({ text: it.what, need, item: it.id, hint: L(`缺：${need.map((n) => names[n]).join('、')}${raw}`, `Missing: ${need.map((n) => names[n]).join(', ')}${raw}`) });
-    }
-    if (it.plan?.kind === 'task' && !it.plan.date) continue;
-    if (it.flag === 'no-time') lines.date.push({ text: it.what, hint: L(`沒寫時間，暫定 ${hm(it.plan.min)}`, `No time; set to ${hm(it.plan.min)}`) });
-    else if (it.flag === 'no-day') lines.date.push({ text: it.what, hint: L('看不出星期幾或時間', 'Day or time unclear') });
+      const also = when ? L(`；${when}`, `; ${when}`) : '';
+      lines.fill.push({ text: it.what, need, item: it.id, hint: L(`缺：${need.map((n) => names[n]).join('、')}${raw}${also}`, `Missing: ${need.map((n) => names[n]).join(', ')}${raw}${also}`) });
+    } else if (when) lines.date.push({ text: it.what, hint: when });
   }
   if (doc.weightTotal != null && Math.abs(doc.weightTotal - 100) > 0.5) {
     lines.weight.push({ text: L(`比重合計 ${doc.weightTotal}%，不是 100%：可能漏了評核項目`, `Weights add up to ${doc.weightTotal}%, not 100%: an assessment may be missing`) });
@@ -265,12 +290,15 @@ export function report(doc) {
   if (!items.some((i) => EXAMS.has(i.key))) lines.check.push({ text: L('沒找到考試或測驗', 'No exams or quizzes found') });
   for (const n of notesOf(doc)) {
     const list = lines[n.kind] || lines.other;
-    const same = list.find((l) => l.text === n.text);
+    const same = list.find((l) => l.note === n.text);
     if (same) same.times = (same.times || 1) + 1;
-    else list.push({ text: n.text });
+    else list.push({ note: n.text, ...(n.kind === 'source' ? sourceLine(n.text) : { text: n.text }) });
   }
-  // 比重是補充資料，可以之後才補：畫面把這組收起來。
-  return GROUPS.filter(([kind]) => lines[kind].length).map(([kind, label]) => ({ kind, label: label(), lines: lines[kind], ...(kind === 'weight' ? { later: true } : {}) }));
+  // 比重是補充資料，可以之後才補：畫面把這組收起來。n 是這組的數目（「另外還有 N 處」算 N 處）。
+  return GROUPS.filter(([kind]) => lines[kind].length).map(([kind, label]) => ({
+    kind, label: label(), lines: lines[kind], n: kind === 'source' ? sourceCount(lines.source.map((l) => l.note)) : lines[kind].length,
+    ...(kind === 'weight' ? { later: true } : {}),
+  }));
 }
 
 /** 科目裡已有同名項目時的說明（match 由 store.js 判斷：不重複／改日期／補日期）。已確認的不再提示。 */
