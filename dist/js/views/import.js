@@ -185,14 +185,13 @@ function pasteBox() {
         </div>`;
 }
 
-/** Canvas 日曆的訂閱連結：貼上就匯入各科的功課和考試日期（每科一份，等你核對）。 */
+/** Canvas 日曆檔（.ics）：放入就匯入各科的功課和考試日期（每科一份，等你核對）。也可以直接拖進上面的框。 */
 function canvasBox() {
   return `
       <section class="sheet canvas-feed" aria-label="Canvas">
-        <label class="canvas-feed__label" for="canvas-url">${L('從 Canvas 日曆匯入', 'Import from Canvas calendar')}</label>
-        <input class="input" id="canvas-url" type="url" data-canvas-url value="${esc(ui.canvasUrl || '')}" autocomplete="off" spellcheck="false"
-          placeholder="https://canvas.ust.hk/feeds/calendars/….ics">
-        <button class="btn btn--ink" type="button" data-action="canvas-read" ${ui.canvasReading ? 'disabled' : ''}>${icon('upload')} ${ui.canvasReading ? L('讀取中…', 'Reading…') : L('匯入', 'Import')}</button>
+        <span class="canvas-feed__label">${L('從 Canvas 日曆匯入', 'Import from Canvas calendar')}</span>
+        <span class="canvas-feed__how muted">${L('在 Canvas「日曆」打開「Calendar Feed」的連結，會下載 .ics 檔', 'In Canvas Calendar, open the "Calendar Feed" link to download an .ics file')}</span>
+        <label class="btn btn--ink">${icon('upload')} ${L('放入 .ics 檔', 'Add .ics file')}<input type="file" accept=".ics,text/calendar" hidden data-file></label>
       </section>`;
 }
 

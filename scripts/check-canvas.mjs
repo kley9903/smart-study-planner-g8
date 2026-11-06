@@ -1,12 +1,11 @@
-// Checks for the Canvas calendar feed: which links the server accepts, reading the .ics (folded lines,
-// all-day due dates, UTC times turned into Hong Kong time), the relay, which events become items, and
-// importing twice (confirmed or removed items do not come back). The calendar below is made up in Canvas's shape.
+// Checks for the Canvas calendar file (.ics, downloaded from the "Calendar Feed" link and read in the browser):
+// folded lines, all-day due dates, UTC times turned into Hong Kong time, files that are not calendars, which events
+// become items, and importing twice (confirmed or removed items do not come back). The calendar is made up in Canvas's shape.
 import assert from 'node:assert/strict';
 const memory = new Map();
 globalThis.localStorage = { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => memory.set(k, v) };
 
-const { feedUrl, parseFeed, onRequestPost } = await import('../functions/api/canvas.js');
-const { readCanvas, canvasFound, keyFromTitle } = await import('../dist/js/canvas.js');
+const { parseFeed, readIcs, canvasFound, keyFromTitle } = await import('../dist/js/canvas.js');
 const { getState, enterMine, addCanvasDocs, setItemState } = await import('../dist/js/store.js');
 
 const ICS = [
@@ -23,16 +22,6 @@ const ICS = [
   'SUMMARY:Module 1 Quiz [LEGL1000 (L6)]', 'END:VEVENT',
   'END:VCALENDAR', '',
 ].join('\r\n');
-const LINK = 'https://canvas.ust.hk/feeds/calendars/user_abcDEF123.ics';
-
-/* ---------- which links are accepted ---------- */
-assert.equal(feedUrl(LINK), LINK);
-assert.equal(feedUrl(` ${LINK.replace('https:', 'webcal:')} `), LINK, 'webcal links and spaces are fine');
-assert.equal(feedUrl('https://school.instructure.com/feeds/calendars/user_x.ics'), 'https://school.instructure.com/feeds/calendars/user_x.ics');
-for (const bad of ['', 'not a link', 'http://canvas.ust.hk/feeds/calendars/user_x.ics', 'https://evil.example/feeds/calendars/user_x.ics',
-  'https://canvas.ust.hk/api/v1/users/self', 'https://canvas.ust.hk:8443/feeds/calendars/user_x.ics', 'https://canvas.ust.hk.evil.example/feeds/calendars/user_x.ics']) {
-  assert.equal(feedUrl(bad), null, `refuses ${bad}`);
-}
 
 /* ---------- reading the calendar ---------- */
 const events = parseFeed(ICS);
@@ -43,19 +32,10 @@ assert.deepEqual([events[2].kind, events[2].course, events[2].date, events[2].mi
 assert.deepEqual([events[3].date, events[3].min], ['2026-11-22', 0], 'Hong Kong time can be the next day');
 assert.ok(!('description' in events[0]), 'descriptions are not passed on');
 
-/* ---------- the relay ---------- */
-const asked = [];
-const canvas = async (url, init) => { asked.push({ url, init }); return url === LINK ? new Response(ICS, { status: 200 }) : new Response('', { status: 400 }); }; // HKUST answers 400 for an unknown link
-const relay = async (url, init) => onRequestPost({ request: new Request(`https://planner.test${url}`, init), fetcher: canvas });
-assert.equal((await readCanvas(LINK, { fetcher: relay })).length, 5);
-assert.equal(asked[0].url, LINK);
-assert.equal(asked[0].init.redirect, 'manual', 'redirects are not followed');
-await assert.rejects(readCanvas('https://example.com/x.ics', { fetcher: relay }), { reason: 'bad-url' });
-assert.equal(asked.length, 1, 'a refused link is never fetched');
-await assert.rejects(readCanvas('https://canvas.ust.hk/feeds/calendars/user_old.ics', { fetcher: relay }), { reason: 'not-found' });
-const cross = await onRequestPost({ request: new Request('https://planner.test/api/canvas', { method: 'POST', headers: { Origin: 'https://other.test' }, body: JSON.stringify({ url: LINK }) }), fetcher: canvas });
-assert.equal(cross.status, 403, 'other sites cannot use the relay');
-await assert.rejects(readCanvas(LINK, { fetcher: async () => { throw new Error('down'); } }), { reason: 'offline' });
+/* ---------- reading a downloaded .ics file ---------- */
+assert.equal((await readIcs(new File([ICS], 'user_abc.ics', { type: 'text/calendar' }))).length, 5);
+await assert.rejects(readIcs(new File(['<html>Canvas sign in</html>'], 'feed.ics')), { reason: 'not-calendar' }, 'a sign-in page saved as .ics is refused');
+await assert.rejects(readIcs({ name: 'huge.ics', size: 6 * 1024 * 1024, text: async () => '' }), { reason: 'too-big' });
 
 /* ---------- which events become items ---------- */
 assert.deepEqual(['Midterm Exam', 'Final Exam', 'Module 1 Quiz', 'Final Project Presentation', 'Lab Report 3', 'Reading reflection'].map(keyFromTitle), ['exam', 'exam', 'quiz', 'presentation', 'lab', 'assignment']);
@@ -81,4 +61,4 @@ docs = getState().docs.filter((d) => d.source === 'canvas');
 assert.equal(docs.length, 2, 'the same course reuses its Canvas source');
 assert.deepEqual(docs[1].items.map((i) => [i.what, i.state]), [['Midterm Exam', 'ink'], ['Module 1 Quiz', 'erased']]);
 
-console.log('Passed: Canvas feed links, reading the calendar, the relay, choosing items and importing twice.');
+console.log('Passed: reading Canvas calendar files, choosing items and importing twice.');
