@@ -11,7 +11,7 @@ const { blockPopover, hatchPopover, busyForm } = await import('../dist/js/views/
 const { snap, paintRange } = await import('../dist/js/busy-paint.js');
 const { keepFile, fits, LIMIT_MB } = await import('../dist/js/attachments.js');
 const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, renameCourse, setTaskGroup, partsOf, ui } = await import('../dist/js/store.js');
-const { toItems, mergeFound, rowText, report, checklist, parseDays, parseWhen, readSyllabus } = await import('../dist/js/syllabus-ai.js');
+const { toItems, mergeFound, rowText, report, checklist, sourceLine, parseDays, parseWhen, readSyllabus } = await import('../dist/js/syllabus-ai.js');
 const { setLang } = await import('../dist/js/i18n.js');
 const { onRequestPost } = await import('../functions/api/syllabus.js');
 
@@ -214,7 +214,7 @@ assert.equal(found.weightTotal, 100);
     missing_information: [{ path: '/assessment_components/0/weight_percent', reason: 'No weight published' }, { path: '/course/instructor', reason: 'No teacher' }],
     warnings: ['原文有「Quiz 10%」，但結果裡沒有 10% 的評核項目，請核對是否漏了。', '原文有「due 11/20」，但結果裡找不到 11/20 這個日期，請核對是否漏了截止日或考試。', 'Scanned file'],
   });
-  assert.deepEqual(dify.notes.map((n) => n.kind), ['weight', 'other', 'check', 'weight', 'date', 'other']);
+  assert.deepEqual(dify.notes.map((n) => n.kind), ['weight', 'other', 'check', 'source', 'source', 'other']);
 
   // Several files added at once are read one by one and put together into one list to check.
   const fromSlides = { course: '', items: [{ ...final, id: 'x1' }, { ...a1, id: 'x2', weight: '' }], notes: [{ kind: 'other', text: 'Slides only' }], weightTotal: null };
@@ -233,7 +233,7 @@ assert.equal(found.weightTotal, 100);
   // Items given a scope and a confident estimate, so only the date problems are left to report.
   const sure = (i) => ({ ...i, scope: 'x', confidence: 'high' });
   const groups = report({ items: found.items.map(sure), notes, weightTotal: 90 });
-  assert.deepEqual(groups.map((g) => [g.kind, g.label]), [['fill', 'To fill in'], ['date', 'Dates to settle'], ['weight', 'Weights'], ['check', 'To confirm'], ['other', 'Other']], 'grouped in this order; nothing about what was found');
+  assert.deepEqual(groups.map((g) => [g.kind, g.label]), [['fill', 'To fill in'], ['date', 'Dates to settle'], ['source', 'Against the syllabus'], ['weight', 'Weights'], ['check', 'To confirm'], ['other', 'Other']], 'grouped in this order; nothing about what was found');
   const by = Object.fromEntries(groups.map((g) => [g.kind, g.lines]));
   assert.deepEqual(by.fill.map((l) => [l.text, l.need]), [['Final exam', ['date']]], 'a missing due date is asked under "To fill in", not listed again under dates');
   assert.ok(by.fill[0].hint.includes(final.raw), 'and says what the syllabus wrote');
@@ -241,15 +241,28 @@ assert.equal(found.weightTotal, 100);
   assert.ok(by.date[0].hint.includes('09:00'), 'each says what time it was set to');
   assert.ok(by.weight[0].text.includes('90%'), 'weights that do not add up to 100% come first under weights');
   assert.equal(by.weight.find((l) => l.text === 'No weight published').times, 3, 'a repeated note is shown once with a count');
-  assert.ok(by.weight.some((l) => l.text.startsWith('原文有「25%」')), 'old notes saved as plain text are still sorted: a coverage check about a percentage goes under weights');
+  assert.deepEqual(by.source.map((l) => [l.date, l.text]), [['25%', '25%']], 'old notes saved as plain text are still sorted: a coverage check goes under "against the syllabus", shown as the value and a short quote');
   assert.deepEqual([by.check.map((l) => l.text), by.other.map((l) => l.text)], [['Week 13 is listed twice'], ['Course name not published.']]);
   assert.deepEqual(report({ items: [sure(found.items[0])], notes: [], weightTotal: null }).map((g) => [g.kind, g.lines.map((l) => l.text)]), [['check', ['No exams or quizzes found']]]);
   assert.deepEqual(report({ items: [found.items[0], found.items[1]].map((i) => ({ ...sure(i), flag: null })), notes: [], weightTotal: 100 }), [], 'nothing to check');
-  assert.equal(checklist({ items: [], notes, weightTotal: null }).at(-1).text, '4 to check', 'the syllabus row counts a repeated note once');
+  assert.equal(checklist({ items: [], notes: [...notes, notes[4]], weightTotal: null }).at(-1).text, '1 to check', 'the syllabus row counts only coverage checks, a repeated one once');
   const rows = checklist({ items: found.items, notes: [], weightTotal: 100 });
   assert.deepEqual(rows.map((r) => r.state), ['ok', 'ok', 'ok', 'ok', 'warn', 'ok'], 'check window rows: read, work, exams, weights, dates (final TBA), syllabus');
   assert.deepEqual(rows.map((r) => r.stage), ['read', 'extract', 'extract', 'check', 'check', 'check']);
-  assert.deepEqual(checklist({ items: [], notes: ['x'], weightTotal: null }).slice(1).map((r) => r.state), ['none', 'none', 'none', 'ok', 'warn']);
+  assert.deepEqual(checklist({ items: [], notes: ['x'], weightTotal: null }).slice(1).map((r) => r.state), ['none', 'none', 'none', 'ok', 'ok'], 'a note that is not a coverage check is not a syllabus mismatch');
+
+  // A coverage check quoting a table row is shown as the date plus a short, clean quote: no empty cells, no half cell at the start.
+  const tableNote = '原文有「…ces in HKUST (1) & (2) | | | 3 Sep 14 – Sep 18 | Module 2: Acade…」，但結果裡找不到 3 Sep 這個日期，請核對是否漏了截止日或考試。';
+  assert.deepEqual(sourceLine(tableNote), { date: '3 Sep', text: '3 Sep 14 – Sep 18 · Module 2: Acade…' });
+  const many = [tableNote, tableNote, '另外還有 7 處原文的比重或日期在結果裡找不到。'];
+  const src = report({ items: [], notes: many, weightTotal: 100 }).find((g) => g.kind === 'source');
+  assert.deepEqual([src.lines.length, src.n, src.lines[0].times], [2, 8, 2], '"7 more" counts as 7; a repeated note is shown once');
+  assert.equal(checklist({ items: [], notes: many, weightTotal: 100 }).at(-1).text, '8 to check', 'the syllabus row and the report group give the same number');
+
+  // An item that needs filling in and has no time says both on one line, not again under dates.
+  const both = report({ items: [{ ...found.items[1], scope: '', confidence: 'high' }], notes: [], weightTotal: 100 });
+  assert.deepEqual(both.map((g) => g.kind), ['fill'], 'the midterm is listed once');
+  assert.ok(both[0].lines[0].hint.includes('09:00'), 'the missing time is on the same line');
 }
 {
   // The AI estimate comes from the course material, not from the type: a 10-question library quiz is 1 hour, not the 3-hour quiz default.
