@@ -68,7 +68,7 @@ const option = {
   changes: [
     { kind: 'sleep', night: '2026-11-04', start: 90, reason: { code: 'late_sleep', minutes: 60 } },
     { kind: 'estimate', task: 't2', step: 't2-1', min: 45, reason: { code: 'simplify', from: 60 } },
-    { kind: 'add', task: 't2', step: 't2-1', date: '2026-11-04', start: 900, end: 945, reason: { code: 'earliest_before_due', due: { date: '2026-11-08', min: 600 } } },
+    { kind: 'add', task: 't2', step: 't2-1', date: '2026-11-04', start: 900, end: 945, reason: { code: 'spread_before_due', due: { date: '2026-11-08', min: 600 } } },
   ],
   short: [],
 };
@@ -77,6 +77,7 @@ assert.deepEqual(prop.changes.map((c) => c.kind), ['sleep', 'estimate', 'add']);
 const add = prop.changes[2];
 assert.deepEqual([add.block.task, add.block.step, add.block.date, add.block.start, add.block.end], ['t2', 't2-1', '2026-11-04', 900, 945], 'an add becomes a block the timetable can draw');
 assert.ok(add.block.id && add.block.reason, 'with an id and a reason in the current language');
+assert.match(add.block.reason, /a bit each day|每天一點/, 'the reason says the work is spread over days');
 assert.deepEqual([prop.changes[1].step, prop.changes[1].min], ['t2-1', 45]);
 
 /* ---------- plan card ---------- */
