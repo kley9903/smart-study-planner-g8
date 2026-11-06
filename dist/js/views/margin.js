@@ -212,7 +212,7 @@ function composer(mine = false) {
     <form class="composer" data-form="say">
       ${chips.length ? `<div class="suggest"><span class="suggest__label">${L('試試：', 'Try:')}</span>${chips.map((c) => `<button class="suggest__chip" type="button" data-action="scenario" data-id="${c.id}">${esc(c.text)}</button>`).join('')}</div>` : ''}
       <div class="composer__box">
-        <label class="sr-only" for="say-input">${L('寫給 AI 助手', 'Message the AI assistant')}</label>
+        <label class="sr-only" for="say-input">${mine ? L('寫給小秘書', 'Message Little Secretary') : L('寫給 AI 助手', 'Message the AI assistant')}</label>
         <textarea id="say-input" name="text" rows="1" placeholder="${L('例如：明天要幫家人搬屋', 'e.g. Helping my family move tomorrow')}" data-draft>${esc(ui.draft)}</textarea>
         <button class="composer__send" type="submit" aria-label="${L('送出', 'Send')}">${icon('send')}</button>
       </div>
