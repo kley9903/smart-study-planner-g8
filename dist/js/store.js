@@ -370,6 +370,37 @@ export function setProgress(stepId, progress) {
   emit({ toast: L(`已記錄：${task.short} ${step.title} · ${progressLabel(progress)}`, `Saved: ${task.short} ${step.title} · ${progressLabel(progress)}`), keepScroll: true });
 }
 
+/** 待確認的建議若碰到這些時段就作廢（避免建議指向已不存在的時段）。 */
+function dropProposalTouching(ids) {
+  const p = pendingProposal(state);
+  if (p && p.changes.some((c) => ids.has(c.block) || ids.has(c.block?.id))) { p.status = 'erased'; state.proposal = null; }
+}
+
+/** 從時間表移除一段：只拿走時段，功課和進度不動；這一部分會回到「未排」。 */
+export function removeBlock(id) {
+  const b = state.blocks.find((x) => x.id === id);
+  if (!b) return;
+  dropProposalTouching(new Set([id]));
+  state.blocks = state.blocks.filter((x) => x !== b);
+  emit({ toast: L('已從時間表移除，功課還在', 'Removed from the schedule; the task is kept'), toastIcon: 'x', keepScroll: true });
+}
+
+/** 還沒開始的讀書時段（今天稍後和之後的日子）。 */
+export function upcomingBlocks(s = state) {
+  return s.blocks.filter((b) => b.date > s.today || (b.date === s.today && b.start > s.now));
+}
+
+/** 一鍵清空排程：拿走所有還沒開始的時段；已過去或進行中的保留，功課不動。回傳清走的段數。 */
+export function clearSchedule() {
+  const s = getState();
+  const gone = new Set(upcomingBlocks(s).map((b) => b.id));
+  if (!gone.size) return 0;
+  dropProposalTouching(gone);
+  state.blocks = state.blocks.filter((b) => !gone.has(b.id));
+  emit({ toast: L(`已清空 ${gone.size} 段排程，功課還在`, `Cleared ${gone.size} session${gone.size === 1 ? '' : 's'}; tasks are kept`), toastIcon: 'x', keepScroll: true });
+  return gone.size;
+}
+
 /* ---------------- 預計時數 ---------------- */
 export function adjustStep(stepId, delta) {
   const { step } = stepOf(state, stepId);

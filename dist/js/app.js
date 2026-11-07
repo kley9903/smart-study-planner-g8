@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, editTaskBasics, addCourseTask, setTaskGroup, partsOf,
+  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, editTaskBasics, addCourseTask, setTaskGroup, partsOf, removeBlock, clearSchedule, upcomingBlocks,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
 import { readIcs, canvasFound, ICS_MAX_MB } from './canvas.js';
@@ -430,6 +430,11 @@ const actions = {
   'sleep-edit': (el) => { ui.sleepEdit = el.dataset.on === '1'; render(); },
   'sleep-save': () => setSleep(Number($('#sleep-start').value), Number($('#sleep-end').value)),
   'remove-rule': (el) => { closePopover(); removeRule(el.dataset.rule); },
+  'block-remove': (el) => { closePopover(); removeBlock(el.dataset.block); },
+  'clear-plan': () => {
+    const n = upcomingBlocks(getState()).length;
+    if (n && window.confirm(L(`清空 ${n} 段還沒開始的排程？功課不會刪除，之後可以再按「自動排程」。`, `Clear ${n} upcoming session${n === 1 ? '' : 's'}? Tasks are kept; you can auto-schedule again.`))) clearSchedule();
+  },
   doc: (el) => { ui.docId = el.dataset.doc; ui.editItem = null; render(); },
   'open-doc': (el) => { ui.docId = el.dataset.doc; },
   'doc-remove': (el) => {
