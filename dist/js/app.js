@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, editTaskBasics, addCourseTask, setTaskGroup, partsOf, removeBlock, clearSchedule, upcomingBlocks,
+  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, editTaskBasics, addCourseTask, setTaskGroup, partsOf, editUndated, deleteUndated, removeBlock, clearSchedule, upcomingBlocks,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
 import { readIcs, canvasFound, ICS_MAX_MB } from './canvas.js';
@@ -553,6 +553,9 @@ const actions = {
     const t = taskOf(getState(), el.dataset.task);
     if (t && window.confirm(L(`刪除「${t.title}」和它已排的讀書時段？`, `Delete "${t.title}" and its scheduled sessions?`))) deleteTask(t.id);
   },
+  'course-undated-delete': (el) => {
+    if (window.confirm(L(`刪除「${el.dataset.title}」？`, `Delete "${el.dataset.title}"?`))) deleteUndated(el.dataset.ref);
+  },
   'course-row-new': (el) => {
     ui.newRow = el.dataset.course;
     ui.editRow = null;
@@ -858,6 +861,9 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+/** 時間格 "HH:MM" → 分鐘；空白或看不懂回傳 null。 */
+const minOf = (v) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(v || '').trim()); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+
 document.addEventListener('submit', (e) => {
   if (e.target.matches('[data-form="task"], [data-form="edit-task"]')) {
     e.preventDefault();
@@ -910,11 +916,16 @@ document.addEventListener('submit', (e) => {
   if (e.target.matches('[data-form="course-new"]')) {
     e.preventDefault();
     const f = new FormData(e.target);
-    const [h, m] = String(f.get('time') || '').split(':').map(Number);
     addCourseTask(e.target.dataset.course, {
-      title: String(f.get('title')), group: String(f.get('group')), date: String(f.get('date')), min: h * 60 + m,
-      weight: String(f.get('weight') || ''), hours: Number(f.get('hours')),
+      title: String(f.get('title')), group: String(f.get('group')), date: String(f.get('date') || '').trim(), min: minOf(f.get('time')),
+      weight: String(f.get('weight') || ''), hours: String(f.get('hours') || '').trim() ? Number(f.get('hours')) : null,
     });
+    return;
+  }
+  if (e.target.matches('[data-form="course-undated"]')) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    editUndated(e.target.dataset.ref, { title: String(f.get('title')), date: String(f.get('date') || '').trim(), min: minOf(f.get('time')), weight: String(f.get('weight') || '') });
     return;
   }
   if (e.target.matches('[data-form="course-row"]')) {
