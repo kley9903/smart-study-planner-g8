@@ -902,7 +902,10 @@ export async function requestPlans(request = '') {
   return aiRequests.send('plan', { state: sent, request }, (out) => {
     ui.planning = false;
     if (!out?.ok || !out.result?.plans?.length) {
-      ui.planError = out?.reason === 'invalid'
+      // 有回應但一份方案都沒有：截止前的空檔不夠，不是連不上
+      ui.planError = out?.ok
+        ? L('截止前的空檔不夠，排不下還沒排的部分。可以按「清空排程」後再排一次，或改沒空的時間。', 'There is not enough free time before the deadlines for the unscheduled parts. Try "Clear schedule" and plan again, or edit your busy times.')
+        : out?.reason === 'invalid'
         ? L('現在沒有可以排的功課：可能都已排好，或還缺截止日期。', 'Nothing to schedule right now: everything may already be planned, or due dates are missing.')
         : L('AI 暫時連不上，請稍後再試。', 'The AI cannot be reached right now. Please try again later.');
       emit({ keepScroll: true });

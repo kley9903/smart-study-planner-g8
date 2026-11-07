@@ -139,4 +139,10 @@ await store.requestPlans();
 assert.equal(store.ui.planOptions, null);
 assert.match(store.ui.planError, /.+/, 'a failure is shown, nothing is scheduled');
 
+globalThis.fetch = async () => Response.json({ ok: true, result: { capacity: { need_min: 2160, free_min: 4170, enough: false }, skipped: [], plans: [] } });
+await store.requestPlans();
+assert.equal(store.ui.planOptions, null);
+assert.doesNotMatch(store.ui.planError, /連不上|cannot be reached/, 'no plans is not reported as a connection problem');
+assert.match(store.ui.planError, /空檔不夠|not enough free time/);
+
 console.log('Passed: planning relay, workflow input, plan options as proposals and cards, asking for and confirming plans.');
