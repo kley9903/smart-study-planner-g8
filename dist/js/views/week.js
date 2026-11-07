@@ -1,6 +1,6 @@
 // 本週：示範導覽、未來 7 日的具體時間表、「下一段」、接下來的 deadline。AI 助手在每頁右下角（views/dock.js）。
 import { esc, icon } from '../ui.js';
-import { ui, canRun, getMode } from '../store.js';
+import { ui, canRun, getMode, upcomingBlocks } from '../store.js';
 import { renderPlanner } from '../planner.js';
 import { HERO } from '../scenarios.js';
 import {
@@ -144,6 +144,7 @@ function head(s, dates, editing) {
           ? `<button class="wk-bar__btn is-on" type="button" data-action="busy-edit" data-on="0" aria-pressed="true">${icon('check')} ${L('完成', 'Done')}</button>`
           : `${mine ? `<a class="wk-bar__btn" href="#/add-task">${icon('plus')} ${L('新增功課', 'Add task')}</a>` : ''}
         ${canPlan ? `<button class="wk-bar__btn is-main" type="button" data-action="auto-plan">${icon('clock')} ${left.length ? L('自動排程', 'Auto-schedule') : L('重新排程', 'Replan')}</button>` : ''}
+        ${canPlan && upcomingBlocks(s).length ? `<button class="wk-bar__btn" type="button" data-action="clear-plan">${icon('trash')} ${L('清空排程', 'Clear schedule')}</button>` : ''}
         <button class="wk-bar__btn" type="button" data-action="toggle-gaps" aria-pressed="${ui.showGaps}">${icon('eye')} ${L('空檔', 'Free time')}</button>
         <button class="wk-bar__btn" type="button" data-action="busy-edit" data-on="1" aria-pressed="false">${icon('hatch')} ${L('改沒空的時間', 'Edit busy times')}</button>`}
       </div>

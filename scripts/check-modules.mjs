@@ -10,7 +10,7 @@ const { createMascot, TIMING } = await import('../dist/js/mascot.js');
 const { blockPopover, hatchPopover, busyForm } = await import('../dist/js/views/popovers.js');
 const { snap, paintRange } = await import('../dist/js/busy-paint.js');
 const { keepFile, fits, LIMIT_MB } = await import('../dist/js/attachments.js');
-const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, renameCourse, setTaskGroup, addCourseTask, deleteTask, partsOf, ui } = await import('../dist/js/store.js');
+const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, renameCourse, setTaskGroup, addCourseTask, deleteTask, partsOf, removeBlock, clearSchedule, upcomingBlocks, ui } = await import('../dist/js/store.js');
 const { toItems, mergeFound, rowText, report, checklist, sourceLine, parseDays, parseWhen, readSyllabus } = await import('../dist/js/syllabus-ai.js');
 const { setLang } = await import('../dist/js/i18n.js');
 const { onRequestPost } = await import('../functions/api/syllabus.js');
@@ -494,6 +494,25 @@ inkAllItems('doc-10');
   deleteTask(mid.id);
   assert.equal(mine.tasks.length, n);
   assert.equal(ui.editRow, null, 'deleting from the row form closes it');
+}
+{
+  // Removing one session, then clearing the schedule: tasks stay, past sessions stay.
+  const t = mine.tasks[0];
+  const n = mine.tasks.length;
+  const keep = mine.blocks.length;
+  const mk = (id, date, start) => ({ id, task: t.id, step: t.steps[0].id, date, start, end: start + 60, reason: '' });
+  mine.blocks.push(mk('zz-past', '2000-01-01', 600), mk('zz-a', '2099-01-01', 600), mk('zz-b', '2099-01-02', 600));
+  removeBlock('zz-a');
+  assert.ok(!mine.blocks.some((b) => b.id === 'zz-a'), 'one session is removed');
+  assert.equal(mine.tasks.length, n, 'removing a session keeps the task');
+  assert.ok(upcomingBlocks(mine).some((b) => b.id === 'zz-b'));
+  assert.ok(clearSchedule() >= 1);
+  assert.equal(upcomingBlocks(mine).length, 0, 'nothing upcoming is left');
+  assert.ok(mine.blocks.some((b) => b.id === 'zz-past'), 'past sessions are kept');
+  assert.equal(mine.tasks.length, n, 'clearing keeps every task');
+  assert.equal(clearSchedule(), 0, 'clearing an empty schedule does nothing');
+  mine.blocks = mine.blocks.filter((b) => b.id !== 'zz-past');
+  assert.ok(mine.blocks.length <= keep);
 }
 assert.equal(Object.values(mine.courses).find((c) => c.name === 'CHEM1001').ink, math.ink, 'a new course takes the freed colour instead of repeating one in use');
 

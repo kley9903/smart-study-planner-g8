@@ -2,6 +2,7 @@
 // 全部只由資料算出 HTML，不碰 DOM；app.js 負責在按到的元素旁邊打開（openPopover）。
 import { timeField, dateField } from '../pickers.js';
 import { L } from '../i18n.js';
+import { getMode } from '../store.js';
 import { esc, icon } from '../ui.js';
 import { blockOf, stepOf, taskOf, overlay, pendingProposal, courseOf, inkOf } from '../model.js';
 import { dayLabel, span, hoursText, hm, wdName, dayShort, md } from '../time.js';
@@ -59,7 +60,7 @@ export function blockPopover(s, blockId) {
         </div>
         <p class="muted" style="font-size:12.5px;margin-top:8px">${step.progress === 'doing' && step.remain ? L(`你回報還差 ${hoursText(step.remain)}。`, `You reported ${hoursText(step.remain)} left. `) : ''}</p>
       </div>
-      <div class="pop__actions"><a class="btn btn--sm" href="#/tasks/${task.id}">${icon('list')} ${L('在任務頁查看', 'Open in Tasks')}</a></div>`;
+      <div class="pop__actions"><a class="btn btn--sm" href="#/tasks/${task.id}">${icon('list')} ${L('在任務頁查看', 'Open in Tasks')}</a>${getMode() === 'mine' && !p ? `<button class="btn btn--sm btn--ghost" type="button" data-action="block-remove" data-block="${b.id}">${icon('trash')} ${L('移除', 'Remove')}</button>` : ''}</div>`;
   } else {
     html += `
       <div class="pop__section"><p style="font-size:13.5px;color:var(--ink-2)">${variant === 'pencil' ? L('這是建議的時段，還未確認。', 'This is a suggested session, not confirmed yet.') : esc(ghostText(b, p))}</p></div>
