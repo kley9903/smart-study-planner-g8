@@ -12,7 +12,8 @@ export function toState(s) {
   return {
     now: { date: s.today, min: s.now },
     horizon_days: HORIZON_DAYS,
-    tasks: s.tasks.map((t) => ({
+    // 截止已過的不送：排程程式會因為排不進過去而整份回零個方案
+    tasks: s.tasks.filter((t) => t.due.date > s.today || (t.due.date === s.today && t.due.min > s.now)).map((t) => ({
       id: t.id, title: t.title, kind: t.kind, due: { ...t.due }, weight_percent: pct(t.weight), difficulty: t.difficulty || 'mid',
       steps: t.steps.filter((st) => !st.dropped).map((st) => {
         const progress = PROGRESS[st.progress] || 'todo';

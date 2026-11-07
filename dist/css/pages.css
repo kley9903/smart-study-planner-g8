@@ -1127,7 +1127,6 @@ a.crow:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; }
 .crow.is-past { opacity: 0.55; }
 .crow.is-past:hover { opacity: 0.85; }
 .crow.is-undated .crow__due { color: var(--sepia-3); }
-.crow.is-undated { padding-right: 74px; } /* 沒有鉛筆和垃圾桶，留同樣寬度，比重和上面對齊 */
 
 /* 移到另一組：拖動時原位變淡，可以放的那一組出現虛線框；空的那一組平時不顯示，拖動時才出現 */
 a.crow { -webkit-touch-callout: none; }
@@ -1209,7 +1208,7 @@ a.crow.is-dragged { opacity: 0.35; }
 
 /* 每項右邊一枝小鉛筆：平時很淡，滑過那一行才變清楚；手機（不能滑過）一直看得到 */
 .crows li:has(> .crow__edit) { display: flex; align-items: center; }
-.crows li > a.crow { flex: 1; min-width: 0; }
+.crows li > .crow { flex: 1; min-width: 0; }
 .crow__edit {
   flex: none; width: 32px; height: 32px; margin-left: 2px; display: grid; place-items: center; border: 0; border-radius: 8px;
   background: none; color: var(--sepia-3); cursor: pointer; opacity: 0.35; transition: opacity 0.15s, background 0.15s, color 0.15s;
@@ -1303,7 +1302,6 @@ a.crow.is-dragged { opacity: 0.35; }
   .crow__due.is-zh, .crow__due.is-en { display: flex; column-gap: 0.4em; }
   .crow__when:empty { display: none; }
   .crow__when { margin-right: 0.3em; }
-  .crow.is-undated { padding-right: 72px; }
   .crow__weight { grid-area: weight; min-width: 36px; font-size: 16px; }
   .course__foot { flex-direction: column; align-items: stretch; }
   .course__actions { flex-direction: column; align-items: stretch; gap: 4px; }

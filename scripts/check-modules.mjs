@@ -10,7 +10,7 @@ const { createMascot, TIMING } = await import('../dist/js/mascot.js');
 const { blockPopover, hatchPopover, busyForm } = await import('../dist/js/views/popovers.js');
 const { snap, paintRange } = await import('../dist/js/busy-paint.js');
 const { keepFile, fits, LIMIT_MB } = await import('../dist/js/attachments.js');
-const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, renameCourse, setTaskGroup, addCourseTask, deleteTask, partsOf, removeBlock, clearSchedule, upcomingBlocks, ui } = await import('../dist/js/store.js');
+const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, renameCourse, setTaskGroup, addCourseTask, deleteTask, partsOf, undatedOf, editUndated, deleteUndated, removeBlock, clearSchedule, upcomingBlocks, ui } = await import('../dist/js/store.js');
 const { toItems, mergeFound, rowText, report, checklist, sourceLine, parseDays, parseWhen, readSyllabus } = await import('../dist/js/syllabus-ai.js');
 const { setLang } = await import('../dist/js/i18n.js');
 const { onRequestPost } = await import('../functions/api/syllabus.js');
@@ -477,7 +477,7 @@ inkAllItems('doc-10');
   const chem = Object.values(mine.courses).find((c) => c.name === 'CHEM1001');
   const n = mine.tasks.length;
   assert.equal(addCourseTask(chem.id, { title: ' ', group: 'work', date: '2099-01-10', min: 1439, hours: 2 }), false, 'a blank name is refused');
-  assert.equal(addCourseTask(chem.id, { title: 'Lab 2', group: 'work', date: '', min: 1439, hours: 2 }), false, 'a missing date is refused');
+  assert.equal(addCourseTask(chem.id, { title: 'Lab 2', group: 'work', date: 'soon', min: 1439, hours: 2 }), false, 'a badly written date is refused');
   assert.equal(addCourseTask(chem.id, { title: 'Lab 2', group: 'work', date: '2099-01-10', min: 1439, hours: 0 }), false, 'zero hours is refused');
   assert.equal(mine.tasks.length, n);
   ui.newRow = chem.id;
@@ -494,6 +494,30 @@ inkAllItems('doc-10');
   deleteTask(mid.id);
   assert.equal(mine.tasks.length, n);
   assert.equal(ui.editRow, null, 'deleting from the row form closes it');
+}
+{
+  // Items without a date: kept on the course card only, never scheduled; adding a date turns them into tasks.
+  const chem = Object.values(mine.courses).find((c) => c.name === 'CHEM1001');
+  const n = mine.tasks.length;
+  assert.equal(addCourseTask(chem.id, { title: 'Final project', group: 'work', date: '', min: null, weight: '', hours: null }), true, 'only the name is required');
+  assert.equal(mine.tasks.length, n, 'no date means no task to schedule');
+  const u = undatedOf(mine, chem.id).find((x) => x.title === 'Final project');
+  assert.deepEqual([u.group, u.weight], ['work', '']);
+  editUndated(u.ref, { title: 'Final project report', date: '', min: null, weight: '30%' });
+  assert.deepEqual(undatedOf(mine, chem.id).filter((x) => x.ref === u.ref).map((x) => [x.title, x.weight]), [['Final project report', '30%']], 'name and weight can change without a date');
+  assert.equal(editUndated(u.ref, { title: 'Final project report', date: '2099-02-01', min: null, weight: '30%' }), true);
+  const made = mine.tasks.at(-1);
+  assert.deepEqual([mine.tasks.length, made.title, made.due, made.weight, made.course], [n + 1, 'Final project report', { date: '2099-02-01', min: 1439 }, '30%', chem.id], 'adding a date makes it a task, 23:59 when no time');
+  assert.ok(!undatedOf(mine, chem.id).some((x) => x.ref === u.ref), 'it leaves the undated list');
+  deleteTask(made.id);
+  addCourseTask(chem.id, { title: 'Quiz 9', group: 'exam', date: '2099-02-03', min: null, hours: null });
+  const q = mine.tasks.at(-1);
+  assert.deepEqual([q.kind, q.due.min, q.steps.reduce((m, st) => m + st.min, 0)], ['Quiz', 1439, 180], 'a blank time is 23:59 and blank hours use the default for the type');
+  deleteTask(q.id);
+  addCourseTask(chem.id, { title: 'Essay', group: 'work', date: '', min: null, hours: null });
+  const e = undatedOf(mine, chem.id).find((x) => x.title === 'Essay');
+  deleteUndated(e.ref);
+  assert.ok(!undatedOf(mine, chem.id).some((x) => x.title === 'Essay'), 'an undated item can be deleted');
 }
 {
   // Removing one session, then clearing the schedule: tasks stay, past sessions stay.

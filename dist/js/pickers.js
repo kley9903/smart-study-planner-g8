@@ -12,22 +12,23 @@ import { getState } from './store.js';
 const pad = (n) => String(n).padStart(2, '0');
 const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-function field(kind, name, value, cls, extra, btnIcon, btnLabel) {
-  return `<span class="pick pick--${kind}"><input class="${cls}" type="text" name="${name}" value="${esc(value)}" required autocomplete="off" spellcheck="false" data-pick="${kind}" ${extra}><button class="pick__btn" type="button" aria-label="${btnLabel}" aria-expanded="false" aria-haspopup="dialog">${icon(btnIcon)}</button></span>`;
+function field(kind, name, value, cls, extra, btnIcon, btnLabel, optional = false) {
+  return `<span class="pick pick--${kind}"><input class="${cls}" type="text" name="${name}" value="${esc(value)}" ${optional ? '' : 'required'} autocomplete="off" spellcheck="false" data-pick="${kind}" ${extra}><button class="pick__btn" type="button" aria-label="${btnLabel}" aria-expanded="false" aria-haspopup="dialog">${icon(btnIcon)}</button></span>`;
 }
 
 /** 時間格。value 是 "HH:MM"；cls 是文字格自己的 class（例如 input）。 */
-export function timeField(name, value, cls = '') {
+/** optional：可以留空（不加 required）。 */
+export function timeField(name, value, cls = '', optional = false) {
   return field('time', name, value, cls,
     `inputmode="numeric" maxlength="5" pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]" placeholder="HH:MM"`,
-    'clock', L('選時間', 'Pick a time'));
+    'clock', L('選時間', 'Pick a time'), optional);
 }
 
 /** 日期格。value 是 "YYYY-MM-DD"。 */
-export function dateField(name, value, cls = '') {
+export function dateField(name, value, cls = '', optional = false) {
   return field('date', name, value, cls,
     `inputmode="numeric" maxlength="10" pattern="\\d{4}-\\d{2}-\\d{2}" placeholder="YYYY-MM-DD"`,
-    'calendar', L('選日期', 'Pick a date'));
+    'calendar', L('選日期', 'Pick a date'), optional);
 }
 
 /** 打字時常見的寫法整理成 HH:MM：930 → 09:30、7 → 07:00、23：59 → 23:59。認不出就原樣不動。 */

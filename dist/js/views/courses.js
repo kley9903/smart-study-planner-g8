@@ -3,13 +3,15 @@
 // 上課時間不收：這個網站只幫你安排溫習和做功課的時間。
 // 版面照使用者給的參考圖：暖色紙卡，左上角斜貼科目色紙膠帶，卡頭大號代號、右邊淡淡的浮水印（見 mark）；
 // 卡裡全用襯線字，科目色用在代號、小標題、箭咀和「補充資訊」按鈕。
-// 展開後以小標題（測驗和考試、功課、日期未公布）分組，類型只寫在小標題；每項一行：名稱｜日期時間｜比重，
+// 展開後以小標題（測驗和考試、功課）分組，類型只寫在小標題；每項一行：名稱｜日期時間｜比重。
+// 沒有日期的（自己加時留空、或大綱寫日期未公布）放在同一組最後，日期一格空白，不排進時間表；用鉛筆補日期才變成任務。
+//
 // 7 天內到期用朱紅標出，已過的變淡。
 // 每項右邊一枝小鉛筆和一個垃圾桶：鉛筆原地改名稱、截止日期時間、比重（rowForm，只用 ✓ ✕ 符號按鈕）；垃圾桶確認後刪除；改名時卡頭原地變輸入格，字型跟平時一樣（renameForm）。
 // 卡底「新增一項」：原地多一行輸入格，自己加功課、測驗或考試（newForm）。
 import { timeField, dateField } from '../pickers.js';
 import { esc, icon } from '../ui.js';
-import { ui } from '../store.js';
+import { ui, undatedOf } from '../store.js';
 import { L } from '../i18n.js';
 import { mdNum, wd, hm } from '../time.js';
 
@@ -64,8 +66,9 @@ function courseCard(s, c) {
   const tasks = s.tasks.filter((t) => t.course === c.id).sort((a, b) => due(a).localeCompare(due(b)));
   const exams = tasks.filter((t) => groupOf(t) === 'exam');
   const work = tasks.filter((t) => groupOf(t) === 'work');
-  const undated = s.docs.filter((d) => d.own && d.course === c.id).flatMap((d) => d.items)
-    .filter((i) => i.state === 'ink' && i.applied !== 'dup' && !i.filled && i.plan?.kind === 'task' && !i.plan.date);
+  const undated = undatedOf(s, c.id);
+  const undatedIn = (key) => undated.filter((u) => (u.group || groupOf({ kind: u.kind, title: u.title })) === key);
+  const any = tasks.length + undated.length;
   const id = `course-${c.id}`;
   const wm = mark(c.name);
   return `
@@ -81,20 +84,10 @@ function courseCard(s, c) {
       </button>`}
       ${open ? `
       <div class="course__body" id="${id}">
-        ${group(s, c, 'exam', L('測驗和考試', 'Quizzes and exams'), exams, tasks.length)}
-        ${group(s, c, 'work', L('功課', 'Assignments'), work, tasks.length)}
-        ${undated.length ? `
-        <div class="course__group">
-          <h3>${L('日期未公布', 'Date not announced')} <span>${undated.length}</span></h3>
-          <ul class="crows ${undated.some((i) => i.weight) ? 'crows--weights' : ''}">${undated.map((i) => `
-            <li><div class="crow is-undated">
-              <span class="crow__title">${esc(i.what)}</span>
-              <span class="crow__due">${L('待公布', 'TBA')}</span>
-              <span class="crow__weight">${esc(i.weight || '')}</span>
-            </div></li>`).join('')}</ul>
-        </div>` : ''}
-        ${ui.newRow === c.id ? newForm(s) : ''}
-        ${!tasks.length && !undated.length && ui.newRow !== c.id ? `<p class="course__empty">${L('這科還沒有已確認的測驗、考試或功課。', 'Nothing confirmed for this course yet.')}</p>` : ''}
+        ${group(s, c, 'exam', L('測驗和考試', 'Quizzes and exams'), exams, undatedIn('exam'), any)}
+        ${group(s, c, 'work', L('功課', 'Assignments'), work, undatedIn('work'), any)}
+        ${ui.newRow === c.id ? newForm() : ''}
+        ${!any && ui.newRow !== c.id ? `<p class="course__empty">${L('這科還沒有已確認的測驗、考試或功課。', 'Nothing confirmed for this course yet.')}</p>` : ''}
         <footer class="course__foot">
           <div class="course__actions">
             <button class="course__more" type="button" data-action="course-row-new" data-course="${c.id}">${icon('plus')} ${L('新增一項', 'Add an item')}</button>
@@ -126,12 +119,12 @@ function renameForm(c) {
 }
 
 /** 卡上直接改一項：名稱｜日期｜時間｜比重，原地換成輸入格。Enter 保存，Esc 取消。 */
-function rowForm(t) {
+function rowForm(t, ref = '') {
   return `
-            <li><form class="crow-edit" data-form="course-row" data-task="${t.id}">
+            <li><form class="crow-edit" data-form="${ref ? 'course-undated' : 'course-row'}" ${ref ? `data-ref="${esc(ref)}"` : `data-task="${t.id}"`}>
               <label class="crow-edit__title"><span>${L('名稱', 'Name')}</span><input name="title" value="${esc(t.title)}" maxlength="80" required autocomplete="off"></label>
-              <label class="crow-edit__date"><span>${L('截止日期', 'Due date')}</span>${dateField('date', t.due.date)}</label>
-              <label class="crow-edit__time"><span>${L('時間', 'Time')}</span>${timeField('time', hm(t.due.min))}</label>
+              <label class="crow-edit__date"><span>${L('截止日期', 'Due date')}</span>${dateField('date', t.due?.date || '', '', !!ref)}</label>
+              <label class="crow-edit__time"><span>${L('時間', 'Time')}</span>${timeField('time', t.due ? hm(t.due.min) : '', '', !!ref)}</label>
               <label class="crow-edit__weight"><span>${L('比重', 'Weight')}</span><input name="weight" value="${esc(t.weight || '')}" maxlength="20" placeholder="${L('例如 20%', 'e.g. 20%')}" autocomplete="off"></label>
               <div class="crow-edit__actions">
                 <button class="course__save is-icon" type="submit" aria-label="${L('保存', 'Save')}">${icon('check')}</button>
@@ -140,10 +133,8 @@ function rowForm(t) {
             </form></li>`;
 }
 
-/** 卡上新增一項：名稱｜類型，下一行截止日期｜時間｜比重｜預計時數｜保存 取消。日期預設一週後 23:59。 */
-function newForm(s) {
-  const d = new Date(`${s.today}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 7);
+/** 卡上新增一項：名稱｜類型，下一行截止日期｜時間｜比重｜預計時數｜加入 取消。只有名稱必填；日期留空就不排進時間表。 */
+function newForm() {
   return `
         <form class="crow-edit crow-edit--new" data-form="course-new" data-course="${ui.newRow}">
           <label class="crow-edit__title"><span>${L('名稱', 'Name')}</span><input name="title" maxlength="80" required autocomplete="off"></label>
@@ -151,10 +142,10 @@ function newForm(s) {
             <option value="work">${L('功課', 'Assignment')}</option>
             <option value="exam">${L('測驗或考試', 'Quiz or exam')}</option>
           </select></label>
-          <label class="crow-edit__date"><span>${L('截止日期', 'Due date')}</span>${dateField('date', d.toISOString().slice(0, 10))}</label>
-          <label class="crow-edit__time"><span>${L('時間', 'Time')}</span>${timeField('time', '23:59')}</label>
+          <label class="crow-edit__date"><span>${L('截止日期', 'Due date')}</span>${dateField('date', '', '', true)}</label>
+          <label class="crow-edit__time"><span>${L('時間', 'Time')}</span>${timeField('time', '', '', true)}</label>
           <label class="crow-edit__weight"><span>${L('比重', 'Weight')}</span><input name="weight" maxlength="20" placeholder="${L('例如 20%', 'e.g. 20%')}" autocomplete="off"></label>
-          <label class="crow-edit__hours"><span>${L('預計時數', 'Hours')}</span><input name="hours" type="number" min="0.5" max="200" step="0.5" value="2" required></label>
+          <label class="crow-edit__hours"><span>${L('預計時數', 'Hours')}</span><input name="hours" type="number" min="0.5" max="200" step="0.5"></label>
           <div class="crow-edit__actions">
             <button class="course__save" type="submit">${icon('check')} ${L('加入', 'Add')}</button>
             <button class="course__cancel is-icon" type="button" data-action="course-row-new-cancel" aria-label="${L('取消', 'Cancel')}">${icon('x')}</button>
@@ -166,12 +157,13 @@ function newForm(s) {
  * 一組（測驗和考試／功課）。電腦上可以把一項拖到另一組（改它的類型），手機上長按選「移到…」。
  * 這科有任務但這一組是空的時候，先畫一個隱藏的空組，拖動時才出現，讓你放進去。
  */
-function group(s, c, key, title, tasks, any) {
-  if (!tasks.length && !any) return '';
+function group(s, c, key, title, tasks, undated, any) {
+  const n = tasks.length + undated.length;
+  if (!n && !any) return '';
   return `
-        <div class="course__group ${tasks.length ? '' : 'is-empty'}" data-group="${key}" data-course="${c.id}">
-          <h3>${title} <span>${tasks.length}</span></h3>
-          ${tasks.length ? `<ul class="crows ${tasks.some((t) => t.weight) ? 'crows--weights' : ''}">${tasks.map((t) => row(s, t)).join('')}</ul>`
+        <div class="course__group ${n ? '' : 'is-empty'}" data-group="${key}" data-course="${c.id}">
+          <h3>${title} <span>${n}</span></h3>
+          ${n ? `<ul class="crows ${[...tasks, ...undated].some((t) => t.weight) ? 'crows--weights' : ''}">${tasks.map((t) => row(s, t)).join('')}${undated.map(undatedRow).join('')}</ul>`
             : `<p class="course__drop">${L('放到這裡', 'Drop here')}</p>`}
         </div>`;
 }
@@ -197,4 +189,15 @@ function row(s, t) {
               ${due4(when, t)}
               <span class="crow__weight">${esc(t.weight || '')}</span>
             </a><button class="crow__edit" type="button" data-action="course-row-edit" data-task="${t.id}" aria-label="${L(`修改「${esc(t.title)}」`, `Edit "${esc(t.title)}"`)}">${icon('pencil')}</button><button class="crow__edit crow__del" type="button" data-action="course-row-delete" data-task="${t.id}" aria-label="${L(`刪除「${esc(t.title)}」`, `Delete "${esc(t.title)}"`)}">${icon('trash')}</button></li>`;
+}
+
+/** 沒有日期的一項：日期一格空白，不排進時間表。鉛筆補日期（補了就變成任務），垃圾桶刪除。 */
+function undatedRow(u) {
+  if (ui.editRow === u.ref) return rowForm(u, u.ref);
+  return `
+            <li><div class="crow is-undated">
+              <span class="crow__title">${esc(u.title)}</span>
+              <span class="crow__due ${L('is-zh', 'is-en')}"><span class="crow__when"></span></span>
+              <span class="crow__weight">${esc(u.weight || '')}</span>
+            </div><button class="crow__edit" type="button" data-action="course-row-edit" data-task="${esc(u.ref)}" aria-label="${L(`修改「${esc(u.title)}」`, `Edit "${esc(u.title)}"`)}">${icon('pencil')}</button><button class="crow__edit crow__del" type="button" data-action="course-undated-delete" data-ref="${esc(u.ref)}" data-title="${esc(u.title)}" aria-label="${L(`刪除「${esc(u.title)}」`, `Delete "${esc(u.title)}"`)}">${icon('trash')}</button></li>`;
 }

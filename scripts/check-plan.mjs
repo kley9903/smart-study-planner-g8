@@ -59,6 +59,8 @@ assert.deepEqual(input.tasks[0], { id: 't1', title: 'Problem Set 4', kind: 'Assi
 assert.deepEqual([input.tasks[1].weight_percent, input.tasks[1].difficulty], [null, 'mid'], 'unknown weight is null; unknown difficulty is mid');
 assert.deepEqual(input.blocks, [{ id: 'b1', step: 't1-3', date: '2026-11-05', start: 1140, end: 1290 }], 'only blocks from today on');
 assert.deepEqual(input.unavailable, s.unavailable);
+const late = { id: 't0', title: 'Old', short: 'Old', kind: 'Assignment', due: { date: '2026-11-04', min: 600 }, weight: '', steps: [{ id: 't0-1', title: 'All', min: 60, progress: 'todo' }] };
+assert.deepEqual(toState({ ...s, tasks: [late, ...s.tasks] }).tasks.map((t) => t.id), ['t1', 't2'], 'tasks past their deadline are not sent to the planner');
 assert.deepEqual([input.sleep, input.sleep_overrides], [{ start: 30, end: 510 }, [{ night: '2026-11-04', start: 90 }]]);
 
 /* ---------- chosen plan option → proposal ---------- */

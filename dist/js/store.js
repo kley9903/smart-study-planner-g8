@@ -8,7 +8,7 @@ import { blockOf, stepOf, taskOf, pendingProposal, unplannedSteps } from './mode
 import { md, span, dayShort, hoursText } from './time.js';
 import { recall, remember, esc } from './ui.js';
 import { L } from './i18n.js';
-import { parseWhen, parseHours, typeLabel } from './syllabus-ai.js';
+import { parseWhen, parseHours, typeLabel, typeHours } from './syllabus-ai.js';
 import { toState, proposalFrom } from './plan-ai.js';
 import { questionsFor, readDue } from './ask.js';
 import { toContext } from './chat-ai.js';
@@ -654,23 +654,113 @@ export function deleteTask(id) {
   emit({ toast: L(`已刪除「${t.title}」和它的讀書時段`, `Deleted "${t.title}" and its sessions`), toastIcon: 'x', keepScroll: true });
 }
 
+const kindFor = (group, name) => (group === 'exam' ? (/exam|midterm|final|考試/i.test(name) ? L('考試', 'Exam') : L('測驗', 'Quiz')) : L('功課', 'Assignment'));
+const groupKey = (group, name) => (group === 'exam' ? (/exam|midterm|final|考試/i.test(name) ? 'exam' : 'quiz') : 'assignment');
+
 /**
- * 科目卡上直接新增一項：名稱、類型（功課／測驗或考試）、截止日期時間、比重、預計時數。
- * 跟新增功課頁一樣按時數拆成子任務；不跳頁，留在課程資料。成功回傳 true。
+ * 截止日期時間：日期留空 → { none: true }（不排進時間表）；有日期沒時間 → 23:59；寫錯 → null。
+ */
+function readDueFields(date, min) {
+  if (!String(date || '').trim()) return { none: true };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  if (min == null || Number.isNaN(min)) return { date, min: 1439 };
+  return Number.isInteger(min) && min >= 0 && min < 1440 ? { date, min } : null;
+}
+
+/**
+ * 科目卡上直接新增一項：只有名稱必填。日期留空的放在同一組、日期一格空白，不排進時間表，之後用鉛筆補日期才變成任務。
+ * 有日期沒填時數就用這類項目的預設時數。成功回傳 true。
  */
 export function addCourseTask(courseId, { title, group, date, min, weight = '', hours }) {
-  if (!state.courses[courseId]) return false;
+  const course = state.courses[courseId];
+  if (!course) return false;
   const name = String(title || '').trim();
   const bad = (msg) => { emit({ toast: msg, toastIcon: 'alert', keepScroll: true }); return false; };
   if (!name) return bad(L('名稱不能留空', 'Enter a name'));
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !Number.isInteger(min) || min < 0 || min >= 1440) return bad(L('請填寫日期和時間', 'Enter a date and time'));
-  if (!(hours > 0 && hours <= 200)) return bad(L('請填寫預計時數', 'Enter the estimated hours'));
-  const exam = group === 'exam';
-  const kind = exam ? (/exam|midterm|final|考試/i.test(name) ? L('考試', 'Exam') : L('測驗', 'Quiz')) : L('功課', 'Assignment');
-  const { total } = createTask({ title: name, courseId, kind, date, min, hours, weight: String(weight || '').trim().slice(0, 20) });
+  const due = readDueFields(date, min);
+  if (!due) return bad(L('日期或時間寫法不對', 'Check the date and time'));
+  const h = hours == null || hours === '' || Number.isNaN(hours) ? null : Number(hours);
+  if (h != null && !(h > 0 && h <= 200)) return bad(L('預計時數要大過 0', 'Hours must be more than 0'));
+  const w = String(weight || '').trim().slice(0, 20);
+  const grp = group === 'exam' ? 'exam' : 'work';
+  if (due.none) {
+    (course.undated ||= []).push({ id: nid('u'), title: name, group: grp, weight: w, ...(h ? { hours: h } : {}) });
+    ui.newRow = null;
+    emit({ toast: L(`已加入「${name}」（沒有日期，不會排進時間表）`, `Added "${name}" (no date, so it is not scheduled)`), toastIcon: 'check', keepScroll: true });
+    return true;
+  }
+  const { total } = createTask({ title: name, courseId, kind: kindFor(grp, name), date: due.date, min: due.min, hours: h || typeHours(groupKey(grp, name)), weight: w });
   ui.newRow = null;
   emit({ toast: L(`已加入「${name}」，共 ${hoursText(total)}`, `Added "${name}" (${hoursText(total)})`), toastIcon: 'check', keepScroll: true });
   return true;
+}
+
+/**
+ * 科目卡上沒有日期的項目：自己加的（course.undated）和大綱裡日期未公布的（已確認的資料項目）。
+ * ref 是 'm:科目:項目' 或 'd:資料:項目'。回傳 [{ ref, title, group?, kind?, weight }]，group 沒有時由名稱和類型判斷。
+ */
+export function undatedOf(s, courseId) {
+  const own = (s.courses[courseId]?.undated || []).map((u) => ({ ref: `m:${courseId}:${u.id}`, title: u.title, group: u.group, weight: u.weight || '' }));
+  const fromDocs = s.docs.filter((d) => d.own && d.course === courseId).flatMap((d) => d.items
+    .filter((i) => i.state === 'ink' && i.applied !== 'dup' && !i.filled && i.plan?.kind === 'task' && !i.plan.date)
+    .map((i) => ({ ref: `d:${d.id}:${i.id}`, title: i.plan.title || i.what, kind: typeLabel(i.plan.key), weight: i.weight || '' })));
+  return [...own, ...fromDocs];
+}
+function undatedRef(ref) {
+  const [k, a, b] = String(ref || '').split(':');
+  if (k === 'm') {
+    const course = state.courses[a];
+    const u = course?.undated?.find((x) => x.id === b);
+    return u && { kind: 'm', course, u };
+  }
+  if (k === 'd') {
+    const doc = state.docs.find((d) => d.id === a);
+    const it = doc?.items.find((i) => i.id === b);
+    return it && { kind: 'd', doc, it };
+  }
+  return null;
+}
+
+/** 改一項沒有日期的：填了日期就變成任務（之後可以排程）；沒填就只改名稱和比重。成功回傳 true。 */
+export function editUndated(ref, { title, date, min, weight = '' }) {
+  const r = undatedRef(ref);
+  if (!r) return false;
+  const name = String(title || '').trim();
+  const bad = (msg) => { emit({ toast: msg, toastIcon: 'alert', keepScroll: true }); return false; };
+  if (!name) return bad(L('名稱不能留空', 'Enter a name'));
+  const due = readDueFields(date, min);
+  if (!due) return bad(L('日期或時間寫法不對', 'Check the date and time'));
+  const w = String(weight || '').trim().slice(0, 20);
+  ui.editRow = null;
+  if (due.none) {
+    if (r.kind === 'm') Object.assign(r.u, { title: name, weight: w });
+    else { r.it.plan = { ...r.it.plan, title: name }; r.it.what = name; r.it.weight = w; }
+    emit({ toast: L('已保存', 'Saved'), toastIcon: 'check', keepScroll: true });
+    return true;
+  }
+  let total;
+  if (r.kind === 'm') {
+    const courseId = r.course.id;
+    ({ total } = createTask({ title: name, courseId, kind: kindFor(r.u.group, name), date: due.date, min: due.min, hours: r.u.hours || typeHours(groupKey(r.u.group, name)), weight: w }));
+    r.course.undated = r.course.undated.filter((x) => x !== r.u);
+  } else {
+    const p = r.it.plan;
+    const task = createTask({ title: name, courseId: r.doc.course, kind: typeLabel(p.key), date: due.date, min: due.min, hours: p.hours || typeHours(p.key), weight: w, requirements: r.it.scope || '', estimateBy: r.it.byStudent ? 'me' : 'ai' });
+    total = task.total;
+    r.it.filled = task.id;
+  }
+  emit({ toast: L(`已加入日期，「${name}」可以排進時間表了（共 ${hoursText(total)}）`, `Date added; "${name}" can now be scheduled (${hoursText(total)})`), toastIcon: 'check', keepScroll: true });
+  return true;
+}
+
+/** 刪除一項沒有日期的。 */
+export function deleteUndated(ref) {
+  const r = undatedRef(ref);
+  if (!r) return;
+  if (r.kind === 'm') r.course.undated = r.course.undated.filter((x) => x !== r.u);
+  else r.it.state = 'erased';
+  if (ui.editRow === ref) ui.editRow = null;
+  emit({ toast: L('已刪除這一項', 'Item deleted'), toastIcon: 'x', keepScroll: true });
 }
 
 /**
