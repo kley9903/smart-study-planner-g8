@@ -1209,6 +1209,8 @@ a.crow.is-dragged { opacity: 0.35; }
 .crow__edit .i { font-size: 15px; }
 .crows li:hover .crow__edit, .crow__edit:focus-visible { opacity: 1; }
 .crow__edit:hover { background: var(--c-wash, var(--paper-2)); color: var(--c-deep, var(--ink)); }
+.crow__del { margin-left: 0; }
+.crow__del:hover { background: var(--seal-wash); color: var(--seal); }
 .crow__edit:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; }
 @media (hover: none) { .crow__edit { opacity: 0.8; } }
 
@@ -1224,7 +1226,9 @@ a.crow.is-dragged { opacity: 0.35; }
 .crow-edit input { font-size: 16px; color: var(--sepia); font-variant-numeric: tabular-nums lining-nums; }
 .crow-edit__title input { font-size: 17px; font-weight: 500; }
 .crow-edit__weight input { font-weight: 700; color: var(--c-deep, var(--sepia)); }
-.crow-edit .course__del { min-height: 38px; }
+.course__save.is-icon { width: 38px; padding: 0; justify-content: center; }
+.course__cancel.is-icon { width: 38px; padding: 0; display: inline-grid; place-items: center; color: var(--sepia-3); }
+.course__cancel.is-icon .i { font-size: 16px; }
 /* 卡上新增一項：名稱｜類型，下一行 截止日期｜時間｜比重｜預計時數｜加入 取消 */
 .crow-edit--new { --indent: 20px; grid-template-columns: 150px 124px 84px 96px minmax(0, 1fr); margin: 18px -8px 8px; }
 .crow-edit--new .crow-edit__title { grid-column: 1 / 4; }
@@ -1295,7 +1299,7 @@ a.crow.is-dragged { opacity: 0.35; }
   .course__rename-fields { flex-basis: 100%; }
   .course__rename-code input { font-size: 30px; }
   .crow-edit { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .crow-edit__title, .crow-edit__actions, .crow-edit--new .crow-edit__title, .crow-edit--new .crow-edit__kind { grid-column: 1 / -1; }
+  .crow-edit__title, .crow-edit--new .crow-edit__actions, .crow-edit--new .crow-edit__kind { grid-column: 1 / -1; }
   .crow-edit--new .crow-edit__kind { max-width: none; }
   .crow-edit__actions { justify-content: flex-end; }
 }
