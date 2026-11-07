@@ -11,7 +11,7 @@ import { timeField, dateField } from '../pickers.js';
 import { esc, icon } from '../ui.js';
 import { ui } from '../store.js';
 import { L } from '../i18n.js';
-import { dayShort, hm } from '../time.js';
+import { mdNum, wd, hm } from '../time.js';
 
 // 分組看類型（AI 給的、你拖動或在任務裡改的）；類型是空的或「其他」才看名稱（只認明確的字，「final report」不是考試）。
 const EXAM_KIND = /考試|測驗|小測|exam|quiz|test/i;
@@ -176,6 +176,16 @@ function group(s, c, key, title, tasks, any) {
         </div>`;
 }
 
+/**
+ * 日期分四格（還有幾天｜日期｜星期｜時間），每格固定寬度，整組的日期、星期、時間上下對齊。
+ * 中文：11/8（日）；英文：Sun 11/8。
+ */
+function due4(when, t) {
+  const day = L(`<span class="crow__d1">${mdNum(t.due.date)}</span><span class="crow__d2">（${wd(t.due.date)}）</span>`,
+    `<span class="crow__d1">${wd(t.due.date)}</span><span class="crow__d2">${mdNum(t.due.date)}</span>`);
+  return `<span class="crow__due ${L('is-zh', 'is-en')}"><span class="crow__when">${when}</span>${day}<span class="crow__time">${hm(t.due.min)}</span></span>`;
+}
+
 /** 一項：名稱｜（還有幾天）日期時間｜比重。類型已經寫在小標題，這裡不再貼標籤。 */
 function row(s, t) {
   if (ui.editRow === t.id) return rowForm(t);
@@ -184,7 +194,7 @@ function row(s, t) {
   return `
             <li><a class="crow ${d < 0 ? 'is-past' : d <= 7 ? 'is-soon' : ''}" href="#/tasks/${t.id}" draggable="true" data-task="${t.id}" data-course="${t.course}" data-group="${groupOf(t)}">
               <span class="crow__title">${esc(t.title)}</span>
-              <span class="crow__due">${when ? `<span class="crow__when">${when}</span>` : ''}${dayShort(t.due.date)} ${hm(t.due.min)}</span>
+              ${due4(when, t)}
               <span class="crow__weight">${esc(t.weight || '')}</span>
             </a><button class="crow__edit" type="button" data-action="course-row-edit" data-task="${t.id}" aria-label="${L(`修改「${esc(t.title)}」`, `Edit "${esc(t.title)}"`)}">${icon('pencil')}</button><button class="crow__edit crow__del" type="button" data-action="course-row-delete" data-task="${t.id}" aria-label="${L(`刪除「${esc(t.title)}」`, `Delete "${esc(t.title)}"`)}">${icon('trash')}</button></li>`;
 }
