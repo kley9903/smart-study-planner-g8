@@ -178,8 +178,9 @@ export function toItems(result) {
     const weight = t.weight_percent ?? (perComponent[t.component_id] === 1 ? (r.assessment_components || []).find((c) => c.id === t.component_id)?.weight_percent : null);
     // 預計所需時間依課程資料估算（測驗和考試是溫習時間）；Dify 沒給估算才用類型預設值。
     const est = t.estimate?.minutes > 0 ? t.estimate : null;
+    // group_work 只認 true：AI 有時寫成一句說明（例如「須個人完成」），不能當成小組。
     items.push({
-      id: `task-${i}`, key, what: t.title, group: !!t.group_work, raw: t.due_raw || '', weight: weight != null ? `${weight}%` : '',
+      id: `task-${i}`, key, what: t.title, group: t.group_work === true, raw: t.due_raw || '', weight: weight != null ? `${weight}%` : '',
       ...sourceOf(prefix), reasons, flag, hoursDefault: !est,
       confidence: est?.confidence === 'high' ? 'high' : 'low', basis: est?.basis || '', difficulty: { easy: 'easy', medium: 'mid', mid: 'mid', hard: 'hard' }[t.difficulty] || null, scope: t.scope || '',
       steps: (t.steps || []).filter((st) => st?.title && st.minutes > 0).map((st) => ({ title: st.title, min: st.minutes })),
@@ -325,7 +326,7 @@ export function rowText(it) {
     'no-date': L('大綱沒寫日期，確認後只作記錄；知道日期後按「改」填上。', 'No date given; if confirmed it is kept as a note. Use Edit once you know the date.'),
     'no-day': L('看不出是星期幾或幾點，確認後只作記錄，不會加入沒空的時間。', 'Cannot tell the day or time; if confirmed it is kept as a note only.'),
   }[it.flag];
-  const task = p?.kind === 'task' && p.date;
+  const task = p?.kind === 'task'; // 日期未公布的也顯示時數：之後補上日期時照用
   return {
     type: typeLabel(it.key),
     what: it.what + (it.group ? L('（小組）', ' (group)') : ''),

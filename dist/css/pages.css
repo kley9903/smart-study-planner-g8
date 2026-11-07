@@ -1224,6 +1224,17 @@ a.crow.is-dragged { opacity: 0.35; }
 .crow-edit input { font-size: 16px; color: var(--sepia); font-variant-numeric: tabular-nums lining-nums; }
 .crow-edit__title input { font-size: 17px; font-weight: 500; }
 .crow-edit__weight input { font-weight: 700; color: var(--c-deep, var(--sepia)); }
+.crow-edit .course__del { min-height: 38px; }
+/* 卡上新增一項：名稱｜類型，下一行 截止日期｜時間｜比重｜預計時數｜加入 取消 */
+.crow-edit--new { --indent: 20px; grid-template-columns: 150px 124px 84px 96px minmax(0, 1fr); margin: 18px -8px 8px; }
+.crow-edit--new .crow-edit__title { grid-column: 1 / 4; }
+.crow-edit--new .crow-edit__kind { grid-column: 4 / -1; max-width: 220px; }
+.crow-edit--new .crow-edit__actions { justify-content: flex-end; }
+.crow-edit select {
+  width: 100%; margin: 0; padding: 2px 0 3px; border: 0; border-radius: 0; background: transparent; color: var(--sepia); font: inherit; font-size: 16px; cursor: pointer;
+  border-bottom: 1.5px dashed color-mix(in srgb, var(--c-deep, var(--ink-2)) 40%, transparent);
+}
+.crow-edit select:focus { outline: none; border-bottom-style: solid; border-bottom-color: var(--c-deep, var(--ink)); }
 
 /* 增加科目：一張空白的虛線索引卡 */
 .course-add {
@@ -1270,6 +1281,7 @@ a.crow.is-dragged { opacity: 0.35; }
   .course__group h3 { gap: 10px; font-size: 19px; }
   /* 手機：日期放到名稱下面，比重在右邊置中 */
   .crows { --indent: 12px; margin: 0 -6px; }
+  .crow-edit--new { --indent: 12px; margin: 18px -6px 8px; }
   .crow, .crows--weights .crow {
     grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title weight" "due weight";
     align-items: center; gap: 4px 12px; padding: 8.4px 6px 7.6px var(--indent);
@@ -1283,7 +1295,8 @@ a.crow.is-dragged { opacity: 0.35; }
   .course__rename-fields { flex-basis: 100%; }
   .course__rename-code input { font-size: 30px; }
   .crow-edit { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .crow-edit__title, .crow-edit__actions { grid-column: 1 / -1; }
+  .crow-edit__title, .crow-edit__actions, .crow-edit--new .crow-edit__title, .crow-edit--new .crow-edit__kind { grid-column: 1 / -1; }
+  .crow-edit--new .crow-edit__kind { max-width: none; }
   .crow-edit__actions { justify-content: flex-end; }
 }
 @media (prefers-reduced-motion: reduce) {

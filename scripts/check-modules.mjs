@@ -10,7 +10,7 @@ const { createMascot, TIMING } = await import('../dist/js/mascot.js');
 const { blockPopover, hatchPopover, busyForm } = await import('../dist/js/views/popovers.js');
 const { snap, paintRange } = await import('../dist/js/busy-paint.js');
 const { keepFile, fits, LIMIT_MB } = await import('../dist/js/attachments.js');
-const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, renameCourse, setTaskGroup, partsOf, ui } = await import('../dist/js/store.js');
+const { getState, enterMine, addOwnDoc, setOwnItems, setItemState, inkAllItems, saveItem, setDocCourse, deleteCourse, renameCourse, setTaskGroup, addCourseTask, deleteTask, partsOf, ui } = await import('../dist/js/store.js');
 const { toItems, mergeFound, rowText, report, checklist, sourceLine, parseDays, parseWhen, readSyllabus } = await import('../dist/js/syllabus-ai.js');
 const { setLang } = await import('../dist/js/i18n.js');
 const { onRequestPost } = await import('../functions/api/syllabus.js');
@@ -472,6 +472,29 @@ inkAllItems('doc-10');
   setTaskGroup(exam.id, 'exam');
   assert.equal(exam.kind, 'Exam', 'an item named like an exam becomes an exam, not a quiz');
 }
+{
+  // Adding and deleting an item straight on the course card.
+  const chem = Object.values(mine.courses).find((c) => c.name === 'CHEM1001');
+  const n = mine.tasks.length;
+  assert.equal(addCourseTask(chem.id, { title: ' ', group: 'work', date: '2099-01-10', min: 1439, hours: 2 }), false, 'a blank name is refused');
+  assert.equal(addCourseTask(chem.id, { title: 'Lab 2', group: 'work', date: '', min: 1439, hours: 2 }), false, 'a missing date is refused');
+  assert.equal(addCourseTask(chem.id, { title: 'Lab 2', group: 'work', date: '2099-01-10', min: 1439, hours: 0 }), false, 'zero hours is refused');
+  assert.equal(mine.tasks.length, n);
+  ui.newRow = chem.id;
+  assert.equal(addCourseTask(chem.id, { title: 'Lab 2', group: 'work', date: '2099-01-10', min: 1439, weight: '5%', hours: 3 }), true);
+  const lab2 = mine.tasks.at(-1);
+  assert.deepEqual([lab2.course, lab2.kind, groupOf(lab2), lab2.weight, lab2.estimateBy, lab2.steps.reduce((m, st) => m + st.min, 0)],
+    [chem.id, 'Assignment', 'work', '5%', 'me', 180]);
+  assert.equal(ui.newRow, null, 'the form closes after adding');
+  addCourseTask(chem.id, { title: 'Midterm exam', group: 'exam', date: '2099-01-12', min: 600, hours: 4 });
+  const mid = mine.tasks.at(-1);
+  assert.deepEqual([mid.kind, groupOf(mid)], ['Exam', 'exam']);
+  ui.editRow = lab2.id;
+  deleteTask(lab2.id);
+  deleteTask(mid.id);
+  assert.equal(mine.tasks.length, n);
+  assert.equal(ui.editRow, null, 'deleting from the row form closes it');
+}
 assert.equal(Object.values(mine.courses).find((c) => c.name === 'CHEM1001').ink, math.ink, 'a new course takes the freed colour instead of repeating one in use');
 
 // Server relay with a fake Dify: uploads the file, runs the workflow in streaming mode, unwraps the output.
@@ -554,4 +577,39 @@ assert.equal(normalizeDate('12/1', 2027), '2027-12-01');
 assert.equal(normalizeDate('2026年2月3日'), '2026-02-03');
 assert.equal(normalizeDate('2026-02-30'), '2026-02-30');
 assert.equal(normalizeDate('2028-02-29'), '2028-02-29');
+
+// QA 2026-11-07（TEST2200）：group_work 只認 true、日期未公布的項目可照預填存、時數會顯示、任務分清 AI 估的和自己填的
+{
+  globalThis.document = { documentElement: {}, querySelectorAll: () => [] };
+  setLang('en');
+  const qa = toItems({ course: { code: 'TEST2200' }, tasks: [
+    { title: 'Final report', type: 'report', due_date: '2026-12-14', due_time: '23:59', group_work: 'Final reports must be personal work.', estimate: { minutes: 720, confidence: 'high' } },
+    { title: 'Team pitch', type: 'presentation', due_date: '2026-12-10', due_time: '10:00', group_work: true },
+    { title: 'Peer memo', type: 'report', due_raw: 'TBD — announced after Week 3', estimate: { minutes: 120, confidence: 'high' } },
+    { title: 'Reading log', type: 'report', due_raw: 'TBD' },
+  ] });
+  assert.deepEqual(qa.items.map((i) => i.group), [false, true, false, false], 'a sentence in group_work (e.g. "must be personal work") is not group work');
+  assert.equal(rowText(qa.items[0]).what, 'Final report');
+  assert.equal(rowText(qa.items[2]).hours, '2 hours', 'an undated item still shows its estimate');
+
+  addOwnDoc({ id: 'doc-qa', name: 'test2200.pdf', size: 1 });
+  setOwnItems('doc-qa', qa);
+  const qd = mine.docs.find((d) => d.id === 'doc-qa');
+  const [report1, , memo, log] = qd.items;
+  saveItem('doc-qa', memo.id, { when: rowText(memo).when, hours: '3' });
+  assert.deepEqual([memo.state, memo.plan.date, memo.plan.hours, rowText(memo).hours], ['ink', null, 3, '3 hours'], 'saving with the prefilled TBD text keeps it undated and keeps the new hours');
+  saveItem('doc-qa', log.id, { when: 'TBA', hours: '2' });
+  assert.deepEqual([log.state, log.plan.date], ['ink', null], 'typing TBA also keeps it undated');
+  const pending = qd.items.find((i) => i.what === 'Team pitch');
+  saveItem('doc-qa', pending.id, { when: 'next Friday', hours: '2' });
+  assert.equal(pending.state, 'pencil', 'an unreadable date on a dated item is still refused');
+
+  setItemState('doc-qa', report1.id, 'ink');
+  assert.equal(mine.tasks.find((t) => t.title === 'Final report').estimateBy, 'ai', 'a confirmed AI estimate is not shown as "your estimate"');
+  saveItem('doc-qa', pending.id, { when: '2026-12-10 10:00', hours: '5' });
+  assert.equal(mine.tasks.find((t) => t.title === 'Team pitch').estimateBy, 'me', 'hours the student changed are theirs');
+  assert.equal(finalTask.estimateBy, 'me', 'the edited final exam (10 hours) counts as the student\'s');
+  setLang('zh');
+  delete globalThis.document;
+}
 console.log('Passed: corner character poses, timetable popovers, busy-time ranges, attachment limits and the syllabus AI path.');

@@ -5,7 +5,8 @@
 // 卡裡全用襯線字，科目色用在代號、小標題、箭咀和「補充資訊」按鈕。
 // 展開後以小標題（測驗和考試、功課、日期未公布）分組，類型只寫在小標題；每項一行：名稱｜日期時間｜比重，
 // 7 天內到期用朱紅標出，已過的變淡。
-// 每項右邊一枝小鉛筆：按了原地改名稱、截止日期時間、比重（rowForm）；改名時卡頭原地變輸入格，字型跟平時一樣（renameForm）。
+// 每項右邊一枝小鉛筆：按了原地改名稱、截止日期時間、比重，或刪除這一項（rowForm）；改名時卡頭原地變輸入格，字型跟平時一樣（renameForm）。
+// 卡底「新增一項」：原地多一行輸入格，自己加功課、測驗或考試（newForm）。
 import { timeField, dateField } from '../pickers.js';
 import { esc, icon } from '../ui.js';
 import { ui } from '../store.js';
@@ -92,9 +93,11 @@ function courseCard(s, c) {
               <span class="crow__weight">${esc(i.weight || '')}</span>
             </div></li>`).join('')}</ul>
         </div>` : ''}
-        ${!tasks.length && !undated.length ? `<p class="course__empty">${L('這科還沒有已確認的測驗、考試或功課。', 'Nothing confirmed for this course yet.')}</p>` : ''}
+        ${ui.newRow === c.id ? newForm(s) : ''}
+        ${!tasks.length && !undated.length && ui.newRow !== c.id ? `<p class="course__empty">${L('這科還沒有已確認的測驗、考試或功課。', 'Nothing confirmed for this course yet.')}</p>` : ''}
         <footer class="course__foot">
           <div class="course__actions">
+            <button class="course__more" type="button" data-action="course-row-new" data-course="${c.id}">${icon('plus')} ${L('新增一項', 'Add an item')}</button>
             <button class="course__more" type="button" data-action="course-more" data-course="${c.id}">${icon('plus')} ${L('補充資訊', 'Add information')}</button>
             <button class="course__del is-rename" type="button" data-action="course-rename" data-course="${c.id}">${icon('pencil')} ${L('改名', 'Rename')}</button>
             <button class="course__del" type="button" data-action="course-delete" data-course="${c.id}">${icon('x')} ${L('刪除這一科', 'Delete course')}</button>
@@ -133,8 +136,31 @@ function rowForm(t) {
               <div class="crow-edit__actions">
                 <button class="course__save" type="submit">${icon('check')} ${L('保存', 'Save')}</button>
                 <button class="course__cancel" type="button" data-action="course-row-cancel">${L('取消', 'Cancel')}</button>
+                <button class="course__del" type="button" data-action="course-row-delete" data-task="${t.id}">${icon('x')} ${L('刪除', 'Delete')}</button>
               </div>
             </form></li>`;
+}
+
+/** 卡上新增一項：名稱｜類型，下一行截止日期｜時間｜比重｜預計時數｜保存 取消。日期預設一週後 23:59。 */
+function newForm(s) {
+  const d = new Date(`${s.today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 7);
+  return `
+        <form class="crow-edit crow-edit--new" data-form="course-new" data-course="${ui.newRow}">
+          <label class="crow-edit__title"><span>${L('名稱', 'Name')}</span><input name="title" maxlength="80" required autocomplete="off"></label>
+          <label class="crow-edit__kind"><span>${L('類型', 'Type')}</span><select name="group">
+            <option value="work">${L('功課', 'Assignment')}</option>
+            <option value="exam">${L('測驗或考試', 'Quiz or exam')}</option>
+          </select></label>
+          <label class="crow-edit__date"><span>${L('截止日期', 'Due date')}</span>${dateField('date', d.toISOString().slice(0, 10))}</label>
+          <label class="crow-edit__time"><span>${L('時間', 'Time')}</span>${timeField('time', '23:59')}</label>
+          <label class="crow-edit__weight"><span>${L('比重', 'Weight')}</span><input name="weight" maxlength="20" placeholder="${L('例如 20%', 'e.g. 20%')}" autocomplete="off"></label>
+          <label class="crow-edit__hours"><span>${L('預計時數', 'Hours')}</span><input name="hours" type="number" min="0.5" max="200" step="0.5" value="2" required></label>
+          <div class="crow-edit__actions">
+            <button class="course__save" type="submit">${icon('check')} ${L('加入', 'Add')}</button>
+            <button class="course__cancel" type="button" data-action="course-row-new-cancel">${L('取消', 'Cancel')}</button>
+          </div>
+        </form>`;
 }
 
 /**

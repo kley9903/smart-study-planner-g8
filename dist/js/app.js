@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, editTaskBasics, setTaskGroup, partsOf,
+  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, editTaskBasics, addCourseTask, setTaskGroup, partsOf,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
 import { readIcs, canvasFound, ICS_MAX_MB } from './canvas.js';
@@ -528,6 +528,7 @@ const actions = {
     lastHead = twice ? {} : { id, at: Date.now() };
     ui.openCourse = ui.openCourse === id ? null : id;
     ui.editRow = null;
+    ui.newRow = null;
     if (twice) startRename(id); else render();
   },
   'course-add': () => { ui.addCourse = null; ui.docId = null; location.hash = '#/import/add'; },
@@ -543,6 +544,17 @@ const actions = {
     input?.select();
   },
   'course-row-cancel': () => { ui.editRow = null; render(); },
+  'course-row-delete': (el) => {
+    const t = taskOf(getState(), el.dataset.task);
+    if (t && window.confirm(L(`刪除「${t.title}」和它已排的讀書時段？`, `Delete "${t.title}" and its scheduled sessions?`))) deleteTask(t.id);
+  },
+  'course-row-new': (el) => {
+    ui.newRow = el.dataset.course;
+    ui.editRow = null;
+    render();
+    document.querySelector('.crow-edit--new input[name="title"]')?.focus();
+  },
+  'course-row-new-cancel': () => { ui.newRow = null; render(); },
   'task-group': (el) => { closePopover(); setTaskGroup(el.dataset.task, el.dataset.group); },
   'course-delete': (el) => {
     const c = getState().courses[el.dataset.course];
@@ -830,6 +842,7 @@ document.addEventListener('keydown', (e) => {
     else if (ui.dockOpen) toggleDock(false);
     else if (ui.renameCourse) actions['course-rename-cancel']();
     else if (ui.editRow) actions['course-row-cancel']();
+    else if (ui.newRow) actions['course-row-new-cancel']();
   }
   const t = e.target;
   if ((e.key === 'Enter' || e.key === ' ') && t.matches?.('li[data-action]')) { e.preventDefault(); t.click(); }
@@ -887,6 +900,16 @@ document.addEventListener('submit', (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
     renameCourse(e.target.dataset.course, String(f.get('name')), String(f.get('title')));
+    return;
+  }
+  if (e.target.matches('[data-form="course-new"]')) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const [h, m] = String(f.get('time') || '').split(':').map(Number);
+    addCourseTask(e.target.dataset.course, {
+      title: String(f.get('title')), group: String(f.get('group')), date: String(f.get('date')), min: h * 60 + m,
+      weight: String(f.get('weight') || ''), hours: Number(f.get('hours')),
+    });
     return;
   }
   if (e.target.matches('[data-form="course-row"]')) {
