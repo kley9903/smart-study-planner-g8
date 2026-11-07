@@ -5,7 +5,7 @@
 // 卡裡全用襯線字，科目色用在代號、小標題、箭咀和「補充資訊」按鈕。
 // 展開後以小標題（測驗和考試、功課、日期未公布）分組，類型只寫在小標題；每項一行：名稱｜日期時間｜比重，
 // 7 天內到期用朱紅標出，已過的變淡。
-// 每項右邊一枝小鉛筆：按了原地改名稱、截止日期時間、比重，或刪除這一項（rowForm）；改名時卡頭原地變輸入格，字型跟平時一樣（renameForm）。
+// 每項右邊一枝小鉛筆和一個垃圾桶：鉛筆原地改名稱、截止日期時間、比重（rowForm，只用 ✓ ✕ 符號按鈕）；垃圾桶確認後刪除；改名時卡頭原地變輸入格，字型跟平時一樣（renameForm）。
 // 卡底「新增一項」：原地多一行輸入格，自己加功課、測驗或考試（newForm）。
 import { timeField, dateField } from '../pickers.js';
 import { esc, icon } from '../ui.js';
@@ -134,9 +134,8 @@ function rowForm(t) {
               <label class="crow-edit__time"><span>${L('時間', 'Time')}</span>${timeField('time', hm(t.due.min))}</label>
               <label class="crow-edit__weight"><span>${L('比重', 'Weight')}</span><input name="weight" value="${esc(t.weight || '')}" maxlength="20" placeholder="${L('例如 20%', 'e.g. 20%')}" autocomplete="off"></label>
               <div class="crow-edit__actions">
-                <button class="course__save" type="submit">${icon('check')} ${L('保存', 'Save')}</button>
-                <button class="course__cancel" type="button" data-action="course-row-cancel">${L('取消', 'Cancel')}</button>
-                <button class="course__del" type="button" data-action="course-row-delete" data-task="${t.id}">${icon('x')} ${L('刪除', 'Delete')}</button>
+                <button class="course__save is-icon" type="submit" aria-label="${L('保存', 'Save')}">${icon('check')}</button>
+                <button class="course__cancel is-icon" type="button" data-action="course-row-cancel" aria-label="${L('取消', 'Cancel')}">${icon('x')}</button>
               </div>
             </form></li>`;
 }
@@ -158,7 +157,7 @@ function newForm(s) {
           <label class="crow-edit__hours"><span>${L('預計時數', 'Hours')}</span><input name="hours" type="number" min="0.5" max="200" step="0.5" value="2" required></label>
           <div class="crow-edit__actions">
             <button class="course__save" type="submit">${icon('check')} ${L('加入', 'Add')}</button>
-            <button class="course__cancel" type="button" data-action="course-row-new-cancel">${L('取消', 'Cancel')}</button>
+            <button class="course__cancel is-icon" type="button" data-action="course-row-new-cancel" aria-label="${L('取消', 'Cancel')}">${icon('x')}</button>
           </div>
         </form>`;
 }
@@ -187,5 +186,5 @@ function row(s, t) {
               <span class="crow__title">${esc(t.title)}</span>
               <span class="crow__due">${when ? `<span class="crow__when">${when}</span>` : ''}${dayShort(t.due.date)} ${hm(t.due.min)}</span>
               <span class="crow__weight">${esc(t.weight || '')}</span>
-            </a><button class="crow__edit" type="button" data-action="course-row-edit" data-task="${t.id}" aria-label="${L(`修改「${esc(t.title)}」`, `Edit "${esc(t.title)}"`)}">${icon('pencil')}</button></li>`;
+            </a><button class="crow__edit" type="button" data-action="course-row-edit" data-task="${t.id}" aria-label="${L(`修改「${esc(t.title)}」`, `Edit "${esc(t.title)}"`)}">${icon('pencil')}</button><button class="crow__edit crow__del" type="button" data-action="course-row-delete" data-task="${t.id}" aria-label="${L(`刪除「${esc(t.title)}」`, `Delete "${esc(t.title)}"`)}">${icon('trash')}</button></li>`;
 }
