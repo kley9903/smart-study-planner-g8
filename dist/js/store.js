@@ -87,7 +87,7 @@ function freshUi() {
   return {
     hlTask: null, showGaps: false, day: DEMO_TODAY, docId: 'stat', taskId: 'ps4',
     editBusy: false, dockOpen: false, dockDismissed: [], hlRule: null, justInked: [], arrowFor: null,
-    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, renameCourse: null, editRow: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
+    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, renameCourse: null, editRow: null, newRow: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
     planning: false, planOptions: null, planError: '', ask: null, chatting: false,
   };
@@ -466,7 +466,7 @@ function applyItem(doc, it) {
   if (p.kind === 'task' && p.date) {
     // 用 AI 拆好的步驟；學生在核對表改過時數，就照學生的時數重新拆。
     const aiSteps = !it.edited && it.steps?.length ? it.steps : [];
-    it.taskId = createTask({ title: p.title, course: doc.courseName || '', kind: typeLabel(p.key), date: p.date, min: p.min, hours: p.hours, weight: it.weight || '', difficulty: it.difficulty || null, requirements: it.scope || '' }, aiSteps).id;
+    it.taskId = createTask({ title: p.title, course: doc.courseName || '', kind: typeLabel(p.key), date: p.date, min: p.min, hours: p.hours, weight: it.weight || '', difficulty: it.difficulty || null, requirements: it.scope || '', estimateBy: it.byStudent ? 'me' : 'ai' }, aiSteps).id;
     it.applied = 'task';
     if (m?.kind === 'dated') {
       // 之前確認過、日期未公布的同一項，現在有日期了：不再列在「日期未公布」
@@ -509,7 +509,9 @@ export function saveItem(docId, itemId, fields) {
   if (!it) return;
   if (doc.own && it.plan && !it.applied) {
     // 自己的大綱：讀回改過的日期和時數，讀不懂就留在編輯狀態。
-    const plan = fields.when === '—' ? { ...it.plan, date: null } : parseWhen(it.plan, fields.when);
+    // 日期留空、沒改預填的原文（例如「TBD — 第 5 週前公布」），或只寫 TBD／TBA／未定：保持日期未公布
+    const undated = fields.when === '—' || (!it.plan.date && (fields.when === (it.raw || '—') || /^(tbd|tba|待定|未定|未公布)(?![a-z])/i.test(fields.when)));
+    const plan = undated ? { ...it.plan, date: null } : parseWhen(it.plan, fields.when);
     const hours = it.plan.kind === 'task' ? parseHours(fields.hours) : null;
     if (!plan || (plan.kind === 'task' && plan.date && !hours)) {
       emit({ toast: it.plan.kind === 'busy'
@@ -517,6 +519,7 @@ export function saveItem(docId, itemId, fields) {
         : L('看不懂，日期請寫成「2026-11-20 23:59」，時數寫數字', 'Cannot read that. Write the date like "2026-11-20 23:59" and hours as a number'), toastIcon: 'alert', keepScroll: true });
       return;
     }
+    if (hours && hours !== it.plan.hours) it.byStudent = true; // 學生改了時數，任務裡標「你填的」
     if (hours) plan.hours = hours;
     Object.assign(it, { plan, reasons: [], flag: null, hoursDefault: false });
     // 顯示文字由 rowText(plan) 產生；「要做甚麼」是資料，要留著
@@ -587,14 +590,15 @@ function splitMinutes(total) {
   return out;
 }
 
-function createTask({ title, course, kind, date, min, hours, requirements = '', weight = '', difficulty = null }, ownSteps = []) {
+/** estimateBy：'me' 學生自己填的時數（新增功課頁），'ai' 大綱裡 AI 估的（學生在核對表確認過） */
+function createTask({ title, course, courseId = null, kind, date, min, hours, requirements = '', weight = '', difficulty = null, estimateBy = 'me' }, ownSteps = []) {
   const id = nid('t');
   const total = ownSteps.length ? ownSteps.reduce((n, st) => n + st.min, 0) : Math.max(30, Math.round(hours * 2) * 30);
   const parts = ownSteps.length ? ownSteps : splitMinutes(total).map((m, i, all) => ({ title: all.length > 1 ? L(`第 ${i + 1} 部分`, `Part ${i + 1}`) : L('全部', 'All'), min: m }));
   const steps = parts.map((st, i) => ({ id: `${id}-${i + 1}`, title: st.title, min: st.min, progress: 'todo' }));
   state.tasks.push({
-    id, course: courseFor(course), title, short: title.length > 14 ? `${title.slice(0, 13)}…` : title, kind,
-    due: { date, min }, requirements, attachments: [], weight, source: null, estimateBy: 'me', estimateConfirmed: true, steps, aiNote: '',
+    id, course: courseId && state.courses[courseId] ? courseId : courseFor(course), title, short: title.length > 14 ? `${title.slice(0, 13)}…` : title, kind,
+    due: { date, min }, requirements, attachments: [], weight, source: null, estimateBy, estimateConfirmed: true, steps, aiNote: '',
     ...(difficulty ? { difficulty } : {}),
   });
   return { id, total };
@@ -615,7 +619,27 @@ export function deleteTask(id) {
   state.tasks = state.tasks.filter((x) => x.id !== id);
   state.blocks = state.blocks.filter((b) => b.task !== id);
   ui.taskId = null;
-  emit({ toast: L(`已刪除「${t.title}」和它的讀書時段`, `Deleted "${t.title}" and its sessions`), toastIcon: 'x' });
+  if (ui.editRow === id) ui.editRow = null;
+  emit({ toast: L(`已刪除「${t.title}」和它的讀書時段`, `Deleted "${t.title}" and its sessions`), toastIcon: 'x', keepScroll: true });
+}
+
+/**
+ * 科目卡上直接新增一項：名稱、類型（功課／測驗或考試）、截止日期時間、比重、預計時數。
+ * 跟新增功課頁一樣按時數拆成子任務；不跳頁，留在課程資料。成功回傳 true。
+ */
+export function addCourseTask(courseId, { title, group, date, min, weight = '', hours }) {
+  if (!state.courses[courseId]) return false;
+  const name = String(title || '').trim();
+  const bad = (msg) => { emit({ toast: msg, toastIcon: 'alert', keepScroll: true }); return false; };
+  if (!name) return bad(L('名稱不能留空', 'Enter a name'));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !Number.isInteger(min) || min < 0 || min >= 1440) return bad(L('請填寫日期和時間', 'Enter a date and time'));
+  if (!(hours > 0 && hours <= 200)) return bad(L('請填寫預計時數', 'Enter the estimated hours'));
+  const exam = group === 'exam';
+  const kind = exam ? (/exam|midterm|final|考試/i.test(name) ? L('考試', 'Exam') : L('測驗', 'Quiz')) : L('功課', 'Assignment');
+  const { total } = createTask({ title: name, courseId, kind, date, min, hours, weight: String(weight || '').trim().slice(0, 20) });
+  ui.newRow = null;
+  emit({ toast: L(`已加入「${name}」，共 ${hoursText(total)}`, `Added "${name}" (${hoursText(total)})`), toastIcon: 'check', keepScroll: true });
+  return true;
 }
 
 /**
