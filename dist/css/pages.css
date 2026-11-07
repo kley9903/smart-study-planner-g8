@@ -1113,13 +1113,21 @@ a.crow:hover { background: rgba(120, 84, 40, 0.05); }
 a.crow:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; }
 .crow__title { min-width: 0; font-size: 17px; font-weight: 500; color: var(--sepia); overflow-wrap: anywhere; }
 .crow__due { font-size: 16px; color: var(--sepia-2); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums lining-nums; }
-.crow__when { margin-right: 14px; color: var(--sepia-3); }
+/* 日期四格固定寬度：還有幾天（靠右）｜日期｜星期｜時間，每行同一位置，上下對齊 */
+.crow__due:not(.is-zh):not(.is-en) { display: block; }
+.crow__due.is-zh, .crow__due.is-en { display: grid; column-gap: 0.4em; text-align: left; }
+.crow__due.is-zh { grid-template-columns: 5.4em 2.8em 3.1em 2.7em; }
+.crow__due.is-en { grid-template-columns: 6.2em 2.2em 2.8em 2.7em; }
+.crow__when { padding-right: 0.3em; text-align: right; color: var(--sepia-3); }
+.crow__when:empty::before { content: "\200b"; } /* 空格也要有基線，整行才對齊 */
+.crow__due.is-zh .crow__d2 { margin-left: -0.35em; }
 .crow__weight { display: none; text-align: right; font-size: 17px; font-weight: 700; color: var(--c-deep, var(--sepia)); font-variant-numeric: tabular-nums lining-nums; }
 .crows--weights .crow__weight { display: block; }
 .crow.is-soon .crow__when { color: var(--seal); font-weight: 700; }
 .crow.is-past { opacity: 0.55; }
 .crow.is-past:hover { opacity: 0.85; }
 .crow.is-undated .crow__due { color: var(--sepia-3); }
+.crow.is-undated { padding-right: 74px; } /* 沒有鉛筆和垃圾桶，留同樣寬度，比重和上面對齊 */
 
 /* 移到另一組：拖動時原位變淡，可以放的那一組出現虛線框；空的那一組平時不顯示，拖動時才出現 */
 a.crow { -webkit-touch-callout: none; }
@@ -1292,6 +1300,10 @@ a.crow.is-dragged { opacity: 0.35; }
   }
   .crow__title { grid-area: title; font-size: 16px; }
   .crow__due { grid-area: due; justify-self: start; text-align: left; font-size: 14.5px; }
+  .crow__due.is-zh, .crow__due.is-en { display: flex; column-gap: 0.4em; }
+  .crow__when:empty { display: none; }
+  .crow__when { margin-right: 0.3em; }
+  .crow.is-undated { padding-right: 72px; }
   .crow__weight { grid-area: weight; min-width: 36px; font-size: 16px; }
   .course__foot { flex-direction: column; align-items: stretch; }
   .course__actions { flex-direction: column; align-items: stretch; gap: 4px; }
