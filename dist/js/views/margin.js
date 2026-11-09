@@ -62,7 +62,6 @@ function noteHtml(s, n) {
   const p = n.proposal ? s.proposals[n.proposal] : null;
   const parts = [];
   if (p) parts.push(decideCard(s, p));
-  if (n.remainAsk) parts.push(remainAsk(s));
   if (n.chips) parts.push(chipsHtml());
   if (n.reset) parts.push(`<div class="note__chips"><button class="btn btn--sm" type="button" data-action="reset">${icon('reset')} ${L('重設示範資料', 'Reset demo data')}</button></div>`);
   return `
@@ -83,13 +82,10 @@ function checkinNote(s, n) {
     foot = `
       <div class="ccard__actions">
         <button class="btn btn--sm btn--ink" type="button" data-action="checkin" data-result="done">${icon('check')} ${L('完成了', 'Done')}</button>
-        <button class="btn btn--sm" type="button" data-action="checkin" data-result="partial">${L('還差一點', 'Not quite')}</button>
         <button class="btn btn--sm btn--ghost" type="button" data-action="checkin" data-result="none">${L('沒有做', 'Did not do it')}</button>
       </div>`;
-  } else if (h.checkin === 'asking') {
-    foot = `<p class="ccard__done">${icon('clock')} ${L('等你說還差多少', 'Waiting for how much is left')}</p>`;
   } else {
-    foot = `<p class="ccard__done">${icon('check')} ${L('已回報：', 'Reported: ')}${step.progress === 'done' ? L('完成了', 'done') : L(`還差 ${hoursText(step.remain || 30)}`, `${hoursText(step.remain || 30)} left`)}</p>`;
+    foot = `<p class="ccard__done">${icon('check')} ${L('已回報：完成了', 'Reported: done')}</p>`;
   }
   return `
     <article class="note note--ai" data-checkin>
@@ -103,16 +99,6 @@ function checkinNote(s, n) {
         </div>
       </div>
     </article>`;
-}
-
-function remainAsk(s) {
-  const h = s.history.find((x) => x.id === 'h1');
-  if (!h || h.checkin !== 'asking') return '';
-  return `
-    <div class="note__chips">
-      <button class="btn btn--sm" type="button" data-action="remain" data-min="30">${L('還差 30 分鐘', '30 min left')}</button>
-      <button class="btn btn--sm" type="button" data-action="remain" data-min="60">${L('還差 1 小時', '1 hour left')}</button>
-    </div>`;
 }
 
 function chipsHtml() {

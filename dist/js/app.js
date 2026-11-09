@@ -1,7 +1,7 @@
 // 入口：切頁、畫面更新、所有按鈕的動作。
 import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
-  checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
+  checkin, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, setDailyLimit, editPlanTime, obRestart, obFinish,
   getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, editTaskBasics, addCourseTask, setTaskGroup, partsOf, editUndated, deleteUndated, removeBlock, clearSchedule, upcomingBlocks,
 } from './store.js';
@@ -391,7 +391,6 @@ const actions = {
     runScenario(el.dataset.id);
   },
   checkin: (el) => checkin(el.dataset.result),
-  remain: (el) => checkinRemain(Number(el.dataset.min)),
   progress: (el) => { closePopover(); setProgress(el.dataset.step, el.dataset.p); },
   'toggle-gaps': () => { ui.showGaps = !ui.showGaps; render(); },
   day: (el) => { ui.day = el.dataset.date; render(); },
@@ -625,7 +624,7 @@ const actions = {
   'focus-pause': () => pauseFocus(),
   'focus-resume': () => resumeFocus(),
   'focus-stop': () => stopFocus(),
-  'focus-finish': (el) => finishFocus(el.dataset.result, Number(el.dataset.remain) || null),
+  'focus-finish': (el) => finishFocus(el.dataset.result),
   'ask-start': (el) => startAsk(el.dataset.doc),
   'ask-pick': (el) => answer(Number(el.dataset.value)),
   'ask-skip': () => { ui.askError = ''; skipAsk(); },

@@ -31,26 +31,16 @@ export function bubbleFor(s) {
         </div>`,
     };
   }
-  const h = s.history.find((x) => x.id === 'h1' && (x.checkin === 'pending' || x.checkin === 'asking'));
+  const h = s.history.find((x) => x.id === 'h1' && x.checkin === 'pending');
   if (h) {
     const task = taskOf(s, h.task);
     const { step } = stepOf(s, h.step);
-    if (h.checkin === 'asking') {
-      return {
-        id: `c:${h.id}:asking`,
-        html: `<p>${L('還差多少？', 'How much is left?')}</p>
-          <div class="dock__acts">
-            <button class="btn btn--sm" type="button" data-action="remain" data-min="30">${L('還差 30 分鐘', '30 min left')}</button>
-            <button class="btn btn--sm" type="button" data-action="remain" data-min="60">${L('還差 1 小時', '1 hour left')}</button>
-          </div>`,
-      };
-    }
     return {
       id: `c:${h.id}`,
       html: `<p>${L(`${dayLabel(h.date)} ${span(h.start, h.end)} 的 <b>${esc(task.short)} ${esc(step.title)}</b> 做完了嗎？`, `Did you finish <b>${esc(task.short)} ${esc(step.title)}</b> (${dayShort(h.date)} ${span(h.start, h.end)})?`)}</p>
         <div class="dock__acts">
           <button class="btn btn--sm btn--ink" type="button" data-action="checkin" data-result="done">${icon('check')} ${L('完成了', 'Done')}</button>
-          <button class="btn btn--sm" type="button" data-action="checkin" data-result="partial">${L('還差一點', 'Not quite')}</button>
+          <button class="btn btn--sm btn--ghost" type="button" data-action="checkin" data-result="none">${L('沒有做', 'Did not do it')}</button>
         </div>`,
     };
   }

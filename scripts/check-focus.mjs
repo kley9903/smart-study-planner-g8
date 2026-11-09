@@ -59,8 +59,8 @@ assert.deepEqual([s.focus.step, s.focus.timer.work, step.progress], [step.id, 45
 // 7. Stopping asks whether it is done; the answer records the actual time and the progress.
 store.stopFocus(50 * MIN);
 assert.equal(s.focus.asking, true, 'asks "done?" before recording');
-store.finishFocus('partial', 20);
-assert.deepEqual([step.progress, step.remain], ['doing', 20]);
+store.finishFocus('notdone');
+assert.deepEqual([step.progress, step.remain], ['doing', undefined], '"not finished" asks nothing more; the whole step is planned again');
 assert.deepEqual(s.actuals.at(-1), { task: task.id, step: step.id, kind: 'Quiz', min: 45, date: s.today }, '45 minutes of work (the break does not count)');
 assert.equal(s.focus, null);
 assert.equal(s.blocks[0].completed, true, 'reported work cannot be booked again against the updated remaining estimate');
