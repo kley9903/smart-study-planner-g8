@@ -165,10 +165,9 @@ export function guideState(s) {
   const heroes = Object.values(s.proposals || {}).filter((p) => p.kind === 'hero');
   const hero = heroes[heroes.length - 1] || null;
   return {
-    s1: !!h && h.checkin !== 'pending' && h.checkin !== 'asking',
+    s1: !!h && h.checkin !== 'pending',
     s2: !!hero,
     s3: !!hero && hero.status !== 'pending',
-    asking: h?.checkin === 'asking',
     hero,
   };
 }

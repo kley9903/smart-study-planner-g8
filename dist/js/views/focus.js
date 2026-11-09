@@ -45,7 +45,7 @@ export const focusPage = {
           <div class="focus__acts">
             ${split ? `<button class="btn btn--ink" type="button" data-action="focus-finish" data-result="session">${icon('check')} ${L(`這段完成，餘下 ${hoursText(remainingMinutes(step) - workMinutes(block))}`, `Session done; ${hoursText(remainingMinutes(step) - workMinutes(block))} remains`)}</button>` : ''}
             <button class="btn ${split ? '' : 'btn--ink'}" type="button" data-action="focus-finish" data-result="done">${icon('check')} ${L('整個步驟已完成', 'Whole step done')}</button>
-            ${[15, 30, 60].map((m) => `<button class="btn" type="button" data-action="focus-finish" data-result="partial" data-remain="${m}">${L(`還差 ${hoursText(m)}`, `${hoursText(m)} left`)}</button>`).join('')}
+            <button class="btn btn--ghost" type="button" data-action="focus-finish" data-result="notdone">${L('還沒做完', 'Not finished')}</button>
           </div>
         </section>`;
     }

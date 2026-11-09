@@ -120,9 +120,6 @@ export function heroChanges(option) {
    ------------------------------------------------------------------ */
 export const CHECKIN = {
   get done() { return L('記下了：<b>PS4 題 1–4 完成</b>。這是你回報的進度，直接生效，不需要再確認。', 'Noted: <b>PS4 Q1–4 done</b>. Progress you report takes effect right away, no confirmation needed.'); },
-  get partialAsk() { return L('明白。還差多少？', 'OK. How much is left?'); },
-  get partial30() { return L('今天 18:00–18:30 剛好有半小時，我建議放「題 1–4 餘下部分」（時間表上的虛線）。確認後才生效。', 'There is half an hour free today, 18:00–18:30. I suggest the rest of Q1–4 there (dashed on the timetable). It takes effect once you confirm.'); },
-  get partial60() { return L('截止前只剩兩段各半小時的空檔：今天 18:00–18:30 及 00:00–00:30。比較零碎，但都排在 PS4 截止前。確認後才生效。', 'Only two half-hour gaps are left before the deadline: today 18:00–18:30 and 00:00–00:30. Fragmented, but both are before PS4 is due. They take effect once you confirm.'); },
   get none() { return L('明白，題 1–4 仍需 1.5 小時，截止前的空檔不夠，需要取捨。<br>示範版沒有預備這個情境；可以試「明天要全日幫家人搬屋」，看看取捨怎樣呈現。', 'OK. Q1–4 still needs 1.5 hours and there is not enough free time before the deadline, so something has to give.<br>The demo does not include this case; try "I have to help my family move house all day tomorrow" to see how trade-offs are shown.'); },
 };
 

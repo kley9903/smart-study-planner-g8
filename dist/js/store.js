@@ -299,7 +299,6 @@ function inkSummary(p) {
     return L('已確認。PS4 題 12 仍欠約 1 小時；之後想處理，可以再告訴我。', 'Confirmed. PS4 Q12 is still about 1 hour short; tell me if you want to deal with it later.');
   }
   if (p.kind === 'essay') return L('已確認。「構思大綱」延到 11月16日，這 7 日少了 1 小時讀書時間。', 'Confirmed. The outline moves to Nov 16, freeing 1 hour in these 7 days.');
-  if (p.kind === 'checkin') return L('已確認。題 1–4 餘下的部分已排在 PS4 截止前。', 'Confirmed. The rest of Q1–4 is scheduled before PS4 is due.');
   if (p.kind === 'plan') return L(`已確認 ${p.changes.length} 段讀書時段。做完記得在時段上回報進度。`, `Confirmed ${p.changes.length} study sessions. Report your progress on each one when you finish.`);
   return L('已確認。', 'Confirmed.');
 }
@@ -314,7 +313,6 @@ export function eraseProposal() {
   const msg = {
     hero: () => L('好，這些改動都不做，計劃維持原樣；11月6日的搬屋也沒有記下。如果仍要記下，可以再告訴我。', 'OK, none of these changes are made and the plan stays as it was; the move on Nov 6 is not recorded either. Tell me again if you want it recorded.'),
     essay: () => L('好，不改。「構思大綱」維持在 11月9日 20:00。', 'OK, no change. The outline stays on Nov 9 at 20:00.'),
-    checkin: () => L('好，不加。題 1–4 餘下的部分未有安排；想放在其他時間，可以告訴我。', 'OK, not added. The rest of Q1–4 has no slot yet; tell me if you want it somewhere else.'),
     plan: () => L('好，這次不排。改好功課或沒空的時間後，可以再按「自動排程」。', 'OK, nothing scheduled this time. After changing tasks or busy times, press "Auto-schedule" again.'),
   }[p.kind];
   note({ who: 'ai', html: msg ? msg() : L('好，不改。', 'OK, no change.') });
@@ -331,38 +329,11 @@ export function checkin(result, said = false) {
     h.checkin = 'done';
     step.progress = 'done';
     note({ who: 'ai', html: CHECKIN.done });
-  } else if (result === 'partial') {
-    note({ who: 'me', text: L('還差一點', 'Not quite') });
-    h.checkin = 'asking';
-    note({ who: 'ai', html: CHECKIN.partialAsk, remainAsk: true });
   } else {
     note({ who: 'me', text: L('沒有做', 'Did not do it') });
     note({ who: 'ai', html: CHECKIN.none, chips: true });
   }
   emit({ scrollThread: true, toast: result === 'done' ? L('已記錄：PS4 題 1–4 完成', 'Saved: PS4 Q1–4 done') : undefined });
-}
-
-export function checkinRemain(min) {
-  const h = state.history.find((x) => x.id === 'h1');
-  if (!h || h.checkin !== 'asking') return;
-  note({ who: 'me', text: min === 30 ? L('還差 30 分鐘', '30 minutes left') : L('還差 1 小時', '1 hour left') });
-  const today = state.today;
-  if (pendingProposal(state) || !slotFree(today, 1080, 1110) || (min === 60 && !slotFree(today, 1440, 1470))) {
-    blocked();
-    emit({ scrollThread: true });
-    return;
-  }
-  const { step } = stepOf(state, h.step);
-  h.checkin = 'done';
-  step.progress = 'doing';
-  step.remain = min;
-  const mk = (start, end) => ({ id: nid('bx'), task: 'ps4', step: 'ps4-1', date: today, start, end, reason: L('題 1–4 餘下的部分；PS4 明晚 23:59 截止。', 'The rest of Q1–4; PS4 is due tomorrow at 23:59.') });
-  const blocks = min === 30 ? [mk(1080, 1110)] : [mk(1080, 1110), mk(1440, 1470)];
-  const pid = nid('checkin');
-  state.proposals[pid] = { id: pid, kind: 'checkin', status: 'pending', changes: blocks.map((block) => ({ kind: 'add', block })) };
-  state.proposal = pid;
-  note({ who: 'ai', html: min === 30 ? CHECKIN.partial30 : CHECKIN.partial60, proposal: pid });
-  emit({ scrollThread: true, proposal: true });
 }
 
 export function setProgress(stepId, progress) {
@@ -600,8 +571,8 @@ export function setSleep(start, end) {
 
 /** 平日專注工時上限；臨時加時方案不會改這個值。 */
 export function setDailyLimit(minutes) {
-  if (!Number.isInteger(minutes) || minutes < 15 || minutes > 1440) {
-    emit({ toast: L('每日上限請填 0.25 至 24 小時。', 'Enter a daily limit between 0.25 and 24 hours.'), toastIcon: 'info', keepScroll: true });
+  if (!Number.isInteger(minutes) || minutes < 30 || minutes > 1440 || minutes % 30) {
+    emit({ toast: L('每日上限請填 0.5 至 24 小時，以半小時為單位。', 'Enter a daily limit from 0.5 to 24 hours, in half-hours.'), toastIcon: 'info', keepScroll: true });
     return false;
   }
   aiRequests.reset();
@@ -1177,8 +1148,9 @@ export function stopFocus(now = Date.now()) {
   emit({ keepScroll: true });
 }
 
-/** 回答「做完了嗎？」：記下實際用時（作為日後估算的依據）和進度。 */
-export function finishFocus(result, remain = null) {
+/** 回答「做完了嗎？」：記下實際用時（作為日後估算的依據）和進度。
+ *  「還沒做完」不問還差多少：剩餘工時維持原樣，下次自動排程重新安排。 */
+export function finishFocus(result) {
   const f = state.focus;
   if (!f?.step) { state.focus = null; emit({ keepScroll: true }); return; }
   const { task, step } = stepOf(state, f.step);
@@ -1190,12 +1162,14 @@ export function finishFocus(result, remain = null) {
       const left = Math.max(0, remainingMinutes(step) - workMinutes(b));
       step.progress = left ? 'doing' : 'done';
       if (left) step.remain = left; else delete step.remain;
-    } else { step.progress = 'doing'; if (remain != null) step.remain = remain; }
+    }
     // 已回報的時段保留在日曆及今日負荷，但不能再抵銷已更新的剩餘工時。
     if (b) b.completed = true;
   }
   state.focus = null;
-  emit({ keepScroll: true, toast: result === 'done' ? L('記下了：這一步完成', 'Saved: this step is done') : L('記下了進度', 'Progress saved'), toastIcon: 'check' });
+  const toast = result === 'done' ? L('記下了：這一步完成', 'Saved: this step is done')
+    : result === 'notdone' ? L('記下了：還沒做完，下次排程會重新安排', 'Saved: not finished; the next plan will reschedule it') : L('記下了進度', 'Progress saved');
+  emit({ keepScroll: true, toast, toastIcon: 'check' });
 }
 export function pauseFocus(now = Date.now()) { if (state.focus) { pauseTimer(state.focus.timer, now); emit({ keepScroll: true }); } }
 export function resumeFocus(now = Date.now()) { if (state.focus) { resumeTimer(state.focus.timer, now); emit({ keepScroll: true }); } }
