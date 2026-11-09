@@ -24,6 +24,13 @@ assert.equal(calls[0].init.headers.Authorization, 'Bearer pk', 'uses the plannin
 const sent = JSON.parse(calls[0].init.body);
 assert.deepEqual([JSON.parse(sent.inputs.state), sent.inputs.request, sent.response_mode], [state, 'only evenings', 'streaming']);
 
+const capacityState = { ...state, scheduling_policy: 'capacity-v1' };
+res = await onRequestPost({ request: post({ state: capacityState }), env: { DIFY_PLAN_KEY: 'pk' }, fetcher: fakeDify({ valid: true, data: plans, errors: [] }) });
+assert.deepEqual([res.status, (await res.json()).reason], [503, 'workflow-update-required'], 'a new client cannot accept an old unlimited-hours workflow as capacity-aware');
+const capacityPlans = { ...plans, engine: 'capacity-v1' };
+res = await onRequestPost({ request: post({ state: capacityState }), env: { DIFY_PLAN_KEY: 'pk' }, fetcher: fakeDify({ valid: true, data: capacityPlans, errors: [] }) });
+assert.deepEqual([res.status, await res.json()], [200, { ok: true, result: capacityPlans }], 'matching client and Python policy versions pass the relay');
+
 res = await onRequestPost({ request: post({ state }), env: { DIFY_PLAN_KEY: 'pk' }, fetcher: fakeDify({ valid: false, data: null, errors: ['no task can be scheduled'] }) });
 assert.deepEqual([res.status, await res.json()], [200, { ok: false, reason: 'invalid', message: 'no task can be scheduled' }]);
 res = await onRequestPost({ request: post({ state }), env: { DIFY_API_KEY: 'course-key' }, fetcher: fakeDify({}) });
@@ -53,15 +60,41 @@ const s = {
 const input = toState(s);
 assert.deepEqual(input.now, { date: '2026-11-04', min: 870 });
 assert.equal(input.horizon_days, 7);
+assert.equal(input.daily_limit_min, 180, 'daily focus cap defaults to three hours, independently of AI choices');
+assert.equal(input.scheduling_policy, 'capacity-v1', 'old workflow versions cannot silently apply older scheduling rules');
+assert.equal(toState({ ...s, dailyLimitMin: 240 }).daily_limit_min, 240, 'uses the student-selected limit');
 assert.deepEqual(input.tasks[0], { id: 't1', title: 'Problem Set 4', kind: 'Assignment', due: { date: '2026-11-06', min: 1439 }, weight_percent: 5, difficulty: 'mid',
   steps: [{ id: 't1-1', title: 'Q1–4', min: 90, progress: 'done' }, { id: 't1-2', title: 'Q5–8', min: 120, progress: 'partial', remaining_min: 30 }, { id: 't1-3', title: 'Q9–12', min: 150, progress: 'todo' }] },
   'done stays done, doing is partial with what is left, dropped steps are left out, weight becomes a number');
 assert.deepEqual([input.tasks[1].weight_percent, input.tasks[1].difficulty], [null, 'mid'], 'unknown weight is null; unknown difficulty is mid');
-assert.deepEqual(input.blocks, [{ id: 'b1', step: 't1-3', date: '2026-11-05', start: 1140, end: 1290 }], 'only blocks from today on');
+assert.deepEqual(input.blocks, [{ id: 'b1', task: 't1', step: 't1-3', date: '2026-11-05', start: 1140, end: 1290 }], 'only blocks from today on');
+assert.deepEqual(toState({ ...s, blocks: [{ ...s.blocks[0], work_min: 120, completed: true }] }).blocks[0],
+  { ...input.blocks[0], work_min: 120, completed: true }, 'completed focus coverage is explicit; breaks are not work');
 assert.deepEqual(input.unavailable, s.unavailable);
 const late = { id: 't0', title: 'Old', short: 'Old', kind: 'Assignment', due: { date: '2026-11-04', min: 600 }, weight: '', steps: [{ id: 't0-1', title: 'All', min: 60, progress: 'todo' }] };
 assert.deepEqual(toState({ ...s, tasks: [late, ...s.tasks] }).tasks.map((t) => t.id), ['t1', 't2'], 'tasks past their deadline are not sent to the planner');
 assert.deepEqual([input.sleep, input.sleep_overrides], [{ start: 30, end: 510 }, [{ night: '2026-11-04', start: 90 }]]);
+
+// Consecutive requests and moving to the next day keep the same uncovered work after a session report.
+{
+  const { unplannedSteps } = await import('../dist/js/model.js');
+  const task = { ...s.tasks[0], steps: [{ id: 'split-step', title: 'Report', min: 120, progress: 'doing', remain: 90 }] };
+  const blocks = [
+    { id: 'reported', task: task.id, step: 'split-step', date: '2026-11-04', start: 510, end: 550, work_min: 30, completed: true },
+    { id: 'tomorrow', task: task.id, step: 'split-step', date: '2026-11-05', start: 600, end: 640, work_min: 30 },
+    { id: 'later', task: task.id, step: 'split-step', date: '2026-11-06', start: 600, end: 640, work_min: 30 },
+  ];
+  const reported = { ...s, now: 600, tasks: [task], blocks };
+  const before = JSON.stringify(reported);
+  const one = toState(reported), two = toState(reported);
+  assert.deepEqual(one, two, 'repeated input conversion does not consume work');
+  assert.equal(JSON.stringify(reported), before, 'input conversion does not mutate progress or confirmed blocks');
+  assert.equal(unplannedSteps(reported)[0].missing, 30, 'reported 30 minutes are already reflected in the 90-minute remaining estimate');
+  const tomorrow = { ...reported, today: '2026-11-05', now: 0 };
+  assert.equal(toState(tomorrow).blocks.some((b) => b.id === 'reported'), false, 'yesterday no longer consumes today capacity');
+  assert.equal(unplannedSteps(tomorrow)[0].missing, 30, 'dropping yesterday does not restore or lose remaining work');
+  assert.equal(toState(tomorrow).tasks[0].steps[0].remaining_min, 90);
+}
 
 /* ---------- chosen plan option → proposal ---------- */
 const option = {
@@ -88,6 +121,21 @@ assert.deepEqual([card.title, card.risky, card.costsSleep], ['Sleep later tonigh
 assert.match(card.finish, /Nov 5|11\/5|Thu/, 'when everything is done');
 assert.match(card.tightest, /PS4/, 'names the tightest task');
 assert.equal(cardOf({ ...option, stats: { ...option.stats, tightest: { task: 't1', buffer_min: 120 } } }, s).risky, true, 'a buffer under half a day is risky');
+assert.equal(cardOf({ ...option, deferred: { steps: 3, work_min: 180 } }, s).deferred, '3 hours', 'future work is visible separately from this week');
+assert.equal(cardOf(option, s).deferred, '', 'older workflow responses still render');
+const capacityOption = { ...option, tradeoff: { type: 'extra_time' }, daily_loads: [{ date: s.today, fixed_min: 60, work_min: 180, total_min: 240, capacity_min: 240 }],
+  changes: [{ kind: 'add', task: 't1', step: 't1-3', date: s.today, start: 900, end: 1110, work_min: 180 }] };
+assert.equal(proposalFrom(capacityOption, s).changes[0].block.work_min, 180, 'keeps focused work distinct from occupied time on confirmation');
+assert.match(proposalFrom({ ...capacityOption, changes: [{ ...capacityOption.changes[0], reason: { code: 'capacity_balanced' } }] }, s).changes[0].reason, /daily availability|每日可用時間/, 'capacity-based additions explain the deterministic distribution');
+assert.deepEqual(cardOf(capacityOption, s).days, [240, 0, 0, 0, 0, 0, 0], 'daily graph includes fixed and new focused work from Python');
+assert.match(cardOf(capacityOption, s).consent, /usual daily limit|平日上限/);
+const combinedOption = { ...capacityOption, tradeoff: { type: 'reduce_buffer_extra_time', adopted_days: 1, days: [{ date: s.today, total_min: 240 }] } };
+assert.match(cardOf(combinedOption, s).consent, /buffer to 1 day|緩衝至 1 天/, 'combined option discloses the shortened buffer');
+assert.match(cardOf(combinedOption, s).consent, /add time|臨時加時/, 'combined option also discloses extra study time');
+assert.match(cardOf(combinedOption, s).consent, /stays unchanged|維持不變/, 'normal daily limit is not changed by a combined trade-off');
+assert.equal(cardOf({ ...combinedOption, short: [{ task: 't1', missing_min: 60 }] }, s).actionable, false, 'a combined option with work still missing is not confirmable');
+assert.match(cardOf({ ...option, summary: null, knobs: { order: 'short', period: 'morning' } }, s).title, /deadline order|提交日期/, 'fallback text respects fixed task order even for legacy AI knobs');
+assert.equal(cardOf({ ...option, short: [{ task: 't1', missing_min: 60 }] }, s).actionable, false);
 
 /* ---------- store: ask for plans, preview one, confirm ---------- */
 const store = await import('../dist/js/store.js');
@@ -96,6 +144,11 @@ store.enterMine();
 const mine = store.getState();
 store.addTask({ title: 'Essay 2', course: 'ENGL', kind: 'Essay', date: '2099-01-10', min: 1439, hours: 2 });
 const essay = mine.tasks.at(-1);
+assert.equal(mine.dailyLimitMin, 180);
+assert.equal(store.setDailyLimit(240), true);
+assert.equal(store.getState().dailyLimitMin, 240);
+assert.equal(store.setDailyLimit(0), false);
+assert.equal(store.getState().dailyLimitMin, 240, 'invalid limit leaves the saved limit intact');
 const optionFor = (id, start) => ({ id, kind: 'normal', summary: { zh: id, en: id }, short: [],
   stats: { finish: { date: mine.today, min: start + 60 }, tightest: { task: essay.id, buffer_min: 5000 }, max_daily_min: 60, latest_end: start + 60 },
   changes: [{ kind: 'add', task: essay.id, step: essay.steps[0].id, date: mine.today, start, end: start + 60, reason: { code: 'earliest_before_due', due: essay.due } }] });
@@ -113,6 +166,20 @@ const before = mine.blocks.length;
 store.inkProposal();
 assert.equal(mine.blocks.length, before + 1, 'confirming writes the chosen option into the study plan');
 assert.equal(store.ui.planOptions, null, 'and closes the options');
+assert.equal(mine.dailyLimitMin, 240, 'confirming a schedule does not silently change the normal limit');
+
+// One booked chunk must not hide a step with work remaining after this week.
+{
+  const { unplannedSteps } = await import('../dist/js/model.js');
+  const step = essay.steps[0];
+  const saved = [...mine.blocks];
+  mine.blocks = [{ id: 'chunk', task: essay.id, step: step.id, date: '2099-01-05', start: 600, end: 630, work_min: 15 }];
+  step.progress = 'doing'; step.remain = 60;
+  assert.equal(unplannedSteps(mine).find((x) => x.step.id === step.id).missing, 45, 'partial scheduled focus minutes are deducted, not the entire step');
+  mine.blocks[0].completed = true;
+  assert.equal(unplannedSteps(mine).find((x) => x.step.id === step.id).missing, 60, 'reported sessions do not deduct work again');
+  mine.blocks = saved; step.progress = 'todo'; delete step.remain;
+}
 // Changed your mind after confirming: with everything scheduled, the button plans again. Sessions not started yet are
 // given back to the planner, and the new option replaces them only when confirmed; past or running sessions stay.
 {
@@ -146,5 +213,57 @@ await store.requestPlans();
 assert.equal(store.ui.planOptions, null);
 assert.doesNotMatch(store.ui.planError, /連不上|cannot be reached/, 'no plans is not reported as a connection problem');
 assert.match(store.ui.planError, /空檔不夠|not enough free time/);
+
+// Calculated alternatives that still lack time are useful diagnostics, not confirmable schedules.
+globalThis.fetch = async () => Response.json({ ok: true, result: { capacity: { enough: false, missing_min: 60 }, skipped: [], plans: [], actions: [{ type: 'reduce_buffer', adopted_days: 1, feasible: false, missing_min: 15 }] } });
+await store.requestPlans();
+assert.equal(store.ui.planOptions.actions[0].missing_min, 15);
+assert.equal(pendingProposal(mine), null, 'a shortfall action never becomes an automatic proposal');
+store.editPlanTime();
+assert.equal(store.ui.editBusy, true, 'shortfall has an available-time editing route');
+assert.equal(store.ui.planOptions, null);
+
+globalThis.fetch = async () => Response.json({ ok: true, result: { capacity: { enough: false }, skipped: [], plans: [{ ...optionFor('not-ready', 1300), actionable: false, short: [{ task: essay.id, missing_min: 10 }] }] } });
+await store.requestPlans();
+store.choosePlan('not-ready');
+const blockCount = mine.blocks.length;
+store.inkProposal();
+assert.equal(pendingProposal(mine), null);
+assert.equal(mine.blocks.length, blockCount, 'unready candidate cannot write partial work as a valid plan');
+
+globalThis.fetch = async () => Response.json({ ok: true, result: { capacity: { enough: false }, skipped: [], plans: [{ ...optionFor('extra-time', 1300), tradeoff: { type: 'extra_time', daily_limit_min: 360 }, actionable: true }] } });
+await store.requestPlans();
+const normalCap = mine.dailyLimitMin;
+store.inkProposal();
+assert.equal(mine.dailyLimitMin, normalCap, 'confirming a temporary six-hour candidate does not silently raise the persisted daily cap');
+
+// A valid full-horizon forecast can contain no new sessions inside the seven-day confirmation window.
+const confirmedBeforeForecast = JSON.stringify(mine.blocks);
+globalThis.fetch = async () => Response.json({ ok: true, result: { capacity: { enough: true }, skipped: [], plans: [{ ...optionFor('future-only', 1300), changes: [], deferred: { work_min: 720, steps: 1 } }] } });
+await store.requestPlans();
+assert.equal(store.ui.planError, '', 'future-only work is not mislabeled as insufficient capacity');
+assert.equal(store.ui.planOptions.plans[0].deferred.work_min, 720, 'future forecast stays visible');
+assert.equal(pendingProposal(mine), null, 'no empty confirmation proposal is created');
+store.choosePlan('future-only'); store.inkProposal();
+assert.equal(pendingProposal(mine), null, 'selecting the forecast does not create zero-change work');
+assert.equal(JSON.stringify(mine.blocks), confirmedBeforeForecast, 'a forecast cannot remove or replace existing confirmed sessions');
+
+// Render the actual week view, including overtime dates (cardOf alone cannot catch missing view imports).
+{
+  const oldWindow = globalThis.window;
+  globalThis.window = { innerWidth: 1440 };
+  const { render } = await import('../dist/js/views/week.js');
+  store.ui.editBusy = false;
+  for (const type of ['extra_time', 'reduce_buffer_extra_time']) {
+    store.ui.planOptions = { capacity: { enough: false }, skipped: [], actions: [], plans: [{ ...optionFor(`ui-${type}`, 1300),
+      tradeoff: { type, adopted_days: 1, days: [{ date: '2099-01-09', total_min: 360 }] }, actionable: true }] };
+    const html = render(mine);
+    assert.match(html, /6 hours/, `${type} shows the computed overtime-day hours without breaking the view`);
+    assert.match(html, /usual daily limit/, `${type} explains that the normal cap does not change`);
+    if (type === 'reduce_buffer_extra_time') assert.match(html, /buffer to 1 day/, 'combined option also shows the shortened buffer in the actual week view');
+  }
+  store.ui.planOptions = null;
+  globalThis.window = oldWindow;
+}
 
 console.log('Passed: planning relay, workflow input, plan options as proposals and cards, asking for and confirming plans.');

@@ -41,6 +41,11 @@ export async function onRequestPost({ request, env, fetcher = fetch }) {
     if (finished.status !== 'succeeded') return fail(502, 'dify', finished.error || `Workflow ${finished.status}`);
     const out = unwrap(finished.outputs);
     if (!out?.valid || !out.data) return reply(200, { ok: false, reason: 'invalid', message: (out?.errors || []).join('; ') || 'The workflow did not return plans' });
+    // 新網站不能把舊 Workflow 的「不限每日工時」當作正常方案。
+    // 舊客戶端仍可使用舊合約；容量版須與同版本 Python 一起發布。
+    if (body.state.scheduling_policy === 'capacity-v1' && out.data.engine !== 'capacity-v1') {
+      return fail(503, 'workflow-update-required', 'The capacity-aware scheduling workflow has not been published yet');
+    }
     return reply(200, { ok: true, result: out.data });
   } catch (err) {
     return fail(502, 'dify', String(err?.message || err));

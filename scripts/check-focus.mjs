@@ -63,6 +63,24 @@ store.finishFocus('partial', 20);
 assert.deepEqual([step.progress, step.remain], ['doing', 20]);
 assert.deepEqual(s.actuals.at(-1), { task: task.id, step: step.id, kind: 'Quiz', min: 45, date: s.today }, '45 minutes of work (the break does not count)');
 assert.equal(s.focus, null);
+assert.equal(s.blocks[0].completed, true, 'reported work cannot be booked again against the updated remaining estimate');
+
+// A long step may have many shorter sessions; finishing one session keeps the rest live.
+{
+  step.progress = 'doing'; step.remain = 120;
+  const chunk = { id: 'split-session', task: task.id, step: step.id, date: s.today, start: 900, end: 970, work_min: 60 };
+  s.blocks.push(chunk);
+  store.startFocus({ block: chunk.id }, 0); store.stopFocus(50 * MIN);
+  store.finishFocus('session');
+  assert.deepEqual([step.progress, step.remain, chunk.completed], ['doing', 60, true], 'session completion deducts focused chunk only and keeps remaining work');
+  store.startFocus({ block: chunk.id }, 0);
+  assert.equal(s.focus, null, 'reported session cannot be credited a second time');
+  const next = { ...chunk, id: 'split-next', completed: false };
+  s.blocks.push(next);
+  store.startFocus({ block: next.id }, 0); store.stopFocus(10 * MIN);
+  store.finishFocus('done');
+  assert.deepEqual([step.progress, step.remain], ['done', undefined], 'student can explicitly report the entire step done');
+}
 
 // 8. A free timer (not from a session) records nothing.
 const before = s.actuals.length;
