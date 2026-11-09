@@ -17,6 +17,11 @@ export function stepOf(s, stepId) {
 }
 
 /** 專注分鐘與佔用時段分開；舊資料沒有 work_min 時沿用時段長度。 */
+/** 排程以半小時為單位；每日上限的預設值（分鐘）。 */
+export const PLAN_UNIT = 30;
+export const DAILY_LIMIT_DEFAULT = 180;
+export const dailyLimit = (s) => s.dailyLimitMin ?? DAILY_LIMIT_DEFAULT;
+
 export const workMinutes = (b) => b.work_min ?? Math.max(0, b.end - b.start);
 export const remainingMinutes = (step) => step.progress === 'done' || step.dropped ? 0 : step.progress === 'doing' && step.remain != null ? step.remain : step.min;
 export function bookedMinutes(s, step) {

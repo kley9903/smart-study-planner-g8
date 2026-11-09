@@ -4,7 +4,7 @@
 // 介面文字中英兩版：L('中文', 'English')。
 import { createDemoState, DEMO_TODAY } from './demo-data.js';
 import { HERO, heroChanges, heroMissing, CHECKIN, ESSAY, fallbackText, CHIPS, matchScenario } from './scenarios.js';
-import { blockOf, stepOf, taskOf, pendingProposal, unplannedSteps, remainingMinutes, workMinutes } from './model.js';
+import { blockOf, stepOf, taskOf, pendingProposal, unplannedSteps, remainingMinutes, workMinutes, PLAN_UNIT, DAILY_LIMIT_DEFAULT } from './model.js';
 import { md, span, dayShort, hoursText } from './time.js';
 import { recall, remember, esc } from './ui.js';
 import { L } from './i18n.js';
@@ -40,7 +40,7 @@ function clock() {
 function emptyMine() {
   return {
     mine: true, ...clock(), courses: {}, tasks: [], blocks: [], unavailable: [],
-    sleep: { start: 30, end: 510 }, sleepOverrides: [], dailyLimitMin: 180, history: [], docs: [],
+    sleep: { start: 30, end: 510 }, sleepOverrides: [], dailyLimitMin: DAILY_LIMIT_DEFAULT, history: [], docs: [],
     thread: [{ id: 'm-hello', who: 'ai', kind: 'hello' }],
     proposals: {}, proposal: null, flags: {},
   };
@@ -49,7 +49,12 @@ function emptyMine() {
 function loadMine() {
   try {
     const saved = JSON.parse(recall(MINE_KEY) || 'null');
-    if (saved?.mine) return { ...emptyMine(), ...saved, ...clock() };
+    if (saved?.mine) {
+      const s = { ...emptyMine(), ...saved, ...clock() };
+      // 舊版允許 15 分鐘一格；載入時向下取到半小時，最少半小時。
+      s.dailyLimitMin = Math.max(PLAN_UNIT, Math.floor((Number(s.dailyLimitMin) || DAILY_LIMIT_DEFAULT) / PLAN_UNIT) * PLAN_UNIT);
+      return s;
+    }
   } catch { /* 資料損壞就重新開始 */ }
   return emptyMine();
 }
@@ -571,7 +576,7 @@ export function setSleep(start, end) {
 
 /** 平日專注工時上限；臨時加時方案不會改這個值。 */
 export function setDailyLimit(minutes) {
-  if (!Number.isInteger(minutes) || minutes < 30 || minutes > 1440 || minutes % 30) {
+  if (!Number.isInteger(minutes) || minutes < PLAN_UNIT || minutes > 1440 || minutes % PLAN_UNIT) {
     emit({ toast: L('每日上限請填 0.5 至 24 小時，以半小時為單位。', 'Enter a daily limit from 0.5 to 24 hours, in half-hours.'), toastIcon: 'info', keepScroll: true });
     return false;
   }
@@ -1106,7 +1111,7 @@ async function chat(text) {
     const { reply, action, follow_up: follow } = out.result;
     const change = action && {
       busy: () => ({ kind: 'hatch', rule: { id: nid('u'), ...action.rule, label: action.rule.label || L('沒空', 'Busy'), src: 'me' } }),
-      progress: () => ({ kind: 'progress', step: action.step, progress: action.progress, ...(action.remain_min ? { remain: action.remain_min } : {}) }),
+      progress: () => ({ kind: 'progress', step: action.step, progress: action.progress }),
       fill: () => ({ kind: 'fill', doc: action.doc, item: action.item, field: action.field, value: action.value }),
     }[action.type]?.();
     let pid = null;
@@ -1168,7 +1173,7 @@ export function finishFocus(result) {
   }
   state.focus = null;
   const toast = result === 'done' ? L('記下了：這一步完成', 'Saved: this step is done')
-    : result === 'notdone' ? L('記下了：還沒做完，下次排程會重新安排', 'Saved: not finished; the next plan will reschedule it') : L('記下了進度', 'Progress saved');
+    : L('記下了進度', 'Progress saved');
   emit({ keepScroll: true, toast, toastIcon: 'check' });
 }
 export function pauseFocus(now = Date.now()) { if (state.focus) { pauseTimer(state.focus.timer, now); emit({ keepScroll: true }); } }

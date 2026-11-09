@@ -2,6 +2,7 @@
 // 時段全部由 Dify 的固定規則算好，這裡不再排；只轉格式和產生顯示文字（跟著目前的介面語言）。
 import { L, getLang } from './i18n.js';
 import { dayShort, hm, hoursText, diffDays } from './time.js';
+import { dailyLimit } from './model.js';
 
 export const HORIZON_DAYS = 7;
 const PROGRESS = { todo: 'todo', doing: 'partial', done: 'done' };
@@ -13,7 +14,7 @@ export function toState(s) {
     now: { date: s.today, min: s.now },
     horizon_days: HORIZON_DAYS,
     scheduling_policy: 'capacity-v1',
-    daily_limit_min: s.dailyLimitMin ?? 180,
+    daily_limit_min: dailyLimit(s),
     // 截止已過的不送：排程程式會因為排不進過去而整份回零個方案
     tasks: s.tasks.filter((t) => t.due.date > s.today || (t.due.date === s.today && t.due.min > s.now)).map((t) => ({
       id: t.id, title: t.title, kind: t.kind, due: { ...t.due }, weight_percent: pct(t.weight), difficulty: t.difficulty || 'mid',

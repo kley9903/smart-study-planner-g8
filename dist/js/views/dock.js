@@ -2,7 +2,7 @@
 import { icon, esc } from '../ui.js';
 import { ui, getMode } from '../store.js';
 import { pendingProposal, pendingCount, nextBlock, taskOf, stepOf } from '../model.js';
-import { renderMargin } from './margin.js';
+import { renderMargin, checkinButtons } from './margin.js';
 import { span, hm, dayShort, dayLabel } from '../time.js';
 import { L } from '../i18n.js';
 
@@ -39,8 +39,7 @@ export function bubbleFor(s) {
       id: `c:${h.id}`,
       html: `<p>${L(`${dayLabel(h.date)} ${span(h.start, h.end)} 的 <b>${esc(task.short)} ${esc(step.title)}</b> 做完了嗎？`, `Did you finish <b>${esc(task.short)} ${esc(step.title)}</b> (${dayShort(h.date)} ${span(h.start, h.end)})?`)}</p>
         <div class="dock__acts">
-          <button class="btn btn--sm btn--ink" type="button" data-action="checkin" data-result="done">${icon('check')} ${L('完成了', 'Done')}</button>
-          <button class="btn btn--sm btn--ghost" type="button" data-action="checkin" data-result="none">${L('沒有做', 'Did not do it')}</button>
+          ${checkinButtons()}
         </div>`,
     };
   }

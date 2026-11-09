@@ -5,7 +5,7 @@ import { renderPlanner } from '../planner.js';
 import { HERO } from '../scenarios.js';
 import {
   windowDates, nextBlock, pendingCount, pendingProposal,
-  taskOf, stepOf, inkOf, taskStats, courseOf, overlay, guideState, unplannedSteps,
+  taskOf, stepOf, inkOf, taskStats, courseOf, overlay, guideState, unplannedSteps, dailyLimit,
 } from '../model.js';
 import { cardOf } from '../plan-ai.js';
 import { md, span, hm, hShort, num, addDays, dayNum, dayShort, wd, wk, mdNum, isWeekend, diffDays, hoursText } from '../time.js';
@@ -338,7 +338,7 @@ function planStrip(s) {
       ${forecastOnly ? `<p class="plans__note" role="status">${hasWeekBlocks ? L('本週已有安排；後續工作只作試算，尚未確認。', 'This week is already scheduled; future work is a forecast and remains unconfirmed.') : L('本週沒有新增安排；後續工作只作試算，尚未確認。', 'No new sessions this week; future work is a forecast and remains unconfirmed.')}</p>` : ''}
       <ol class="plans__row">${opts.plans.map((p) => {
         const c = cardOf(p, s);
-        const extra = ['extra_time', 'reduce_buffer_extra_time'].includes(p.tradeoff?.type) ? (p.tradeoff.days || (p.daily_loads || []).filter((d) => d.total_min > (s.dailyLimitMin ?? 180))).map((d) => `${dayShort(d.date)} ${hoursText(d.total_min)}`).join(' · ') : '';
+        const extra = ['extra_time', 'reduce_buffer_extra_time'].includes(p.tradeoff?.type) ? (p.tradeoff.days || (p.daily_loads || []).filter((d) => d.total_min > dailyLimit(s))).map((d) => `${dayShort(d.date)} ${hoursText(d.total_min)}`).join(' · ') : '';
         return `<li><button class="plan-card ${c.id === current ? 'is-on' : ''} ${c.risky ? 'is-risky' : ''}" type="button" data-action="plan-pick" data-plan="${esc(c.id)}" aria-pressed="${c.id === current}" ${c.actionable ? '' : 'disabled'}>
           <span class="plan-card__title">${esc(c.title)}</span>
           <span class="plan-card__week" aria-hidden="true">${c.days.map((m) => `<i style="--h:${Math.round((m / max) * 100)}%"></i>`).join('')}</span>

@@ -151,7 +151,7 @@ function stepRow(s, t, step) {
       <div class="rstep__top">
         <span class="rstep__title" style="${step.dropped ? 'text-decoration:line-through;color:var(--ink-3)' : ''}">${esc(step.title)}</span>
         <span class="rstep__hours">${hoursText(step.min)}</span>
-        <span class="rstep__est">${est}${step.progress === 'doing' && step.remain ? L(` · 還差 ${hoursText(step.remain)}`, ` · ${hoursText(step.remain)} left`) : ''}</span>
+        <span class="rstep__est">${est}${step.progress === 'doing' && step.remain ? L(` · 餘下 ${hoursText(step.remain)}`, ` · ${hoursText(step.remain)} remains`) : ''}</span>
       </div>
       <div class="rstep__slots">${slots.join('') || `<span class="slot slot--later">${L('未排', 'Not scheduled')}</span>`}</div>
       <div class="rstep__progress">${seg}</div>

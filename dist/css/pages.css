@@ -738,6 +738,7 @@ body:not([data-route="start"]) .app-main { padding-bottom: 240px; }
 /* 歡迎頁 */
 .hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 64px; align-items: center; min-height: calc(100vh - var(--header-h) - 80px); padding: 20px 8px 40px; max-width: 1160px; margin-inline: auto; }
 .hero__title { font-size: clamp(40px, 5.2vw, 64px); line-height: 1.12; letter-spacing: 0.02em; text-wrap: balance; }
+.hero__title .nowrap { white-space: nowrap; }
 .hero__title .pencil-word { position: relative; color: #4d5361; }
 .hero__title .pencil-word::after { content: ""; position: absolute; left: 0; right: 0; bottom: -0.04em; height: 3px; background-image: linear-gradient(90deg, var(--graphite) 55%, transparent 55%); background-size: 12px 3px; }
 .hero__lede { font-size: 17.5px; color: var(--ink-2); line-height: 1.85; margin-top: 30px; max-width: 34em; text-wrap: pretty; }
