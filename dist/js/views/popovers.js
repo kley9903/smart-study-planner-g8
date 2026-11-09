@@ -58,7 +58,7 @@ export function blockPopover(s, blockId) {
         <div class="seg seg--sm" role="group" aria-label="${L('進度', 'Progress')}">
           ${[['todo', L('未開始', 'Not started')], ['doing', L('進行中', 'In progress')], ['done', L('已完成', 'Done')]].map(([k, t]) => `<button class="seg__opt" type="button" data-action="progress" data-step="${step.id}" data-p="${k}" aria-pressed="${step.progress === k}">${t}</button>`).join('')}
         </div>
-        <p class="muted" style="font-size:12.5px;margin-top:8px">${step.progress === 'doing' && step.remain ? L(`你回報還差 ${hoursText(step.remain)}。`, `You reported ${hoursText(step.remain)} left. `) : ''}</p>
+        <p class="muted" style="font-size:12.5px;margin-top:8px">${step.progress === 'doing' && step.remain ? L(`餘下 ${hoursText(step.remain)}`, `${hoursText(step.remain)} remains`) : ''}</p>
       </div>
       <div class="pop__actions"><a class="btn btn--sm" href="#/tasks/${task.id}">${icon('list')} ${L('在任務頁查看', 'Open in Tasks')}</a>${getMode() === 'mine' && !p ? `<button class="btn btn--sm btn--ghost" type="button" data-action="block-remove" data-block="${b.id}">${icon('trash')} ${L('移除', 'Remove')}</button>` : ''}</div>`;
   } else {

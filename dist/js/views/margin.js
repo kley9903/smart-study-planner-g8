@@ -8,6 +8,10 @@ import { span, dayShort, dayLabel, md, hm, hoursText } from '../time.js';
 import { L } from '../i18n.js';
 import { daysText } from '../syllabus-ai.js';
 
+/** 「做完了嗎？」的兩個答案；對話卡與底部提示共用。 */
+export const checkinButtons = () => `<button class="btn btn--sm btn--ink" type="button" data-action="checkin" data-result="done">${icon('check')} ${L('完成了', 'Done')}</button>
+        <button class="btn btn--sm btn--ghost" type="button" data-action="checkin" data-result="none">${L('沒有做', 'Did not do it')}</button>`;
+
 // 只讓「新」訊息有升上來的動畫；第一次打開頁面時已有的訊息不動。
 // 送出後畫面會馬上再畫一次（顯示「正在回覆」），所以記住每則訊息第一次出現的時間，
 // 動畫期間重畫時用負的 animation-delay 接著播，不會被打斷或重頭再來。
@@ -81,8 +85,7 @@ function checkinNote(s, n) {
   if (h.checkin === 'pending') {
     foot = `
       <div class="ccard__actions">
-        <button class="btn btn--sm btn--ink" type="button" data-action="checkin" data-result="done">${icon('check')} ${L('完成了', 'Done')}</button>
-        <button class="btn btn--sm btn--ghost" type="button" data-action="checkin" data-result="none">${L('沒有做', 'Did not do it')}</button>
+        ${checkinButtons()}
       </div>`;
   } else {
     foot = `<p class="ccard__done">${icon('check')} ${L('已回報：完成了', 'Reported: done')}</p>`;
@@ -180,7 +183,7 @@ function changeHtml(s, c, p) {
       if (c.rule.type === 'weekly') return `<li class="change"><span class="change__glyph change__glyph--hatch">${icon('pin')}</span><span><b>${L('新增每週沒空時間', 'New weekly busy time')}</b> ${daysText(c.rule.days)} ${span(c.rule.start, c.rule.end)} "${esc(c.rule.label)}"</span></li>`;
       return `<li class="change" ${target(c.rule.date, '')}><span class="change__glyph change__glyph--hatch">${icon('pin')}</span><span><b>${L('新增沒空時間', 'New busy time')}</b> ${dayShort(c.rule.date)} ${span(c.rule.start, c.rule.end)} "${esc(c.rule.label)}"<small>${L('只限這天', 'this day only')}${c.note ? `; ${c.note}` : ''}</small></span></li>`;
     case 'progress':
-      return `<li class="change"><span class="change__glyph">${icon('check')}</span><span><b>${c.progress === 'done' ? L('記下完成', 'Mark done') : L('記下進行中', 'Mark in progress')}</b> ${name(c.step)}${c.remain ? `<small>${L(`還差 ${hoursText(c.remain)}`, `${hoursText(c.remain)} left`)}</small>` : ''}</span></li>`;
+      return `<li class="change"><span class="change__glyph">${icon('check')}</span><span><b>${c.progress === 'done' ? L('記下完成', 'Mark done') : L('記下進行中', 'Mark in progress')}</b> ${name(c.step)}</span></li>`;
     case 'fill':
       return `<li class="change"><span class="change__glyph">${icon('pencil')}</span><span><b>${{ date: L('補截止日期', 'Add due date'), scope: L('補要做甚麼', 'Add what to do'), hours: L('補要多久', 'Add how long') }[c.field]}</b> ${esc(c.value)}</span></li>`;
     case 'move':

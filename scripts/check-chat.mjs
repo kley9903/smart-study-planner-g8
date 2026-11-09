@@ -100,7 +100,7 @@ assert.equal(reply.last.body.conversation, 'c-9', 'the conversation continues');
 p = pendingProposal(mine);
 assert.equal(p.changes[0].kind, 'progress');
 store.inkProposal();
-assert.deepEqual([essay.steps[0].progress, essay.steps[0].remain], ['doing', 40]);
+assert.deepEqual([essay.steps[0].progress, essay.steps[0].remain], ['doing', undefined], 'chat cannot record minutes left; the whole step is rescheduled');
 assert.ok(mine.thread.some((n) => (n.text || n.html || '').includes('其他部分呢？')), 'the follow-up question is shown');
 
 reply({ reply: '我幫你排，只排晚上。', action: { type: 'plan', request: 'only evenings' }, follow_up: null });

@@ -6,6 +6,7 @@ import { ui, getMode } from '../store.js';
 import { span, hm, dayShort, md, wdName, hoursText } from '../time.js';
 import { isMobile } from './week.js';
 import { L } from '../i18n.js';
+import { dailyLimit, PLAN_UNIT } from '../model.js';
 
 /** 放在時間表上方的一行說明 */
 export function busyHint() {
@@ -30,7 +31,7 @@ export function busySide(s) {
       ${getMode() === 'mine' ? `<section class="card side-card">
         <h3>${icon('clock')} ${L('每日專注上限', 'Daily focus limit')}</h3>
         <label class="field" for="daily-limit-hours"><span class="field__label">${L('小時／天', 'Hours per day')}</span>
-          <input class="input" id="daily-limit-hours" type="number" min="0.5" max="24" step="0.5" value="${(s.dailyLimitMin ?? 180) / 60}" aria-describedby="daily-limit-hint"></label>
+          <input class="input" id="daily-limit-hours" type="number" min="${PLAN_UNIT / 60}" max="24" step="${PLAN_UNIT / 60}" value="${dailyLimit(s) / 60}" aria-describedby="daily-limit-hint"></label>
         <p class="side-card__sub" id="daily-limit-hint">${L('所有功課合計的上限；實際空檔較少時，按空檔計算。休息不計入專注時數。', 'A combined limit for all tasks. Less availability means less study time. Breaks are excluded.')}</p>
         <button class="btn btn--sm" type="button" data-action="daily-limit-save">${L('保存上限', 'Save limit')}</button>
       </section>` : ''}

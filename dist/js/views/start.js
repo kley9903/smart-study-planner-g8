@@ -53,7 +53,7 @@ function welcome() {
   return `
     <section class="hero">
       <div class="hero__copy">
-        <h1 class="hero__title">${L('讀書計劃，<br>先用<span class="pencil-word">鉛筆起稿</span>。', 'Plan your study.<br>Draft it in <span style="white-space:nowrap"><span class="pencil-word">pencil</span> first.</span>')}</h1>
+        <h1 class="hero__title">${L('讀書計劃，<br>先用<span class="pencil-word">鉛筆起稿</span>。', 'Plan your study.<br>Draft it in <span class="nowrap"><span class="pencil-word">pencil</span> first.</span>')}</h1>
         <p class="hero__lede">${L('告訴它你的功課和 deadline，它幫你排好未來 7 日。<br>每個建議都要你確認才生效。', 'Tell it your assignments and deadlines, and it plans your next 7 days.<br>Every suggestion needs your confirmation.')}</p>
         <div class="hero__cta">
           <a class="btn btn--ink btn--lg" href="#/week" data-action="start-mine">${icon('play')} ${L('直接開始', 'Get started')}</a>
