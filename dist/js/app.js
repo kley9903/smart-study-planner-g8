@@ -2,7 +2,7 @@
 import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, checkinRemain, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
-  addRule, removeRule, setSleep, obRestart, obFinish,
+  addRule, removeRule, setSleep, setDailyLimit, editPlanTime, obRestart, obFinish,
   getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, editTaskBasics, addCourseTask, setTaskGroup, partsOf, editUndated, deleteUndated, removeBlock, clearSchedule, upcomingBlocks,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
@@ -429,6 +429,8 @@ const actions = {
   },
   'sleep-edit': (el) => { ui.sleepEdit = el.dataset.on === '1'; render(); },
   'sleep-save': () => setSleep(Number($('#sleep-start').value), Number($('#sleep-end').value)),
+  'daily-limit-save': () => setDailyLimit(Math.round(Number($('#daily-limit-hours').value) * 60)),
+  'plan-edit-time': () => { closePopover(); editPlanTime(); if (current.name !== 'week') location.hash = '#/week'; },
   'remove-rule': (el) => { closePopover(); removeRule(el.dataset.rule); },
   'block-remove': (el) => { closePopover(); removeBlock(el.dataset.block); },
   'clear-plan': () => {

@@ -8,7 +8,7 @@ import {
   taskOf, stepOf, inkOf, taskStats, courseOf, overlay, guideState, unplannedSteps,
 } from '../model.js';
 import { cardOf } from '../plan-ai.js';
-import { md, span, hm, hShort, num, addDays, dayNum, wd, wk, mdNum, isWeekend, diffDays, hoursText } from '../time.js';
+import { md, span, hm, hShort, num, addDays, dayNum, dayShort, wd, wk, mdNum, isWeekend, diffDays, hoursText } from '../time.js';
 import { HORIZON_DAYS, WINDOW_DAYS } from '../demo-data.js';
 import { L } from '../i18n.js';
 import { renderMonth } from './month.js';
@@ -307,29 +307,54 @@ function planStrip(s) {
   const opts = ui.planOptions;
   if (!opts) return '';
   const current = pendingProposal(s)?.option;
+  const chosen = opts.plans.find((p) => p.id === current);
+  const forecastOnly = opts.plans.length > 0 && opts.plans.every((p) => !p.changes?.length);
+  const hasWeekBlocks = s.blocks.some((b) => !b.completed && diffDays(s.today, b.date) >= 0 && diffDays(s.today, b.date) < 7);
   const skipped = opts.skipped?.length ? `<p class="plans__note">${icon('info')} ${L(`${opts.skipped.length} 項沒有截止日期，這次不排`, `${opts.skipped.length} without a due date, not planned this time`)}</p>` : '';
-  const short = opts.capacity && !opts.capacity.enough ? `<p class="plans__note is-alert">${icon('alert')} ${L('時間不夠：以下是取捨方案，每份寫明代價', 'Not enough time: these trade-off plans say what each one costs')}</p>` : '';
+  const problem = opts.capacity?.reason === 'confirmed_target_conflict'
+    ? L('已確認的時段超過提前完成目標，需要先重新安排。', 'Confirmed sessions extend past an early-completion target and need replanning.')
+    : opts.capacity?.reason === 'placement_failed'
+    ? L('每日總時數足夠，但目前的實際空檔放不下。請調整可用時段。', 'Daily hours are sufficient, but the work does not fit the actual free slots. Adjust your availability.')
+    : L('正常上限與緩衝下排不完：以下列出取捨及仍欠的時間。', 'The usual limit and buffer do not fit all work. Options and remaining gaps are shown below.');
+  const short = opts.capacity && !opts.capacity.enough ? `<p class="plans__note is-alert" role="status">${icon('alert')} ${problem}</p>` : '';
   const max = Math.max(60, ...opts.plans.flatMap((p) => cardOf(p, s).days));
+  const actions = (opts.actions || []).map((a) => {
+    const label = a.type === 'reduce_buffer_extra_time' ? L(`縮短緩衝至 ${a.adopted_days ?? 1} 天並臨時加時`, `Reduce buffer to ${a.adopted_days ?? 1} day and add study time`)
+      : a.type === 'reduce_buffer' ? L(`縮短緩衝至 ${a.adopted_days ?? 1} 天`, `Reduce buffer to ${a.adopted_days ?? 1} day`)
+      : a.type === 'extra_time' ? L('臨時增加每日工時', 'Temporarily add study time') : L('增加實際空檔', 'Add available time');
+    const outcome = a.feasible ? L('有可行方案，代價見上方方案。', 'A feasible option is shown above with its cost.')
+      : a.missing_min > 0 ? L(`仍欠 ${hoursText(a.missing_min)}，需要再騰出時間。`, `Still ${hoursText(a.missing_min)} short; more time is needed.`)
+      : L('目前仍無法排入，需要調整可用時間或已確認的安排。', 'Still cannot fit; adjust availability or confirmed sessions.');
+    return `<p class="plans__note ${!a.feasible ? 'is-alert' : ''}">${esc(label)}：${outcome}${['reduce_buffer', 'reduce_buffer_extra_time'].includes(a.type) ? L(' 留給突發情況的修改時間會減少。', ' Less time remains for unexpected changes.') : ''}</p>`;
+  }).join('');
   return `
     <section class="plans" aria-label="${L('排程方案', 'Plan options')}">
       <header class="plans__head">
-        <h2>${L(`${opts.plans.length} 個排法，選一個`, `${opts.plans.length} ways to plan, pick one`)}</h2>
+        <h2>${forecastOnly ? L('後續安排試算', 'Future schedule forecast') : opts.plans.length ? L(`${opts.plans.length} 個排法，選一個`, `${opts.plans.length} ways to plan, pick one`) : L('需要調整可用時間', 'More available time is needed')}</h2>
         <div class="plans__acts">
-          <button class="btn btn--sm btn--ink" type="button" data-action="ink" ${current ? '' : 'disabled'}>${icon('check')} ${L('用這個', 'Use this one')}</button>
+          <button class="btn btn--sm btn--ink" type="button" data-action="ink" ${chosen?.changes?.length && cardOf(chosen, s).actionable ? '' : 'disabled'}>${icon('check')} ${L('用這個', 'Use this one')}</button>
           <button class="btn btn--sm btn--ghost" type="button" data-action="plan-close">${L('不要', 'Discard')}</button>
         </div>
       </header>
       ${short}${skipped}
+      ${forecastOnly ? `<p class="plans__note" role="status">${hasWeekBlocks ? L('本週已有安排；後續工作只作試算，尚未確認。', 'This week is already scheduled; future work is a forecast and remains unconfirmed.') : L('本週沒有新增安排；後續工作只作試算，尚未確認。', 'No new sessions this week; future work is a forecast and remains unconfirmed.')}</p>` : ''}
       <ol class="plans__row">${opts.plans.map((p) => {
         const c = cardOf(p, s);
-        return `<li><button class="plan-card ${c.id === current ? 'is-on' : ''} ${c.risky ? 'is-risky' : ''}" type="button" data-action="plan-pick" data-plan="${esc(c.id)}" aria-pressed="${c.id === current}">
+        const extra = ['extra_time', 'reduce_buffer_extra_time'].includes(p.tradeoff?.type) ? (p.tradeoff.days || (p.daily_loads || []).filter((d) => d.total_min > (s.dailyLimitMin ?? 180))).map((d) => `${dayShort(d.date)} ${hoursText(d.total_min)}`).join(' · ') : '';
+        return `<li><button class="plan-card ${c.id === current ? 'is-on' : ''} ${c.risky ? 'is-risky' : ''}" type="button" data-action="plan-pick" data-plan="${esc(c.id)}" aria-pressed="${c.id === current}" ${c.actionable ? '' : 'disabled'}>
           <span class="plan-card__title">${esc(c.title)}</span>
           <span class="plan-card__week" aria-hidden="true">${c.days.map((m) => `<i style="--h:${Math.round((m / max) * 100)}%"></i>`).join('')}</span>
-          <span class="plan-card__line">${L('全部做完', 'All done')} <b>${esc(c.finish)}</b></span>
+          <span class="plan-card__line">${L('預計完成', 'Estimated finish')} <b>${esc(c.finish)}</b></span>
+          <span class="plan-card__line">${L('最忙一天', 'Busiest day')} <b>${esc(c.busiest)}</b></span>
+          ${c.deferred ? `<span class="plan-card__line">${L('下週以後：', 'After this week: ')}${esc(c.deferred)}${L('（後續試算，未確認）', ' (estimated, unconfirmed)')}</span>` : ''}
           ${c.tightest ? `<span class="plan-card__line plan-card__tight">${esc(c.tightest)}</span>` : ''}
           ${c.costsSleep ? `<span class="plan-card__line is-alert">${L('會少睡一些', 'Costs some sleep')}</span>` : ''}
+          ${c.consent ? `<span class="plan-card__line is-alert">${esc(c.consent)}</span>` : ''}
+          ${extra ? `<span class="plan-card__line is-alert">${esc(extra)}</span>` : ''}
           ${c.short.length ? `<span class="plan-card__line is-alert">${L('仍欠：', 'Still short: ')}${esc(c.short.join(', '))}</span>` : ''}
         </button></li>`;
       }).join('')}</ol>
+      <div role="status">${actions}</div>
+      ${opts.actions?.length || !opts.capacity?.enough ? `<button class="btn btn--sm" type="button" data-action="plan-edit-time">${icon('clock')} ${L('調整可用時間或每日上限', 'Edit available time or daily limit')}</button>` : ''}
     </section>`;
 }

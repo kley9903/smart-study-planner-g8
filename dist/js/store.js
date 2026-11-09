@@ -4,7 +4,7 @@
 // 介面文字中英兩版：L('中文', 'English')。
 import { createDemoState, DEMO_TODAY } from './demo-data.js';
 import { HERO, heroChanges, heroMissing, CHECKIN, ESSAY, fallbackText, CHIPS, matchScenario } from './scenarios.js';
-import { blockOf, stepOf, taskOf, pendingProposal, unplannedSteps } from './model.js';
+import { blockOf, stepOf, taskOf, pendingProposal, unplannedSteps, remainingMinutes, workMinutes } from './model.js';
 import { md, span, dayShort, hoursText } from './time.js';
 import { recall, remember, esc } from './ui.js';
 import { L } from './i18n.js';
@@ -40,7 +40,7 @@ function clock() {
 function emptyMine() {
   return {
     mine: true, ...clock(), courses: {}, tasks: [], blocks: [], unavailable: [],
-    sleep: { start: 30, end: 510 }, sleepOverrides: [], history: [], docs: [],
+    sleep: { start: 30, end: 510 }, sleepOverrides: [], dailyLimitMin: 180, history: [], docs: [],
     thread: [{ id: 'm-hello', who: 'ai', kind: 'hello' }],
     proposals: {}, proposal: null, flags: {},
   };
@@ -220,6 +220,10 @@ export function chooseOption(optId) {
 export function inkProposal() {
   const p = pendingProposal(state);
   if (!p) return;
+  if (p.kind === 'plan' && p.actionable === false) {
+    emit({ toast: L('這個方案仍欠時間，先增加可用時間再排程。', 'This option still needs more time. Update your availability and plan again.'), toastIcon: 'info' });
+    return;
+  }
   if (p.kind === 'hero' && !p.option) {
     emit({ toast: L('先選一個做法（不想改其他東西，可以選「先不處理」）', 'Pick an option first (choose "Leave it for now" if you want no other changes)'), toastIcon: 'info' });
     return;
@@ -387,7 +391,7 @@ export function removeBlock(id) {
 
 /** 還沒開始的讀書時段（今天稍後和之後的日子）。 */
 export function upcomingBlocks(s = state) {
-  return s.blocks.filter((b) => b.date > s.today || (b.date === s.today && b.start > s.now));
+  return s.blocks.filter((b) => !b.completed && (b.date > s.today || (b.date === s.today && b.start > s.now)));
 }
 
 /** 一鍵清空排程：拿走所有還沒開始的時段；已過去或進行中的保留，功課不動。回傳清走的段數。 */
@@ -592,6 +596,36 @@ export function setSleep(start, end) {
   state.sleep = { start, end };
   ui.sleepEdit = false;
   emit({ toast: mode === 'demo' ? L('已更新每晚的睡眠時間（示範版不會自動重排）', 'Sleep time updated (the demo does not reschedule)') : L('已更新每晚的睡眠時間', 'Sleep time updated'), keepScroll: true });
+}
+
+/** 平日專注工時上限；臨時加時方案不會改這個值。 */
+export function setDailyLimit(minutes) {
+  if (!Number.isInteger(minutes) || minutes < 15 || minutes > 1440) {
+    emit({ toast: L('每日上限請填 0.25 至 24 小時。', 'Enter a daily limit between 0.25 and 24 hours.'), toastIcon: 'info', keepScroll: true });
+    return false;
+  }
+  aiRequests.reset();
+  ui.planning = false;
+  ui.chatting = false;
+  const p = pendingProposal(state);
+  if (p?.kind === 'plan') { p.status = 'erased'; state.proposal = null; }
+  ui.planOptions = null;
+  ui.planError = '';
+  state.dailyLimitMin = minutes;
+  emit({ toast: L(`每日專注上限已設為 ${hoursText(minutes)}`, `Daily focus limit set to ${hoursText(minutes)}`), keepScroll: true });
+  return true;
+}
+
+/** 時間不足的候選通往可用時間設定，不把未完成的候選寫入計劃。 */
+export function editPlanTime() {
+  const p = pendingProposal(state);
+  if (p?.kind === 'plan') { p.status = 'erased'; state.proposal = null; }
+  ui.planOptions = null;
+  ui.planError = '';
+  ui.editBusy = true;
+  ui.calendarView = 'week';
+  ui.sleepEdit = false;
+  emit({ keepScroll: true });
 }
 
 /* ---------------- 我的計劃：功課與自動排程 ---------------- */
@@ -987,22 +1021,26 @@ export async function requestPlans(request = '') {
   // 全部都排好了還按：當作想重新選。還沒開始的時段交回去重排，確認新方案時才換掉；已過去或進行中的不動。
   const now = getState();
   const later = (b) => b.date > now.today || (b.date === now.today && b.start > now.now);
-  const released = unplannedSteps(now).length ? [] : now.blocks.filter((b) => later(b) && stepOf(now, b.step).step?.progress !== 'done');
+  const released = unplannedSteps(now).length ? [] : now.blocks.filter((b) => !b.completed && later(b) && stepOf(now, b.step).step?.progress !== 'done');
   const sent = toState({ ...now, blocks: now.blocks.filter((b) => !released.includes(b)) });
   return aiRequests.send('plan', { state: sent, request }, (out) => {
     ui.planning = false;
-    if (!out?.ok || !out.result?.plans?.length) {
+    if (!out?.ok || (!out.result?.plans?.length && !out.result?.actions?.length)) {
       // 有回應但一份方案都沒有：截止前的空檔不夠，不是連不上
       ui.planError = out?.ok
         ? L('截止前的空檔不夠，排不下還沒排的部分。可以按「清空排程」後再排一次，或改沒空的時間。', 'There is not enough free time before the deadlines for the unscheduled parts. Try "Clear schedule" and plan again, or edit your busy times.')
         : out?.reason === 'invalid'
         ? L('現在沒有可以排的功課：可能都已排好，或還缺截止日期。', 'Nothing to schedule right now: everything may already be planned, or due dates are missing.')
+        : out?.reason === 'workflow-update-required'
+        ? L('排程服務仍是舊版本，尚未支援每日上限與緩衝公式。更新服務後再試。', 'The scheduling service still uses the older rules. Update it to support daily limits and buffers, then try again.')
         : L('AI 暫時連不上，請稍後再試。', 'The AI cannot be reached right now. Please try again later.');
       emit({ keepScroll: true });
       return;
     }
     ui.planOptions = { ...out.result, released: released.map((b) => b.id) };
-    choosePlan(out.result.plans[0].id);
+    const first = out.result.plans.find((x) => x.actionable !== false && !(x.short || []).some((q) => q.missing_min > 0));
+    if (first) choosePlan(first.id);
+    else emit({ keepScroll: true });
   });
 }
 
@@ -1012,6 +1050,9 @@ export function choosePlan(id) {
   if (!plan) return;
   const old = pendingProposal(state);
   if (old?.kind === 'plan') { delete state.proposals[old.id]; state.proposal = null; }
+  if (plan.actionable === false || (plan.short || []).some((x) => x.missing_min > 0)) { emit({ keepScroll: true }); return; }
+  // 全部新增工作都在本週以後：保留試算卡片，不建立「0 項改動」的確認建議。
+  if (!plan.changes?.length) { emit({ keepScroll: true }); return; }
   const pid = nid('plan');
   const prop = proposalFrom(plan, state);
   // 重新排程：先列出會被換掉的舊時段（時間表上變成淡色），確認時才刪
@@ -1119,6 +1160,7 @@ async function chat(text) {
  */
 export function startFocus({ block = null } = {}, now = Date.now()) {
   const b = block ? state.blocks.find((x) => x.id === block) : null;
+  if (b?.completed) { emit({ toast: L('這段已回報完成，請選下一段。', 'This session has already been reported. Choose another session.'), toastIcon: 'info' }); return; }
   const found = b ? stepOf(state, b.step) : { task: null, step: null };
   state.focus = { timer: createTimer(rhythmOf(b?.rest), now), block: b?.id || null, task: found.task?.id || null, step: found.step?.id || null };
   if (found.step && found.step.progress !== 'done') found.step.progress = 'doing';
@@ -1142,8 +1184,15 @@ export function finishFocus(result, remain = null) {
   const { task, step } = stepOf(state, f.step);
   if (task && step) {
     if (f.worked > 0) (state.actuals ||= []).push({ task: task.id, step: step.id, kind: task.kind, min: f.worked, date: state.today });
+    const b = f.block ? blockOf(state, f.block) : null;
     if (result === 'done') { step.progress = 'done'; delete step.remain; }
-    else { step.progress = 'doing'; if (remain) step.remain = remain; }
+    else if (result === 'session' && b) {
+      const left = Math.max(0, remainingMinutes(step) - workMinutes(b));
+      step.progress = left ? 'doing' : 'done';
+      if (left) step.remain = left; else delete step.remain;
+    } else { step.progress = 'doing'; if (remain != null) step.remain = remain; }
+    // 已回報的時段保留在日曆及今日負荷，但不能再抵銷已更新的剩餘工時。
+    if (b) b.completed = true;
   }
   state.focus = null;
   emit({ keepScroll: true, toast: result === 'done' ? L('記下了：這一步完成', 'Saved: this step is done') : L('記下了進度', 'Progress saved'), toastIcon: 'check' });

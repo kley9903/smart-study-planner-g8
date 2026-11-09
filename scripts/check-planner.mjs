@@ -1,6 +1,13 @@
 // Regression checks for calendar boundaries and edits to a confirmed plan.
 import assert from 'node:assert/strict';
 const memory = new Map();
+// getState refreshes the clock; keep fixture deadlines in the future independently of the machine date.
+const NativeDate = Date;
+const fixtureNow = new NativeDate('2026-11-01T10:00:00').getTime();
+globalThis.Date = class extends NativeDate {
+  constructor(...args) { super(...(args.length ? args : [fixtureNow])); }
+  static now() { return fixtureNow; }
+};
 globalThis.localStorage = { getItem: (k) => memory.get(k) ?? null, setItem: (k, v) => memory.set(k, v) };
 const { monthDates, shiftMonth } = await import('../dist/js/views/month.js');
 const { enterMine, getState, addTask, updateTask, editTaskBasics, requestPlans, inkProposal, addTaskAttachment } = await import('../dist/js/store.js');

@@ -16,6 +16,14 @@ export function stepOf(s, stepId) {
   return { task: null, step: null };
 }
 
+/** 專注分鐘與佔用時段分開；舊資料沒有 work_min 時沿用時段長度。 */
+export const workMinutes = (b) => b.work_min ?? Math.max(0, b.end - b.start);
+export const remainingMinutes = (step) => step.progress === 'done' || step.dropped ? 0 : step.progress === 'doing' && step.remain != null ? step.remain : step.min;
+export function bookedMinutes(s, step) {
+  return s.blocks.filter((b) => b.step === step.id && !b.pencil && !b.completed && (b.date > s.today || (b.date === s.today && b.end > s.now)))
+    .reduce((sum, b) => sum + workMinutes(b), 0);
+}
+
 export function windowDates(s) {
   return Array.from({ length: WINDOW_DAYS }, (_, i) => addDays(s.today, i));
 }
@@ -112,8 +120,8 @@ export function taskStats(s, task) {
   const live = task.steps.filter((st) => !st.dropped);
   const planned = s.blocks
     .filter((b) => b.task === task.id && dates.has(b.date) && !b.pencil)
-    .filter((b) => stepOf(s, b.step).step?.progress !== 'done')
-    .reduce((a, b) => a + b.end - b.start, 0);
+    .filter((b) => !b.completed && stepOf(s, b.step).step?.progress !== 'done')
+    .reduce((a, b) => a + workMinutes(b), 0);
   const done = live.filter((st) => st.progress === 'done').reduce((a, st) => a + st.min, 0);
   const total = live.reduce((a, st) => a + st.min, 0);
   const later = live.filter((st) => st.progress !== 'done' && st.later).reduce((a, st) => a + st.min, 0);
@@ -126,18 +134,18 @@ export function stepState(s, step) {
   if (step.progress === 'done') return 'done';
   if (step.progress === 'doing') return 'doing';
   if (s.history.some((h) => h.step === step.id && h.checkin === 'pending')) return 'waiting';
-  if (s.blocks.some((b) => b.step === step.id && !b.pencil)) return 'planned';
+  if (bookedMinutes(s, step) >= remainingMinutes(step)) return 'planned';
   if (step.later) return 'later';
   return 'open';
 }
 
 export function plannedTotal(s) {
   const dates = new Set(windowDates(s));
-  return s.blocks.filter((b) => dates.has(b.date) && !b.pencil).reduce((a, b) => a + b.end - b.start, 0);
+  return s.blocks.filter((b) => dates.has(b.date) && !b.pencil).reduce((a, b) => a + workMinutes(b), 0);
 }
 
 export function nextBlock(s) {
-  const ink = s.blocks.filter((b) => !b.pencil);
+  const ink = s.blocks.filter((b) => !b.pencil && !b.completed);
   const today = ink.filter((b) => b.date === s.today && b.end > s.now).sort((a, b) => a.start - b.start);
   if (today.length) return today[0];
   return ink.filter((b) => b.date > s.today).sort((a, b) => (a.date === b.date ? a.start - b.start : a.date < b.date ? -1 : 1))[0] || null;
@@ -190,8 +198,8 @@ export function unplannedSteps(s) {
     if (task.due.date < s.today || (task.due.date === s.today && task.due.min <= s.now)) continue;
     for (const step of task.steps) {
       if (step.dropped || step.progress === 'done') continue;
-      const ahead = s.blocks.some((b) => b.step === step.id && (b.date > s.today || (b.date === s.today && b.end > s.now)));
-      if (!ahead) out.push({ task, step });
+      const missing = Math.max(0, remainingMinutes(step) - bookedMinutes(s, step));
+      if (missing > 0) out.push({ task, step, missing });
     }
   }
   return out;

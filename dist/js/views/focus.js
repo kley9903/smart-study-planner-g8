@@ -3,14 +3,14 @@
 import { esc, icon } from '../ui.js';
 import { L } from '../i18n.js';
 import { timeLeft } from '../focus.js';
-import { stepOf } from '../model.js';
+import { stepOf, remainingMinutes, workMinutes } from '../model.js';
 import { span, dayShort, hoursText } from '../time.js';
 
 export const clock = (ms) => { const s = Math.ceil(ms / 1000); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
 
 function upcoming(s) {
   return s.blocks
-    .filter((b) => b.date > s.today || (b.date === s.today && b.end > s.now))
+    .filter((b) => !b.completed && (b.date > s.today || (b.date === s.today && b.end > s.now)))
     .sort((a, b) => (a.date === b.date ? a.start - b.start : a.date < b.date ? -1 : 1))
     .slice(0, 3)
     .map((b) => ({ b, ...stepOf(s, b.step) }))
@@ -36,12 +36,15 @@ export const focusPage = {
     const { task, step } = f.step ? stepOf(s, f.step) : { task: null, step: null };
     const what = step ? `<p class="focus__what">${esc(task.short)} · ${esc(step.title)}</p>` : '';
     if (f.asking) {
+      const block = s.blocks.find((b) => b.id === f.block);
+      const split = block && step && workMinutes(block) < remainingMinutes(step);
       return `${head}
         <section class="sheet focus">
           ${what}
           <p class="focus__ask">${L(`專注了 ${hoursText(Math.max(1, f.worked))}。這一步做完了嗎？`, `You focused for ${hoursText(Math.max(1, f.worked))}. Is this step done?`)}</p>
           <div class="focus__acts">
-            <button class="btn btn--ink" type="button" data-action="focus-finish" data-result="done">${icon('check')} ${L('做完了', 'Done')}</button>
+            ${split ? `<button class="btn btn--ink" type="button" data-action="focus-finish" data-result="session">${icon('check')} ${L(`這段完成，餘下 ${hoursText(remainingMinutes(step) - workMinutes(block))}`, `Session done; ${hoursText(remainingMinutes(step) - workMinutes(block))} remains`)}</button>` : ''}
+            <button class="btn ${split ? '' : 'btn--ink'}" type="button" data-action="focus-finish" data-result="done">${icon('check')} ${L('整個步驟已完成', 'Whole step done')}</button>
             ${[15, 30, 60].map((m) => `<button class="btn" type="button" data-action="focus-finish" data-result="partial" data-remain="${m}">${L(`還差 ${hoursText(m)}`, `${hoursText(m)} left`)}</button>`).join('')}
           </div>
         </section>`;
