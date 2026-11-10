@@ -10,6 +10,7 @@ import { recall, remember, esc } from './ui.js';
 import { L } from './i18n.js';
 import { parseWhen, parseHours, typeLabel, typeHours } from './syllabus-ai.js';
 import { toState, proposalFrom } from './plan-ai.js';
+import { annotate, applyChanges } from './proposal.js';
 import { questionsFor, readDue } from './ask.js';
 import { toContext } from './chat-ai.js';
 import { createAiRequests } from './ai-requests.js';
@@ -119,19 +120,6 @@ export function refresh(info) { emit(info); }
 
 function note(n) { state.thread.push({ id: nid('m'), ...n }); }
 
-/** 記下每項改動原本的位置和時數，確認後仍可顯示「由哪裡移到哪裡」。 */
-function annotate(changes) {
-  return changes.map((c) => {
-    const out = { ...c };
-    if (typeof c.block === 'string') {
-      const b = blockOf(state, c.block);
-      if (b) out.from = { ...b };
-    }
-    if (c.kind === 'estimate') out.fromMin = stepOf(state, c.step).step.min;
-    return out;
-  });
-}
-
 const progressLabel = (p) => ({ todo: L('未開始', 'Not started'), doing: L('進行中', 'In progress'), done: L('已完成', 'Done') }[p]);
 
 /* ---------------- 共用檢查 ---------------- */
@@ -202,10 +190,10 @@ export function runScenario(id, said = false) {
   }
   const pid = nid(id);
   if (id === 'hero') {
-    state.proposals[pid] = { id: pid, kind: 'hero', status: 'pending', option: null, changes: annotate(heroChanges(null)), missing: heroMissing(null) };
+    state.proposals[pid] = { id: pid, kind: 'hero', status: 'pending', option: null, changes: annotate(state, heroChanges(null)), missing: heroMissing(null) };
     note({ who: 'ai', html: HERO.intro, proposal: pid });
   } else if (id === 'essay') {
-    state.proposals[pid] = { id: pid, kind: 'essay', status: 'pending', changes: annotate(ESSAY.changes) };
+    state.proposals[pid] = { id: pid, kind: 'essay', status: 'pending', changes: annotate(state, ESSAY.changes) };
     note({ who: 'ai', html: ESSAY.reply, proposal: pid });
   }
   state.proposal = pid;
@@ -217,7 +205,7 @@ export function chooseOption(optId) {
   const p = pendingProposal(state);
   if (!p || p.kind !== 'hero') return;
   p.option = optId;
-  p.changes = annotate(heroChanges(optId));
+  p.changes = annotate(state, heroChanges(optId));
   p.missing = heroMissing(optId);
   emit({ keepScroll: true });
 }
@@ -233,56 +221,7 @@ export function inkProposal() {
     emit({ toast: L('先選一個做法（不想改其他東西，可以選「先不處理」）', 'Pick an option first (choose "Leave it for now" if you want no other changes)'), toastIcon: 'info' });
     return;
   }
-  const inked = [];
-  for (const c of p.changes) {
-    if (c.kind === 'hatch') state.unavailable.push({ ...c.rule });
-    else if (c.kind === 'move') {
-      const b = blockOf(state, c.block);
-      Object.assign(b, c.to, { reason: c.reason || b.reason });
-      inked.push(b.id);
-    } else if (c.kind === 'split') {
-      const b = blockOf(state, c.block);
-      state.blocks = state.blocks.filter((x) => x !== b);
-      c.to.forEach((to, i) => {
-        const nb = { ...b, ...to, id: `${b.id}-${i + 1}`, reason: c.reason || b.reason };
-        state.blocks.push(nb);
-        inked.push(nb.id);
-      });
-    } else if (c.kind === 'remove') {
-      state.blocks = state.blocks.filter((x) => x.id !== c.block);
-      if (c.step) stepOf(state, c.step).step.dropped = true;
-    } else if (c.kind === 'defer') {
-      const b = blockOf(state, c.block);
-      state.blocks = state.blocks.filter((x) => x !== b);
-      const { step } = stepOf(state, b.step);
-      step.later = L(`已延到 ${md(c.toDate)}，具體時間下次排程確認`, `Moved to ${md(c.toDate)}; exact time set in the next planning round`);
-    } else if (c.kind === 'add') {
-      state.blocks.push({ ...c.block });
-      inked.push(c.block.id);
-    } else if (c.kind === 'sleep') {
-      state.sleepOverrides.push({ night: c.night, start: c.start });
-    } else if (c.kind === 'estimate') {
-      const { step } = stepOf(state, c.step);
-      step.min = c.min;
-      step.estNote = c.note;
-    } else if (c.kind === 'borrow') {
-      // 借用單次沒空時間的一部分：把那段切開，借出的時間變成可用
-      const r = state.unavailable.find((x) => x.id === c.rule);
-      if (r) {
-        state.unavailable = state.unavailable.filter((x) => x !== r);
-        if (r.start < c.start) state.unavailable.push({ ...r, id: `-a`, end: c.start });
-        if (c.end < r.end) state.unavailable.push({ ...r, id: `-b`, start: c.end });
-      }
-    } else if (c.kind === 'progress') {
-      const { step } = stepOf(state, c.step);
-      if (step) { step.progress = c.progress; if (c.progress === 'doing' && c.remain) step.remain = c.remain; else delete step.remain; }
-    } else if (c.kind === 'fill') {
-      fillItem(c.doc, c.item, c.field, c.value);
-    } else if (c.kind === 'drop') {
-      const task = state.tasks.find((t) => t.id === c.task);
-      task?.steps.forEach((st) => { if (st.progress !== 'done') st.dropped = true; });
-    }
-  }
+  const inked = applyChanges(state, p.changes, { fillItem });
   p.status = 'inked';
   ui.planOptions = null;
   state.proposal = null;

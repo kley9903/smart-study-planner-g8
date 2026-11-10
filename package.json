@@ -6,7 +6,7 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "start": "node serve.mjs",
-    "check": "node scripts/check.mjs && node scripts/check-planner.mjs && node scripts/check-modules.mjs && node scripts/check-plan.mjs && node scripts/check-ask.mjs && node scripts/check-chat.mjs && node scripts/check-focus.mjs && node scripts/check-canvas.mjs && node scripts/check-requests.mjs",
+    "check": "node scripts/check.mjs && node scripts/check-planner.mjs && node scripts/check-modules.mjs && node scripts/check-plan.mjs && node scripts/check-ask.mjs && node scripts/check-chat.mjs && node scripts/check-focus.mjs && node scripts/check-canvas.mjs && node scripts/check-requests.mjs && node scripts/check-proposal.mjs",
     "preview:cloud": "node scripts/start-preview.mjs"
   }
 }

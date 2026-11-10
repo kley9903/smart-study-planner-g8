@@ -71,6 +71,7 @@
 | `dist/js/syllabus-ai.js` | 自己的大綱 → `/api/syllabus` → 待核對的項目：一次放入的幾個檔案加文字由 `app.js` 逐份交給 `readSyllabus(file)`，`mergeFound` 合成一份（同名只留一項，有日期的優先）；`readSyllabus(file)`（貼上的文字存成 .txt，以文字送出；圖片由伺服器送到工作流程的 image 欄位，先逐字辨識再整理）、`toItems(Dify 結果)`、`rowText(項目)` 按目前語言產生顯示文字、`report(大綱)` 把要你核對的事按類別分組（日期未定、比重、要確認、其他；同一句只列一次並標出次數）；`readSyllabus` 的 `onStage` 收到 Dify 每一步的進度（伺服器以 NDJSON 逐行送出），畫面據此在檢查視窗（`views/import.js` 的 `aiModal`，後面模糊）逐項轉圈；結果到了由 `checklist(大綱)` 逐行揭曉找到／找不到，最後出報告；確認後由 `store.js` 變成任務或每週沒空時間 |
 | `dist/js/attachments.js` | 附件保存在本瀏覽器 IndexedDB；只有按「用 AI 找出項目」時，那一份大綱才會送到 `/api/syllabus`。存檔一律用 `keepFile(file, 上限 MB)`，大小上限在 `LIMIT_MB`（任務附件 10 MB、課程大綱 20 MB） |
 | `dist/js/model.js` | 從狀態推算每日畫面、空檔、課程／任務資料和 AI 建議疊加結果 |
+| `dist/js/proposal.js` | 建議裡的每一種「改動」（新增／移動／分段／不做／延後時段、新增沒空時間、遲睡、改預計時數、記進度、補資料）：確認時怎樣改資料、未確認時怎樣疊在時間表上、建議卡一行的內容、原時段的提示。新增一種改動只改這個檔，並在 `scripts/check-proposal.mjs` 加一個例子 |
 | `dist/js/plan-ai.js` | 排程方案：把網站資料轉成排程工作流程的輸入、把選中的方案變成待確認的建議、方塊上的文字；不自己排時段 |
 | `dist/js/planner.js` | 多頁共用的時間表繪製元件、時段和變動箭嘴 |
 | `dist/js/demo-data.js` | 虛構課程、功課、時間表和匯入結果，供示範使用 |

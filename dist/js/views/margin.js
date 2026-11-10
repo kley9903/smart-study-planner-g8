@@ -4,9 +4,9 @@ import { esc, icon } from '../ui.js';
 import { ui, availableChips, getMode } from '../store.js';
 import { HERO } from '../scenarios.js';
 import { taskOf, stepOf, inkOf } from '../model.js';
-import { span, dayShort, dayLabel, md, hm, hoursText } from '../time.js';
+import { span, dayShort, dayLabel } from '../time.js';
 import { L } from '../i18n.js';
-import { daysText } from '../syllabus-ai.js';
+import { describeChange } from '../proposal.js';
 
 /** 「做完了嗎？」的兩個答案；對話卡與底部提示共用。 */
 export const checkinButtons = () => `<button class="btn btn--sm btn--ink" type="button" data-action="checkin" data-result="done">${icon('check')} ${L('完成了', 'Done')}</button>
@@ -170,39 +170,13 @@ function decideCard(s, p) {
     </div>`;
 }
 
+/** 一項改動在建議卡上的一行；內容由 proposal.js 給，這裡只有版型。未確認時可以按，會跳到時間表上的位置。 */
 function changeHtml(s, c, p) {
-  const from = c.from;
-  const live = p.status === 'pending';
-  const target = (date, block, fromId = '') => (live ? `data-action="locate" data-date="${date}" data-block="${block}" data-from="${fromId}" data-target role="button" tabindex="0"` : '');
-  const name = (stepId) => {
-    const { task, step } = stepOf(s, stepId);
-    return task ? `${esc(task.short)} · ${esc(step.title)}` : '';
-  };
-  switch (c.kind) {
-    case 'hatch':
-      if (c.rule.type === 'weekly') return `<li class="change"><span class="change__glyph change__glyph--hatch">${icon('pin')}</span><span><b>${L('新增每週沒空時間', 'New weekly busy time')}</b> ${daysText(c.rule.days)} ${span(c.rule.start, c.rule.end)} "${esc(c.rule.label)}"</span></li>`;
-      return `<li class="change" ${target(c.rule.date, '')}><span class="change__glyph change__glyph--hatch">${icon('pin')}</span><span><b>${L('新增沒空時間', 'New busy time')}</b> ${dayShort(c.rule.date)} ${span(c.rule.start, c.rule.end)} "${esc(c.rule.label)}"<small>${L('只限這天', 'this day only')}${c.note ? `; ${c.note}` : ''}</small></span></li>`;
-    case 'progress':
-      return `<li class="change"><span class="change__glyph">${icon('check')}</span><span><b>${c.progress === 'done' ? L('記下完成', 'Mark done') : L('記下進行中', 'Mark in progress')}</b> ${name(c.step)}</span></li>`;
-    case 'fill':
-      return `<li class="change"><span class="change__glyph">${icon('pencil')}</span><span><b>${{ date: L('補截止日期', 'Add due date'), scope: L('補要做甚麼', 'Add what to do'), hours: L('補要多久', 'Add how long') }[c.field]}</b> ${esc(c.value)}</span></li>`;
-    case 'move':
-      return `<li class="change" ${target(c.to.date, `${c.block}~0`, c.block)}><span class="change__glyph">${icon('arrow')}</span><span><b>${L('移動', 'Move')}</b> ${name(from.step)}<small>${dayShort(from.date)} ${hm(from.start)} → ${dayShort(c.to.date)} ${span(c.to.start, c.to.end)}${c.short ? L(`（只放得下 ${hoursText(c.to.end - c.to.start)}）`, ` (only ${hoursText(c.to.end - c.to.start)} fits)`) : ''}</small></span></li>`;
-    case 'split':
-      return `<li class="change" ${target(c.to[0].date, `${c.block}~0`, c.block)}><span class="change__glyph">${icon('scissors')}</span><span><b>${L('分兩段做', 'Split in two')}</b> ${name(from.step)}<small>${c.to.map((t) => `${dayShort(t.date)} ${span(t.start, t.end)}`).join(L('、', ', '))}</small></span></li>`;
-    case 'remove':
-      return `<li class="change" ${target(from.date, c.block)}><span class="change__glyph change__glyph--remove">${icon('minus')}</span><span><b>${L('不做', 'Skip')}</b> ${name(from.step)}<small>${esc(c.reason)}</small></span></li>`;
-    case 'defer':
-      return `<li class="change" ${target(from.date, c.block)}><span class="change__glyph">${icon('arrow')}</span><span><b>${L('移出這 7 日', 'Move out of these 7 days')}</b> ${name(from.step)}<small>${dayShort(from.date)} ${hm(from.start)} → ${md(c.toDate)}${L('（下次排程再定時間）', ' (time set in the next round)')}</small></span></li>`;
-    case 'add':
-      return `<li class="change" ${target(c.block.date, c.block.id)}><span class="change__glyph">${icon('plus')}</span><span><b>${L('新增', 'Add')}</b> ${name(c.block.step)}<small>${dayShort(c.block.date)} ${span(c.block.start, c.block.end)}</small></span></li>`;
-    case 'sleep':
-      return `<li class="change" ${target(c.night, '')}><span class="change__glyph change__glyph--sleep">${icon('moon')}</span><span><b>${L('今晚遲睡', 'Later bedtime tonight')}</b> ${L(`${md(c.night)}晚上`, `${md(c.night)}, night:`)} ${hm(s.sleep.start)} → ${hm(c.start)}<small>${L('只限今晚；每晚的睡眠設定不變', 'tonight only; your usual sleep time stays the same')}</small></span></li>`;
-    case 'estimate':
-      return `<li class="change"><span class="change__glyph change__glyph--est">${icon('clock')}</span><span><b>${L('改預計時數', 'New estimate')}</b> ${name(c.step)}<small>${hoursText(c.fromMin)} → ${hoursText(c.min)} (${esc(c.note)})</small></span></li>`;
-    default:
-      return '';
-  }
+  const d = describeChange(s, c);
+  if (!d) return '';
+  const t = p.status === 'pending' && d.target;
+  const target = t ? ` data-action="locate" data-date="${t.date}" data-block="${t.block}" data-from="${t.from || ''}" data-target role="button" tabindex="0"` : '';
+  return `<li class="change"${target}><span class="change__glyph${d.tone ? ` change__glyph--${d.tone}` : ''}">${icon(d.icon)}</span><span><b>${esc(d.title)}</b> ${esc(d.text)}${d.detail ? `<small>${esc(d.detail)}</small>` : ''}</span></li>`;
 }
 
 /* ---------- 輸入框 ---------- */

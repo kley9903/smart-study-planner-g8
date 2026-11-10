@@ -2,6 +2,7 @@
 // 全部只由資料算出 HTML，不碰 DOM；app.js 負責在按到的元素旁邊打開（openPopover）。
 import { timeField, dateField } from '../pickers.js';
 import { L } from '../i18n.js';
+import { changeHint } from '../proposal.js';
 import { getMode } from '../store.js';
 import { esc, icon } from '../ui.js';
 import { blockOf, stepOf, taskOf, overlay, pendingProposal, courseOf, inkOf } from '../model.js';
@@ -16,15 +17,8 @@ function findBlock(s, id) {
 }
 
 function ghostText(b, p) {
-  const c = p?.changes.find((x) => x.block === b.id);
-  if (!c) return L('AI 建議改動這一段。', 'The AI suggests changing this session.');
-  if (c.kind === 'move') return L(`AI 建議移到 ${dayShort(c.to.date)} ${span(c.to.start, c.to.end)}。`, `The AI suggests moving it to ${dayShort(c.to.date)} ${span(c.to.start, c.to.end)}.`);
-  if (c.kind === 'split') {
-    const parts = c.to.map((t) => `${dayShort(t.date)} ${span(t.start, t.end)}`);
-    return L(`AI 建議分兩段：${parts.join('、')}。`, `The AI suggests two sessions: ${parts.join(', ')}.`);
-  }
-  if (c.kind === 'remove') return L('AI 建議不做這一段（簡化）。', 'The AI suggests skipping this (simplified).');
-  if (c.kind === 'defer') return L(`AI 建議移到 ${md(c.toDate)}，具體時間下次排程再定。`, `The AI suggests moving it to ${md(c.toDate)}; the exact time is set in the next round.`);
+  const hint = changeHint(p?.changes.find((x) => x.block === b.id));
+  if (hint) return hint;
   return L('AI 建議改動這一段。', 'The AI suggests changing this session.');
 }
 

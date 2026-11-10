@@ -41,8 +41,6 @@ function reasonText(c, s) {
   if (['capacity_balanced', 'capacity_leveling', 'balanced_before_target'].includes(r.code)) return L('按每日可用時間分攤，並保留提前完成的緩衝。', 'Spread within your daily availability, keeping an early-completion buffer.');
   if (r.code === 'late_sleep') return L(`遲 ${r.minutes} 分鐘睡，會少睡一些。`, `Sleep ${r.minutes} minutes later; this costs sleep.`);
   if (r.code === 'simplify') return L(`簡化：由 ${hoursText(r.from)} 減到 ${hoursText(c.min)}。`, `Simplified: from ${hoursText(r.from)} to ${hoursText(c.min)}.`);
-  if (r.code === 'borrow') return L(`借用「${r.label || '沒空的時間'}」的一部分。`, `Borrows part of "${r.label || 'busy time'}".`);
-  if (r.code === 'drop') return L(`放棄這一項（比重 ${r.weight_percent}%）。`, `Drops this task (${r.weight_percent}% of the grade).`);
   return '';
 }
 
@@ -56,8 +54,6 @@ export function proposalFrom(plan, s) {
       ...(c.work_min != null ? { work_min: c.work_min } : {}), reason, rest: plan.knobs?.rest ?? null } });
     else if (c.kind === 'sleep') changes.push({ kind: 'sleep', night: c.night, start: c.start, reason });
     else if (c.kind === 'estimate') changes.push({ kind: 'estimate', step: c.step, min: c.min, note: reason, reason });
-    else if (c.kind === 'borrow') changes.push({ kind: 'borrow', rule: c.unavailable, date: c.date, start: c.start, end: c.end, reason });
-    else if (c.kind === 'drop') changes.push({ kind: 'drop', task: c.task, reason });
   });
   return { kind: 'plan', option: plan.id, actionable: plan.actionable !== false && !(plan.short || []).some((x) => x.missing_min > 0), tradeoff: plan.tradeoff || null, changes };
 }
