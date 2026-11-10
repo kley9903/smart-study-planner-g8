@@ -3,7 +3,7 @@ import {
   getState, subscribe, ui, ob, resetDemo, say, runScenario, chooseOption, inkProposal, eraseProposal,
   checkin, setProgress, adjustStep, confirmEstimate, setItemState, inkAllItems, saveItem,
   addRule, removeRule, setSleep, setDailyLimit, editPlanTime, obRestart, obFinish,
-  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, editTaskBasics, addCourseTask, setTaskGroup, partsOf, editUndated, deleteUndated, removeBlock, clearSchedule, upcomingBlocks,
+  getMode, enterMine, enterDemo, addTask, deleteTask, requestPlans, choosePlan, startAsk, answerAsk, skipAsk, closeAsk, startFocus, stopFocus, finishFocus, pauseFocus, resumeFocus, tickFocus, relang, updateTask, addTaskAttachment, addOwnDoc, removeOwnDoc, setOwnItems, addCanvasDocs, setDocCourse, deleteCourse, renameCourse, createCourse, editTaskBasics, addCourseTask, setTaskGroup, partsOf, editUndated, deleteUndated, removeBlock, clearSchedule, upcomingBlocks,
 } from './store.js';
 import { readSyllabus, toItems, mergeFound, checklist, AI_MAX_MB, AI_IMAGE_MAX_MB } from './syllabus-ai.js';
 import { readIcs, canvasFound, ICS_MAX_MB } from './canvas.js';
@@ -537,7 +537,14 @@ const actions = {
     ui.newRow = null;
     if (twice) startRename(id); else render();
   },
-  'course-add': () => { ui.addCourse = null; ui.docId = null; location.hash = '#/import/add'; },
+  'course-add': () => {
+    ui.newCourse = true;
+    ui.renameCourse = null;
+    render();
+    document.querySelector('.course__rename--new input[name="name"]')?.focus();
+  },
+  'course-add-cancel': () => { ui.newCourse = false; render(); },
+  'course-add-file': () => { ui.newCourse = false; ui.addCourse = null; ui.docId = null; location.hash = '#/import/add'; },
   'course-more': (el) => { ui.addCourse = el.dataset.course; ui.docId = null; location.hash = '#/import/add'; },
   'course-continue': (el) => { ui.addCourse = null; ui.docId = el.dataset.doc; },
   'course-rename': (el) => startRename(el.dataset.course),
@@ -850,6 +857,7 @@ document.addEventListener('keydown', (e) => {
     else if (ui.aiModal) actions['ai-modal-close']();
     else if (ui.dockOpen) toggleDock(false);
     else if (ui.renameCourse) actions['course-rename-cancel']();
+    else if (ui.newCourse) actions['course-add-cancel']();
     else if (ui.editRow) actions['course-row-cancel']();
     else if (ui.newRow) actions['course-row-new-cancel']();
   }
@@ -912,6 +920,12 @@ document.addEventListener('submit', (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
     renameCourse(e.target.dataset.course, String(f.get('name')), String(f.get('title')));
+    return;
+  }
+  if (e.target.matches('[data-form="course-create"]')) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    if (createCourse(String(f.get('name')), String(f.get('title')))) document.querySelector('.crow-edit--new input[name="title"]')?.focus();
     return;
   }
   if (e.target.matches('[data-form="course-new"]')) {

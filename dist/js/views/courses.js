@@ -9,6 +9,7 @@
 // 7 天內到期用朱紅標出，已過的變淡。
 // 每項右邊一枝小鉛筆和一個垃圾桶：鉛筆原地改名稱、截止日期時間、比重（rowForm，只用 ✓ ✕ 符號按鈕）；垃圾桶確認後刪除；改名時卡頭原地變輸入格，字型跟平時一樣（renameForm）。
 // 卡底「新增一項」：原地多一行輸入格，自己加功課、測驗或考試（newForm）。
+// 「增加科目」：原地打代號和全名直接開一科（createForm），或按「放入大綱」去收集資料頁。
 import { timeField, dateField } from '../pickers.js';
 import { esc, icon } from '../ui.js';
 import { ui, undatedOf } from '../store.js';
@@ -54,10 +55,10 @@ export function coursesPage(s) {
     ${waiting ? `<a class="course-pending" href="#/import/add" data-action="course-continue" data-doc="${firstWaiting.id}">${icon('pencil')} ${L(`還有 ${waiting} 項等你確認`, `${waiting} item${waiting === 1 ? '' : 's'} waiting for you to confirm`)} ${icon('arrow')}</a>` : ''}
     <div class="courses">
       ${courses.map((c) => courseCard(s, c)).join('')}
-      <button class="course-add ${courses.length ? '' : 'is-first'}" type="button" data-action="course-add">
+      ${ui.newCourse ? createForm() : `<button class="course-add ${courses.length ? '' : 'is-first'}" type="button" data-action="course-add">
         <span class="course-add__plus">${icon('plus')}</span>
         <b>${L('增加科目', 'Add a course')}</b>
-      </button>
+      </button>`}
     </div>`;
 }
 
@@ -116,6 +117,27 @@ function renameForm(c) {
           <button class="course__cancel" type="button" data-action="course-rename-cancel">${L('取消', 'Cancel')}</button>
         </div>
       </form>`;
+}
+
+/**
+ * 增加科目：虛線卡原地變成跟改名一樣的輸入格（代號、全名），「建立」直接開一科；
+ * 「放入大綱」走原本的路，去收集資料頁交給 AI 讀。Enter 建立，Esc 取消。
+ */
+function createForm() {
+  return `
+      <section class="course is-new">
+        <form class="course__rename course__rename--new" data-form="course-create">
+          <div class="course__rename-fields">
+            <label class="course__rename-code"><span class="sr-only">${L('代號', 'Code')}</span><input name="name" maxlength="40" required placeholder="${L('例如 COMP1023', 'e.g. COMP1023')}" autocomplete="off"></label>
+            <label class="course__rename-name"><span class="sr-only">${L('全名', 'Full name')}</span><input name="title" maxlength="80" placeholder="${L('全名（可以留空）', 'Full name (optional)')}" autocomplete="off"></label>
+          </div>
+          <div class="course__rename-actions">
+            <button class="course__save" type="submit">${icon('check')} ${L('建立', 'Create')}</button>
+            <button class="course__cancel" type="button" data-action="course-add-file">${icon('upload')} ${L('放入大綱', 'Use a syllabus')}</button>
+            <button class="course__cancel is-icon" type="button" data-action="course-add-cancel" aria-label="${L('取消', 'Cancel')}">${icon('x')}</button>
+          </div>
+        </form>
+      </section>`;
 }
 
 /** 卡上直接改一項：名稱｜日期｜時間｜比重，原地換成輸入格。Enter 保存，Esc 取消。 */
