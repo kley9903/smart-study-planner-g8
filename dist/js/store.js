@@ -93,7 +93,7 @@ function freshUi() {
   return {
     hlTask: null, showGaps: false, day: DEMO_TODAY, docId: 'stat', taskId: 'ps4',
     editBusy: false, dockOpen: false, dockDismissed: [], hlRule: null, justInked: [], arrowFor: null,
-    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, renameCourse: null, editRow: null, newRow: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
+    draft: '', editItem: null, docReading: null, readStage: null, aiModal: null, openCourse: null, renameCourse: null, newCourse: false, editRow: null, newRow: null, addCourse: null, syllabusDraft: '', basket: [], readPart: null, sleepEdit: false, dropMsg: '', guideOpen: false,
     calendarView: 'week', month: null, monthDay: null, taskForm: false, editTask: null, taskDate: '', rulesOpen: {},
     planning: false, planOptions: null, planError: '', ask: null, chatting: false,
   };
@@ -875,6 +875,26 @@ export function renameCourse(id, name, title = '') {
   });
   ui.renameCourse = null;
   emit({ toast: L(`已改名為「${label}」`, `Renamed to ${label}`), keepScroll: true });
+  return true;
+}
+
+/**
+ * 自己手動開一科（不用放大綱）：代號必填、不能跟現有的科目一樣；全名可以留空。
+ * 開好後這科的卡展開、卡底「新增一項」原地打開，方便直接加功課。回傳是否成功。
+ */
+export function createCourse(name, title = '') {
+  const label = String(name || '').trim();
+  if (!label) { emit({ toast: L('科目代號不能留空', 'Enter a course code'), toastIcon: 'alert', keepScroll: true }); return false; }
+  if (Object.values(state.courses).some((c) => c.name === label)) {
+    emit({ toast: L(`已經有一科叫「${label}」`, `There is already a course called ${label}`), toastIcon: 'alert', keepScroll: true });
+    return false;
+  }
+  const id = courseFor(label, String(title || '').trim());
+  ui.newCourse = false;
+  ui.openCourse = id;
+  ui.newRow = id;
+  ui.editRow = null;
+  emit({ toast: L(`已增加「${label}」`, `Added ${label}`), keepScroll: true });
   return true;
 }
 
