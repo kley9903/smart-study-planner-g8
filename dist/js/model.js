@@ -2,6 +2,7 @@
 import { addDays, weekday, diffDays } from './time.js';
 import { WINDOW_DAYS, HORIZON_DAYS } from './demo-data.js';
 import { L } from './i18n.js';
+import { overlayChanges } from './proposal.js';
 
 export const taskOf = (s, id) => s.tasks.find((t) => t.id === id);
 export const blockOf = (s, id) => s.blocks.find((b) => b.id === id);
@@ -40,24 +41,8 @@ export function pendingProposal(s) {
 
 /** 把未確認的 AI 建議疊到畫面上：哪些時段會移走、哪些是新建議的時段。 */
 export function overlay(s) {
-  const o = { rules: [], ghosts: new Map(), adds: [], sleep: [], defers: [] };
   const p = pendingProposal(s);
-  if (!p) return o;
-  for (const c of p.changes) {
-    const b = c.block && typeof c.block === 'string' ? blockOf(s, c.block) : null;
-    if (c.kind === 'hatch') o.rules.push({ ...c.rule, pencil: true });
-    else if (c.kind === 'move' && b) {
-      o.ghosts.set(b.id, 'move');
-      o.adds.push({ ...b, ...c.to, id: `${b.id}~0`, from: b.id, reason: c.reason || b.reason, pencil: true });
-    } else if (c.kind === 'split' && b) {
-      o.ghosts.set(b.id, 'move');
-      c.to.forEach((to, i) => o.adds.push({ ...b, ...to, id: `${b.id}~${i}`, from: b.id, reason: c.reason || b.reason, pencil: true }));
-    } else if (c.kind === 'remove' && b) o.ghosts.set(b.id, c.replaced ? 'move' : 'remove'); // 重新排程換走的，顯示「移走」不是「不做」
-    else if (c.kind === 'defer' && b) { o.ghosts.set(b.id, 'defer'); o.defers.push(c); }
-    else if (c.kind === 'add') o.adds.push({ ...c.block, pencil: true });
-    else if (c.kind === 'sleep') o.sleep.push({ night: c.night, start: c.start });
-  }
-  return o;
+  return overlayChanges(s, p ? p.changes : []);
 }
 
 /** 某一晚幾點睡（以該晚日期計，過了午夜即 1440 以上）。 */
